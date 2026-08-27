@@ -1,83 +1,70 @@
-# ChallanSakshi demo script — 1:50 target
+# ChallanSakshi demo script — 1:55 target
 
-Use **Case A — Clear vehicle mismatch** and the precomputed analysis during the official recording. The first minute is the citizen journey; the second explains what was built and why.
+The official recording should solve one problem: **does the challan evidence match the citizen’s vehicle, and if the contest is rejected, does the supplied order address the evidence they submitted?**
 
-## 0:00–0:07 · Human problem
+Use **Case A — Clear vehicle mismatch** and the precomputed analysis. Record edited cuts rather than performing thirteen confirmations live. Pre-stage three browser states: the finding, the reviewed Order-to-Evidence map, and the final Order Review Note.
 
-**Screen:** Landing page with the scooter/motorcycle comparison visible.
+## Minute one — the citizen journey
 
-> “Asha received a helmet challan, but its photograph appears to show a different vehicle. She needs to understand the evidence before time runs out.”
+### 0:00–0:10 · The accusation
 
-**Click:** `Try the demo challan`.
+**Screen:** Landing comparison, then Case A evidence.
 
-## 0:07–0:15 · Supplied evidence
+> “Asha owns a blue scooter ending 3317. Her fictional helmet challan shows what appears to be a white motorcycle ending 3817.”
 
-**Screen:** Evidence intake with Case A selected.
+### 0:10–0:25 · Evidence before action
 
-> “ChallanSakshi places the fictional challan, vehicle record, and current vehicle photograph side by side. No real documents are accepted.”
+**Cut to:** Confirmed facts and the mismatch finding.
 
-**Click:** `Analyse the evidence`.
+> “ChallanSakshi reads the supplied records, but Asha must verify every observation. Only then do deterministic rules report a possible mismatch and the indicative contest clock—never innocence or illegality.”
 
-## 0:15–0:26 · Human verification
+### 0:25–0:38 · One frozen submission trail
 
-**Screen:** Source-linked facts and visibility controls.
+**Cut to:** Pack and compact case ledger.
 
-> “It reads the visible plate, category, colour, and offence context. Asha can correct comparison observations, while source identifiers stay locked. Nothing becomes a finding until she confirms it.”
+> “The factual pack indexes sources A1 to A5 and receives a stable local revision ID. The ledger keeps analysis, citizen review, rules, and the simulated authority distinct.”
 
-**Click:** Check `I reviewed these extracted facts…`, then `See the evidence finding`.
+### 0:38–0:53 · What did the order address?
 
-## 0:26–0:39 · Hero mismatch
+**Cut to:** Pre-reviewed P1–P6 map; briefly highlight the summary and one paragraph jump.
 
-**Screen:** Possible vehicle mismatch; pause on the side-by-side comparison.
+> “After a fictional rejection, the same revision is compared against the supplied six-paragraph order: one point is explicit, three references are unclear, and two are not found in this text. ‘Not found’ never means ignored or invalid.”
 
-> “The record says blue scooter ending `3317`; the image appears to show a white motorcycle ending `3817`. It says ‘possible mismatch’—never ‘illegal’ or ‘innocent’. Rules show Day 8 of the indicative 45-day window.”
+### 0:53–1:00 · Useful, bounded output
 
-**Click:** `Evidence readiness`.
+**Cut to:** Final Order Review Note.
 
-## 0:39–0:48 · Readiness
+> “Asha gets a cited review note, a neutral clarification request, and one consistent post-order clock—not a legal conclusion or filing.”
 
-**Screen:** Evidence-readiness checklist.
+## Minute two — how and why it was built
 
-> “The checklist separates citizen records, authority-held evidence, and optional support. Missing or unclear evidence is never invented.”
+### 1:00–1:17 · AI has a narrow job
 
-**Click:** `Prepare my contest pack`.
+**Screen:** Source-linked observations and evidence references.
 
-## 0:48–0:56 · Pack and outcome
+> “OpenAI handles the unstructured part: visual observations, OCR, and uncertainty. It receives only bundled synthetic fixtures, uses structured output, stores nothing, and falls back to typed demo data.”
 
-**Screen:** Indexed pack, then tracking.
+### 1:17–1:35 · Rules own consequential state
 
-> “The pack uses only confirmed facts and keeps every source indexed.”
+**Screen:** Architecture diagram in the README or a quick code-to-UI split.
 
-**Click sequence:** `Proceed to simulated submission` → `Move demo case forward` → `Quashed with reasons`.
+> “Pure TypeScript owns dates, mismatch classification, readiness, allowed states, revision linkage, citation validity, and artifact gates. Editing evidence invalidates downstream actions; changing document scope forces every map row to be checked again.”
 
-## 0:56–1:00 · Close the citizen story
+### 1:35–1:49 · Trust is the product choice
 
-> “The submission and outcome are clearly fictional, but the complete evidence trail works.”
+**Screen:** Case C refusal, then the Order Review limitation.
 
-## 1:00–1:18 · Build decision: AI and rules
+> “The third fixture refuses to manufacture a dispute when evidence aligns. Hindi keeps the original English order visible beside its translation. No real upload, OTP, payment, court filing, or government connection exists.”
 
-**Screen:** Keep the tracker or briefly return to reviewed facts.
+### 1:49–1:55 · Final line
 
-> “The optional OpenAI vision route receives only a fixture ID, loads a bundled synthetic image server-side, and returns strict structured observations. Human confirmation is mandatory. Deterministic TypeScript—not AI—controls classifications, dates, readiness, and allowed states.”
+> “ChallanSakshi preserves what the citizen submitted, reads what came back, and makes the next official conversation evidence-complete.”
 
-## 1:18–1:31 · Resilience and deliberate boundaries
+## Recording checklist
 
-> “Three typed fixtures cover mismatch, inconclusive evidence, and evidence that supports the notice. The full demo works without a key through an honest precomputed fallback. We deliberately excluded login, real uploads, OTPs, payment, filing, and live government integration.”
-
-## 1:31–1:43 · Coherent lifecycle breadth
-
-**Click:** `Explore the full resolution desk`.
-
-**Screen:** Resolution Desk with seven fictional guided scenarios.
-
-> “The same evidence discipline continues through rejection, no recorded decision, Virtual Court, payment-status conflict, and access or receipt recovery. These are branches of one dispute lifecycle, not seven unrelated products.”
-
-Optionally click `Payment succeeded, but status is pending` → `Confirm this route` to reveal the working deterministic reconciler.
-
-## 1:43–1:50 · Build proof and final line
-
-> “Codex helped implement and test the bilingual state engine, full payment matrix, privacy guards, responsive UI, and browser flows. ChallanSakshi prepares a safer official handoff; it never replaces the authority.”
-
-## Recording fallback if live AI is slow
-
-Do not wait on the API during the official recording. The visible label **Precomputed demo analysis** is intentional. The typed fixture drives the same verification, rules, pack, and tracker. After the main recording, the optional **Re-run AI analysis** control can demonstrate the live route; any API or validation failure preserves the fixture and displays **Precomputed fallback active**.
+- Keep browser zoom at 100% and use English for the primary recording.
+- Use precomputed analysis; do not wait for the optional API.
+- Use cuts between prepared states. Do not perform seven fact checks and six row confirmations on camera.
+- Keep the 1 / 3 / 2 map visible for two seconds, then show the final note and Oct 27 indicative boundary.
+- Show architecture by 1:00; the second minute is not optional Q&A.
+- Export at no more than 2:00 and test every submitted link in a signed-out browser.

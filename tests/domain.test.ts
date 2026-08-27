@@ -121,5 +121,9 @@ describe('demo state machine', () => {
     expect(guardEvidenceNavigation('tracking', 'mismatch', true, false)).toBe('pack');
     expect(guardEvidenceNavigation('tracking', 'mismatch', true, true)).toBe('tracking');
     expect(guardEvidenceNavigation('pack', 'consistent', true, true)).toBe('finding');
+    expect(guardEvidenceNavigation('order-review', 'mismatch', true, true, 'none')).toBe('tracking');
+    expect(guardEvidenceNavigation('order-review', 'mismatch', true, true, 'rejected')).toBe('order-review');
+    expect(guardEvidenceNavigation('order-map', 'mismatch', true, true, 'rejected', false)).toBe('order-review');
+    expect(guardEvidenceNavigation('order-map', 'mismatch', true, true, 'rejected', true)).toBe('order-map');
   });
 });

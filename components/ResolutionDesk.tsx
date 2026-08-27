@@ -33,8 +33,12 @@ function stageLabel(stage: ResolutionStage, language: Language): string {
   return local(labels[stage], language);
 }
 
-function BackButton({ onClick, language, destination }: { onClick: () => void; language: Language; destination?: 'desk' }) {
-  const label = destination === 'desk' ? (language === 'hi' ? 'रिज़ॉल्यूशन डेस्क पर वापस' : 'Back to Resolution Desk') : (language === 'hi' ? 'पीछे' : 'Back');
+function BackButton({ onClick, language, destination }: { onClick: () => void; language: Language; destination?: 'desk' | 'order-review' }) {
+  const label = destination === 'order-review'
+    ? (language === 'hi' ? 'आदेश समीक्षा नोट पर वापस' : 'Back to Order Review Note')
+    : destination === 'desk'
+      ? (language === 'hi' ? 'रिज़ॉल्यूशन डेस्क पर वापस' : 'Back to Resolution Desk')
+      : (language === 'hi' ? 'पीछे' : 'Back');
   return <button className="back-button" type="button" onClick={onClick}><span aria-hidden="true">←</span>{label}</button>;
 }
 
@@ -200,8 +204,14 @@ function PaymentReconciliationDemo({ language }: { language: Language }) {
   );
 }
 
-function PostRejectionClock({ language }: { language: Language }) {
-  const clock = calculatePostRejectionWindow('2026-08-27', referenceDate);
+function formatCalendarDate(value: string, language: Language): string {
+  return new Intl.DateTimeFormat(language === 'hi' ? 'hi-IN' : 'en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function PostRejectionClock({ language, orderDate, reviewReferenceDate }: { language: Language; orderDate: string; reviewReferenceDate: string }) {
+  const clock = calculatePostRejectionWindow(orderDate, reviewReferenceDate);
   const statusText = clock.status === 'open'
     ? (language === 'hi' ? `${clock.daysRemaining} अनुमानित दिन बाकी` : `${clock.daysRemaining} indicative days remaining`)
     : clock.status === 'final-day'
@@ -210,10 +220,10 @@ function PostRejectionClock({ language }: { language: Language }) {
   return (
     <>
       <section className="post-order-clock">
-        <div><small>{language === 'hi' ? 'काल्पनिक आदेश' : 'FICTIONAL ORDER'}</small><strong>{language === 'hi' ? '27 अगस्त 2026' : '27 Aug 2026'}</strong></div>
+        <div><small>{language === 'hi' ? 'काल्पनिक आदेश' : 'FICTIONAL ORDER'}</small><strong>{formatCalendarDate(clock.orderDate, language)}</strong></div>
         <span aria-hidden="true">→</span>
         <div className="post-order-days"><b>{clock.daysRemaining}</b><small>{statusText}</small></div>
-        <div><small>{language === 'hi' ? 'D+30 सीमा' : 'D+30 BOUNDARY'}</small><strong>{language === 'hi' ? '26 सितंबर 2026' : '26 Sep 2026'}</strong></div>
+        <div><small>{language === 'hi' ? 'D+30 सीमा' : 'D+30 BOUNDARY'}</small><strong>{formatCalendarDate(clock.indicativeBoundary, language)}</strong></div>
         <p>{language === 'hi' ? 'केंद्रीय नियम के आधार पर पारदर्शी डेमो गणना। कटऑफ़ और राज्य की प्रक्रिया आधिकारिक आदेश/पोर्टल पर जाँचें।' : 'Transparent demo calculation from the central rule. Verify the cutoff and state implementation on the official order or portal.'}</p>
       </section>
       <section className="post-rejection-choices" aria-labelledby="post-rejection-choices-title">
@@ -254,20 +264,25 @@ function CourtHandoff({ language }: { language: Language }) {
   );
 }
 
-export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence }: {
+export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence, postRejectionContext }: {
   language: Language;
   issueId: ResolutionIssueId;
   onBack: () => void;
   onStartEvidence: (issueId: 'wrong-evidence' | 'unclear-evidence') => void;
+  postRejectionContext?: { orderDate: string; referenceDate: string };
 }) {
   const route = resolutionRoutes[issueId];
   const issue = resolutionIssues.find((item) => item.id === issueId) ?? resolutionIssues[0];
   const stages: ResolutionStage[] = ['evidence', 'authority', 'court', 'payment'];
+  const activePostRejectionContext = postRejectionContext ?? { orderDate: referenceDate, referenceDate };
+  const linkedPostDecisionClock = issueId === 'grievance-rejected'
+    ? calculatePostRejectionWindow(activePostRejectionContext.orderDate, activePostRejectionContext.referenceDate)
+    : null;
 
   const downloadRoute = () => {
     const record = {
       artifact: 'ChallanSakshi fictional route note',
-      generatedOn: referenceDate,
+      generatedOn: issueId === 'grievance-rejected' ? activePostRejectionContext.referenceDate : referenceDate,
       syntheticOnly: true,
       issue: issue.id,
       stage: route.eyebrow.en,
@@ -277,6 +292,7 @@ export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence
       limitation: route.cannotConclude.en,
       avoid: route.avoid.en,
       officialLinks: route.officialLinks,
+      postDecisionClock: linkedPostDecisionClock,
       disclaimer: 'Information only. Not legal advice. Verify current official routes and deadlines.',
     };
     const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -292,7 +308,7 @@ export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence
 
   return (
     <main className="screen-shell shell resolution-route-screen" tabIndex={-1}>
-      <BackButton onClick={onBack} language={language} destination="desk" />
+      <BackButton onClick={onBack} language={language} destination={postRejectionContext ? 'order-review' : 'desk'} />
       <nav className="journey-map" aria-label={language === 'hi' ? 'समस्या का क्षेत्र' : 'Problem area'}>
         {stages.map((stage) => <span key={stage} className={issue.stage === stage ? 'active' : ''} aria-current={issue.stage === stage ? 'page' : undefined}><b aria-hidden="true">{stage === 'evidence' ? 'E' : stage === 'authority' ? 'A' : stage === 'court' ? '§' : '₹'}</b>{stageLabel(stage, language)}</span>)}
       </nav>
@@ -302,7 +318,7 @@ export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence
         <div><p>{local(route.eyebrow, language)}</p><h1>{local(route.title, language)}</h1><span>{local(route.summary, language)}</span></div>
       </section>
 
-      {issueId === 'grievance-rejected' && <PostRejectionClock language={language} />}
+      {issueId === 'grievance-rejected' && <PostRejectionClock language={language} orderDate={activePostRejectionContext.orderDate} reviewReferenceDate={activePostRejectionContext.referenceDate} />}
       {issueId === 'no-recorded-decision' && <AuthorityResponseClock language={language} />}
       {issueId === 'virtual-court' && <CourtHandoff language={language} />}
       {issueId === 'payment-pending' && <PaymentReconciliationDemo language={language} />}
@@ -333,7 +349,7 @@ export function ResolutionRouteView({ language, issueId, onBack, onStartEvidence
       <div className="route-actions">
         {(issueId === 'wrong-evidence' || issueId === 'unclear-evidence') && <button type="button" className="button button-primary" onClick={() => onStartEvidence(issueId)}>{language === 'hi' ? 'सबूत डेमो खोलें' : 'Open the evidence demo'} <span aria-hidden="true">→</span></button>}
         <button type="button" className="button button-secondary" onClick={downloadRoute}>{language === 'hi' ? 'काल्पनिक रास्ता नोट डाउनलोड करें' : 'Download fictional route note'} <span aria-hidden="true">↓</span></button>
-        <button type="button" className="button button-quiet" onClick={onBack}>{language === 'hi' ? 'दूसरी समस्या चुनें' : 'Choose another problem'}</button>
+        <button type="button" className="button button-quiet" onClick={onBack}>{postRejectionContext ? (language === 'hi' ? 'आदेश समीक्षा नोट पर वापस' : 'Return to Order Review Note') : (language === 'hi' ? 'दूसरी समस्या चुनें' : 'Choose another problem')}</button>
       </div>
     </main>
   );

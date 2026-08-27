@@ -21,29 +21,92 @@ import {
 } from '../lib/domain';
 import { fixtureList, fixtures, type DemoFixture, type EvidenceCardData } from '../lib/fixtures';
 import { ResolutionDesk, ResolutionRouteView } from './ResolutionDesk';
-import { resolutionIssues, type ResolutionIssueId } from '../lib/resolution';
+import { calculatePostRejectionWindow, resolutionIssues, type ResolutionIssueId } from '../lib/resolution';
+import {
+  buildCaseLedger,
+  buildCorrectionRecords,
+  buildEvidenceIndex,
+  createSubmittedRevisionId,
+  deriveCaseLedgerSnapshot,
+} from '../lib/case-ledger';
+import {
+  ORDER_ACKNOWLEDGED_DATE,
+  ORDER_REVIEW_REFERENCE_DATE,
+  buildClarificationDraft,
+  buildOrderEvidenceMap,
+  buildOrderReviewArtifact,
+  buildOrderReviewNote,
+  buildPostDecisionCalendar,
+  buildSyntheticRejectedOrder,
+  createInitialOrderMapReviews,
+  invalidateOrderMapConfirmations,
+  validateOrderFactReview,
+  validateOrderMapReview,
+  type OrderCompleteness,
+  type OrderExtractedFact,
+  type OrderFactId,
+  type OrderMapReview,
+} from '../lib/order-evidence';
+import { CaseLedgerTimeline, OrderMapScreen, OrderReviewScreen } from './OrderEvidenceReview';
 
 type AnalysisMode = 'precomputed' | 'live' | 'fallback';
 type Pair = { en: string; hi: string };
-interface PersistedDemoStateV2 {
-  version: 2;
+interface PersistedDemoStateV4 {
+  version: 4;
   language: Language;
   step: StepId;
   fixtureId: FixtureId;
   facts: ExtractedFact[];
+  analysisFacts: ExtractedFact[];
   confirmed: boolean;
   analysisMode: AnalysisMode;
   trackingStage: number;
   outcome: OutcomeState;
   resolutionIssue: ResolutionIssueId;
-  simulatedSubmitted: boolean;
+  submittedFacts: ExtractedFact[] | null;
+  submittedRevisionId: string | null;
+  orderExtractedFacts: OrderExtractedFact[];
+  orderConfirmedFactIds: string[];
+  orderCompleteness: OrderCompleteness | null;
+  orderMapReviews: Record<string, OrderMapReview>;
+  orderLimitationConfirmed: boolean;
+  orderNoteCreated: boolean;
 }
 
 const DEMO_REFERENCE_DATE = '2026-08-27';
-const STORAGE_KEY = 'challansakshi-demo-v2';
-const OLD_STORAGE_KEY = 'challansakshi-demo-v1';
-const steps: StepId[] = ['landing', 'desk', 'route', 'intake', 'review', 'finding', 'readiness', 'pack', 'tracking'];
-const evidenceSteps: StepId[] = ['intake', 'review', 'finding', 'readiness', 'pack', 'tracking'];
+const STORAGE_KEY = 'challansakshi-demo-v4';
+const OLD_STORAGE_KEYS = ['challansakshi-demo-v3', 'challansakshi-demo-v2', 'challansakshi-demo-v1'];
+const ORDER_FACT_IDS: OrderFactId[] = ['order-id', 'grievance-id', 'challan-id', 'order-date', 'outcome', 'reason', 'next-route'];
+const steps: StepId[] = ['landing', 'desk', 'route', 'intake', 'review', 'finding', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
+const evidenceSteps: StepId[] = ['intake', 'review', 'finding', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
+
+function isStoredFactList(value: unknown): value is ExtractedFact[] {
+  return Array.isArray(value) && value.every((fact) => fact && typeof fact === 'object'
+    && typeof (fact as ExtractedFact).id === 'string'
+    && typeof (fact as ExtractedFact).value === 'string'
+    && typeof (fact as ExtractedFact).evidenceRef === 'string');
+}
+
+function isStoredOrderReviews(value: unknown): value is Record<string, OrderMapReview> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length > 0 && entries.every(([rowId, review]) => /^P[1-9]\d*$/.test(rowId) && review && typeof review === 'object'
+    && ['mentioned', 'unclear', 'not-found'].includes((review as OrderMapReview).status)
+    && Array.isArray((review as OrderMapReview).reasonRefs)
+    && (review as OrderMapReview).reasonRefs.every((ref) => typeof ref === 'string')
+    && typeof (review as OrderMapReview).confirmed === 'boolean');
+}
+
+function isStoredOrderFactList(value: unknown): value is OrderExtractedFact[] {
+  if (!Array.isArray(value) || value.length !== ORDER_FACT_IDS.length) return false;
+  const ids = new Set(value.map((fact) => fact && typeof fact === 'object' ? (fact as OrderExtractedFact).id : null));
+  return ids.size === ORDER_FACT_IDS.length && ORDER_FACT_IDS.every((id) => ids.has(id)) && value.every((fact) => fact && typeof fact === 'object'
+    && ORDER_FACT_IDS.includes((fact as OrderExtractedFact).id)
+    && typeof (fact as OrderExtractedFact).value === 'string'
+    && (fact as OrderExtractedFact).label && typeof (fact as OrderExtractedFact).label.en === 'string' && typeof (fact as OrderExtractedFact).label.hi === 'string'
+    && Array.isArray((fact as OrderExtractedFact).sourceParagraphs)
+    && (fact as OrderExtractedFact).sourceParagraphs.every((source) => typeof source === 'string'));
+}
 
 function parseAppHash(hash: string): { step: StepId; issueId?: ResolutionIssueId } | null {
   const raw = hash.replace(/^#/, '');
@@ -269,7 +332,8 @@ function Progress({ step, language }: { step: StepId; language: Language }) {
     { id: 'pack', label: { en: 'Pack', hi: 'पैक' } },
     { id: 'tracking', label: { en: 'Track', hi: 'स्थिति' } },
   ];
-  const activeIndex = items.findIndex((item) => item.id === step);
+  const progressStep: StepId = step === 'order-review' || step === 'order-map' ? 'tracking' : step;
+  const activeIndex = items.findIndex((item) => item.id === progressStep);
   return (
     <div className="progress-wrap">
       <ol className="progress shell" aria-label={language === 'hi' ? 'डेमो के चरण' : 'Demo progress'}>
@@ -549,20 +613,12 @@ function buildContestDraft(fixture: DemoFixture, facts: ExtractedFact[], languag
     : `Subject: Request to review the available image and record\n\nI request review of e-Challan ${fixture.challanNumber}. The citizen-confirmed record contains these evidence limitations: ${limitations} I am not asserting a vehicle mismatch. Please review the original image and related record and provide a reasoned decision.`;
 }
 
-function Timeline({ stage, language }: { stage: number; language: Language }) {
-  const timeline = [copy.evidenceReviewed, copy.packPrepared, copy.submissionReceived, copy.underReview, copy.reasonedOutcome];
-  return (
-    <ol className="case-timeline">
-      {timeline.map((item, index) => <li key={item.en} className={index < stage ? 'done' : index === stage ? 'active' : ''}><span>{index < stage ? '✓' : index + 1}</span><div><strong>{local(item, language)}</strong><small>{index < 3 ? (language === 'hi' ? '27 अगस्त 2026 · डेमो' : '27 Aug 2026 · demo') : index === stage ? (language === 'hi' ? 'मौजूदा चरण' : 'Current demo stage') : (language === 'hi' ? 'बाकी' : 'Pending')}</small></div></li>)}
-    </ol>
-  );
-}
-
 export default function ChallanSakshiApp() {
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<StepId>('landing');
   const [fixtureId, setFixtureId] = useState<FixtureId>('mismatch');
   const [facts, setFacts] = useState<ExtractedFact[]>(fixtures.mismatch.extractedFacts);
+  const [analysisFacts, setAnalysisFacts] = useState<ExtractedFact[]>(fixtures.mismatch.extractedFacts);
   const [confirmed, setConfirmed] = useState(false);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('precomputed');
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -572,10 +628,20 @@ export default function ChallanSakshiApp() {
   const [trackingStage, setTrackingStage] = useState(2);
   const [outcome, setOutcome] = useState<OutcomeState>('none');
   const [resolutionIssue, setResolutionIssue] = useState<ResolutionIssueId>('wrong-evidence');
-  const [simulatedSubmitted, setSimulatedSubmitted] = useState(false);
+  const [submittedFacts, setSubmittedFacts] = useState<ExtractedFact[] | null>(null);
+  const [submittedRevisionId, setSubmittedRevisionId] = useState<string | null>(null);
+  const [orderExtractedFacts, setOrderExtractedFacts] = useState<OrderExtractedFact[]>([]);
+  const [orderConfirmedFactIds, setOrderConfirmedFactIds] = useState<string[]>([]);
+  const [orderCompleteness, setOrderCompleteness] = useState<OrderCompleteness | null>(null);
+  const [orderMapReviews, setOrderMapReviews] = useState<Record<string, OrderMapReview>>({});
+  const [orderLimitationConfirmed, setOrderLimitationConfirmed] = useState(false);
+  const [orderNoteCreated, setOrderNoteCreated] = useState(false);
+  const [orderFormError, setOrderFormError] = useState('');
+  const [orderCopied, setOrderCopied] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   const fixture = fixtures[fixtureId];
+  const grievanceNumber = fixture.id === 'mismatch' ? 'DEMO-GRV-A-0827-17' : 'DEMO-GRV-B-0827-09';
   const confirmedVehicleFacts = useMemo(() => deriveConfirmedVehicleFacts(fixture.confirmedFacts, facts), [fixture, facts]);
   const classification = useMemo(() => classifyEvidenceComparison(confirmedVehicleFacts), [confirmedVehicleFacts]);
   const reviewValidation = useMemo(() => validateEvidenceReviewFacts(facts), [facts]);
@@ -587,19 +653,113 @@ export default function ChallanSakshiApp() {
     return evaluateEvidenceReadiness(items);
   }, [classification.finding, fixture]);
   const contestDraft = useMemo(() => buildContestDraft(fixture, facts, language), [fixture, facts, language]);
-  const renderStep = guardEvidenceNavigation(step, classification.finding, confirmed && reviewValidation.complete, simulatedSubmitted);
+  const simulatedSubmitted = submittedFacts !== null && submittedRevisionId !== null;
+  const submittedVehicleFacts = useMemo(
+    () => deriveConfirmedVehicleFacts(fixture.confirmedFacts, submittedFacts ?? facts),
+    [fixture, submittedFacts, facts],
+  );
+  const submittedClassification = useMemo(() => classifyEvidenceComparison(submittedVehicleFacts), [submittedVehicleFacts]);
+  const activeRevisionId = submittedRevisionId ?? (confirmed ? createSubmittedRevisionId(fixtureId, facts) : null);
+  const corrections = useMemo(
+    () => activeRevisionId ? buildCorrectionRecords(analysisFacts, submittedFacts ?? facts, activeRevisionId) : [],
+    [activeRevisionId, analysisFacts, submittedFacts, facts],
+  );
+  const evidenceIndex = useMemo(() => buildEvidenceIndex({
+    challanNumber: fixture.challanNumber,
+    registeredPlate: submittedVehicleFacts.registeredPlate,
+    observedPlate: submittedVehicleFacts.observedPlate,
+    submittedRevisionId,
+  }), [fixture.challanNumber, submittedVehicleFacts.registeredPlate, submittedVehicleFacts.observedPlate, submittedRevisionId]);
+  const rejectedOrder = useMemo(() => buildSyntheticRejectedOrder({
+    finding: submittedClassification.finding,
+    grievanceNumber,
+    challanNumber: fixture.challanNumber,
+    registeredPlate: submittedVehicleFacts.registeredPlate,
+  }), [submittedClassification.finding, grievanceNumber, fixture.challanNumber, submittedVehicleFacts.registeredPlate]);
+  const orderRows = useMemo(() => buildOrderEvidenceMap({
+    classification: submittedClassification,
+    confirmedFacts: submittedVehicleFacts,
+    evidenceIndex,
+  }), [submittedClassification, submittedVehicleFacts, evidenceIndex]);
+  const effectiveOrderExtractedFacts = orderExtractedFacts.length === rejectedOrder.extractedFacts.length ? orderExtractedFacts : rejectedOrder.extractedFacts;
+  const orderFactValidation = useMemo(
+    () => validateOrderFactReview(
+      effectiveOrderExtractedFacts,
+      orderConfirmedFactIds,
+      orderCompleteness,
+      {
+        'order-id': rejectedOrder.id,
+        'grievance-id': rejectedOrder.grievanceNumber,
+        'challan-id': rejectedOrder.challanNumber,
+        outcome: 'Grievance rejected',
+      },
+      { earliest: ORDER_ACKNOWLEDGED_DATE, reference: ORDER_REVIEW_REFERENCE_DATE },
+    ),
+    [effectiveOrderExtractedFacts, orderConfirmedFactIds, orderCompleteness, rejectedOrder],
+  );
+  const orderMapValidation = useMemo(
+    () => validateOrderMapReview(orderRows, orderMapReviews, rejectedOrder.paragraphs.map((paragraph) => paragraph.id)),
+    [orderRows, orderMapReviews, rejectedOrder.paragraphs],
+  );
+  const orderReviewPrerequisitesComplete = orderFactValidation.complete && orderMapValidation.complete && orderLimitationConfirmed;
+  const effectiveOrderNoteCreated = orderNoteCreated && orderReviewPrerequisitesComplete;
+  const orderWorkflowComplete = outcome === 'rejected' && Boolean(submittedRevisionId) && effectiveOrderNoteCreated;
+  const ledgerFinding = simulatedSubmitted ? submittedClassification.finding : classification.finding;
+  const packPrepared = simulatedSubmitted || (confirmed && reviewValidation.complete && ledgerFinding !== 'consistent' && readiness.complete);
+  const ledgerEvents = useMemo(() => buildCaseLedger({
+    fixtureId,
+    issueDate: fixture.issueDate,
+    analysisMode,
+    confirmed: simulatedSubmitted || (confirmed && reviewValidation.complete),
+    corrections,
+    finding: ledgerFinding,
+    packPrepared,
+    submitted: simulatedSubmitted,
+    submittedRevisionId,
+    trackingStage,
+    outcome,
+    orderFactsConfirmed: orderFactValidation.complete,
+    orderMapConfirmed: orderWorkflowComplete,
+  }), [fixtureId, fixture.issueDate, analysisMode, confirmed, reviewValidation.complete, corrections, ledgerFinding, packPrepared, simulatedSubmitted, submittedRevisionId, trackingStage, outcome, orderFactValidation.complete, orderWorkflowComplete]);
+  const ledgerSnapshot = useMemo(() => deriveCaseLedgerSnapshot(ledgerEvents, submittedRevisionId), [ledgerEvents, submittedRevisionId]);
+  const latestLedgerDate = ledgerEvents.reduce((latest, event) => event.recordedOn > latest ? event.recordedOn : latest, DEMO_REFERENCE_DATE);
+  const extractedOrderDate = effectiveOrderExtractedFacts.find((fact) => fact.id === 'order-date')?.value;
+  const reviewedOrderDate = extractedOrderDate && !orderFactValidation.invalidFactIds.includes('order-date') ? extractedOrderDate : rejectedOrder.orderDate;
+  const postRejectionClock = useMemo(() => calculatePostRejectionWindow(reviewedOrderDate, ORDER_REVIEW_REFERENCE_DATE), [reviewedOrderDate]);
+  const orderReviewNote = useMemo(() => submittedRevisionId && orderCompleteness && orderRows.every((row) => orderMapReviews[row.id]) ? buildOrderReviewNote({
+    language,
+    generatedOn: ORDER_REVIEW_REFERENCE_DATE,
+    order: rejectedOrder,
+    extractedFacts: effectiveOrderExtractedFacts,
+    completeness: orderCompleteness,
+    rows: orderRows,
+    reviews: orderMapReviews,
+    evidenceIndex,
+    submittedRevisionId,
+  }) : '', [language, submittedRevisionId, orderCompleteness, rejectedOrder, effectiveOrderExtractedFacts, orderRows, orderMapReviews, evidenceIndex]);
+  const clarificationDraft = useMemo(() => orderCompleteness ? buildClarificationDraft({
+    language,
+    challanNumber: fixture.challanNumber,
+    grievanceNumber,
+    completeness: orderCompleteness,
+    rows: orderRows,
+    reviews: orderMapReviews,
+  }) : null, [language, orderCompleteness, fixture.challanNumber, grievanceNumber, orderRows, orderMapReviews]);
+  const renderStep = guardEvidenceNavigation(step, classification.finding, confirmed && reviewValidation.complete, simulatedSubmitted, outcome, orderFactValidation.complete);
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
       try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const saved = JSON.parse(stored) as Partial<PersistedDemoStateV2>;
-          if (saved.version !== 2) throw new Error('Unsupported persisted state');
+          const saved = JSON.parse(stored) as Partial<PersistedDemoStateV4>;
+          if (saved.version !== 4) throw new Error('Unsupported persisted state');
           if (saved.language === 'en' || saved.language === 'hi') setLanguage(saved.language);
           if (saved.fixtureId && fixtures[saved.fixtureId]) {
             setFixtureId(saved.fixtureId);
-            setFacts(Array.isArray(saved.facts) ? saved.facts : fixtures[saved.fixtureId].extractedFacts);
+            const restoredFacts = isStoredFactList(saved.facts) ? saved.facts : fixtures[saved.fixtureId].extractedFacts;
+            setFacts(restoredFacts);
+            setAnalysisFacts(isStoredFactList(saved.analysisFacts) ? saved.analysisFacts : fixtures[saved.fixtureId].extractedFacts);
           }
           if (saved.step && steps.includes(saved.step)) setStep(saved.step);
           setConfirmed(Boolean(saved.confirmed));
@@ -607,7 +767,25 @@ export default function ChallanSakshiApp() {
           if (typeof saved.trackingStage === 'number') setTrackingStage(saved.trackingStage);
           if (saved.outcome) setOutcome(saved.outcome);
           if (saved.resolutionIssue && resolutionIssues.some((item) => item.id === saved.resolutionIssue)) setResolutionIssue(saved.resolutionIssue);
-          setSimulatedSubmitted(Boolean(saved.simulatedSubmitted));
+          const storedSubmissionIsValid = Boolean(saved.fixtureId && fixtures[saved.fixtureId]
+            && isStoredFactList(saved.submittedFacts)
+            && typeof saved.submittedRevisionId === 'string'
+            && createSubmittedRevisionId(saved.fixtureId, saved.submittedFacts) === saved.submittedRevisionId);
+          if (storedSubmissionIsValid && saved.submittedFacts && typeof saved.submittedRevisionId === 'string') {
+            setSubmittedFacts(saved.submittedFacts);
+            setSubmittedRevisionId(saved.submittedRevisionId);
+          }
+          if (storedSubmissionIsValid) {
+            if (isStoredOrderFactList(saved.orderExtractedFacts)) setOrderExtractedFacts(saved.orderExtractedFacts);
+            if (Array.isArray(saved.orderConfirmedFactIds)) setOrderConfirmedFactIds(saved.orderConfirmedFactIds.filter((id): id is string => typeof id === 'string'));
+            if (saved.orderCompleteness === 'yes' || saved.orderCompleteness === 'no' || saved.orderCompleteness === 'not-sure') setOrderCompleteness(saved.orderCompleteness);
+            if (isStoredOrderReviews(saved.orderMapReviews)) setOrderMapReviews(saved.orderMapReviews);
+            setOrderLimitationConfirmed(Boolean(saved.orderLimitationConfirmed));
+            setOrderNoteCreated(Boolean(saved.orderNoteCreated));
+          } else if (saved.step === 'tracking' || saved.step === 'order-review' || saved.step === 'order-map') {
+            setStep('pack');
+            setOutcome('none');
+          }
         }
         const location = parseAppHash(window.location.hash);
         if (location) {
@@ -620,7 +798,7 @@ export default function ChallanSakshiApp() {
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
       } finally {
-        window.localStorage.removeItem(OLD_STORAGE_KEY);
+        OLD_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
         setHydrated(true);
       }
     }, 0);
@@ -640,10 +818,30 @@ export default function ChallanSakshiApp() {
 
   useEffect(() => {
     if (!hydrated) return;
-    const persisted: PersistedDemoStateV2 = { version: 2, language, step: renderStep, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, simulatedSubmitted };
+    const persisted: PersistedDemoStateV4 = {
+      version: 4,
+      language,
+      step: renderStep,
+      fixtureId,
+      facts,
+      analysisFacts,
+      confirmed,
+      analysisMode,
+      trackingStage,
+      outcome,
+      resolutionIssue,
+      submittedFacts,
+      submittedRevisionId,
+      orderExtractedFacts,
+      orderConfirmedFactIds,
+      orderCompleteness,
+      orderMapReviews,
+      orderLimitationConfirmed,
+      orderNoteCreated,
+    };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
     document.documentElement.lang = language === 'hi' ? 'hi' : 'en';
-  }, [language, renderStep, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, simulatedSubmitted, hydrated]);
+  }, [language, renderStep, fixtureId, facts, analysisFacts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, submittedFacts, submittedRevisionId, orderExtractedFacts, orderConfirmedFactIds, orderCompleteness, orderMapReviews, orderLimitationConfirmed, orderNoteCreated, hydrated]);
 
   useEffect(() => {
     if (!hydrated || renderStep === step) return;
@@ -666,15 +864,33 @@ export default function ChallanSakshiApp() {
     window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
 
+  const clearOrderWorkflow = () => {
+    setOrderExtractedFacts([]);
+    setOrderConfirmedFactIds([]);
+    setOrderCompleteness(null);
+    setOrderMapReviews({});
+    setOrderLimitationConfirmed(false);
+    setOrderNoteCreated(false);
+    setOrderFormError('');
+    setOrderCopied(false);
+  };
+
+  const invalidateAfterEvidenceChange = () => {
+    setConfirmed(false);
+    setSubmittedFacts(null);
+    setSubmittedRevisionId(null);
+    setTrackingStage(2);
+    setOutcome('none');
+    clearOrderWorkflow();
+  };
+
   const chooseFixture = (nextId: FixtureId) => {
     setFixtureId(nextId);
     setFacts(fixtures[nextId].extractedFacts);
-    setConfirmed(false);
+    setAnalysisFacts(fixtures[nextId].extractedFacts);
+    invalidateAfterEvidenceChange();
     setAnalysisMode('precomputed');
     setAnalysisMessage('');
-    setOutcome('none');
-    setTrackingStage(2);
-    setSimulatedSubmitted(false);
   };
 
   const resetDemo = () => {
@@ -683,20 +899,19 @@ export default function ChallanSakshiApp() {
     window.localStorage.removeItem(STORAGE_KEY);
     setFixtureId('mismatch');
     setFacts(fixtures.mismatch.extractedFacts);
-    setConfirmed(false);
+    setAnalysisFacts(fixtures.mismatch.extractedFacts);
+    invalidateAfterEvidenceChange();
     setAnalysisMode('precomputed');
     setAnalysisMessage('');
-    setOutcome('none');
-    setTrackingStage(2);
     setResolutionIssue('wrong-evidence');
-    setSimulatedSubmitted(false);
     go('landing');
   };
 
   const runInitialAnalysis = () => {
     setAnalysisBusy(true);
-    setConfirmed(false);
-    setSimulatedSubmitted(false);
+    setFacts(fixtures[fixtureId].extractedFacts);
+    setAnalysisFacts(fixtures[fixtureId].extractedFacts);
+    invalidateAfterEvidenceChange();
     window.setTimeout(() => { setAnalysisBusy(false); setAnalysisMode('precomputed'); go('review'); }, 650);
   };
 
@@ -713,15 +928,16 @@ export default function ChallanSakshiApp() {
       const idByField: Record<string, string> = {
         observed_registration: 'observed-registration', observed_category: 'observed-category', observed_colour: 'observed-colour', offence_assessable: 'offence-visible',
       };
-      setFacts((current) => current.map((item) => {
+      const nextFacts = facts.map((item) => {
         const incoming = data.analysis?.facts?.find((candidate) => idByField[candidate.field || ''] === item.id);
         if (!incoming?.value) return item;
         const visibility = ['clear', 'partial', 'unclear', 'not-visible'].includes(incoming.visibility || '') ? incoming.visibility as ExtractedFact['visibility'] : item.visibility;
         const confidence = ['high', 'medium', 'low'].includes(incoming.confidence || '') ? incoming.confidence as ExtractedFact['confidence'] : item.confidence;
         return { ...item, value: incoming.value, visibility, confidence, evidenceRef: incoming.evidence_reference || item.evidenceRef };
-      }));
-      setConfirmed(false);
-      setSimulatedSubmitted(false);
+      });
+      setFacts(nextFacts);
+      setAnalysisFacts(nextFacts.map((item) => ({ ...item })));
+      invalidateAfterEvidenceChange();
       setAnalysisMode('live');
       setAnalysisMessage(language === 'hi' ? 'लाइव विश्लेषण पूरा हुआ। इस्तेमाल से पहले हर जानकारी फिर जाँचें।' : 'Live analysis completed. Review every observation again before using it.');
     } catch {
@@ -734,8 +950,7 @@ export default function ChallanSakshiApp() {
 
   const updateFact = (id: string, patch: Partial<ExtractedFact>) => {
     setFacts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
-    setConfirmed(false);
-    setSimulatedSubmitted(false);
+    invalidateAfterEvidenceChange();
   };
 
   const continueFromReview = () => {
@@ -767,11 +982,155 @@ export default function ChallanSakshiApp() {
     go('intake');
   };
 
+  const downloadBlob = (contents: string, mimeType: string, filename: string) => {
+    const blob = new Blob([contents], { type: mimeType });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 0);
+  };
+
+  const submitDemo = () => {
+    if (!confirmed || !reviewValidation.complete || classification.finding === 'consistent') return;
+    const frozenFacts = facts.map((fact) => ({ ...fact, label: { ...fact.label }, uncertainty: fact.uncertainty ? { ...fact.uncertainty } : undefined }));
+    const revisionId = createSubmittedRevisionId(fixtureId, frozenFacts);
+    setSubmittedFacts(frozenFacts);
+    setSubmittedRevisionId(revisionId);
+    setTrackingStage(2);
+    setOutcome('none');
+    clearOrderWorkflow();
+    go('tracking');
+  };
+
+  const selectOutcome = (next: Exclude<OutcomeState, 'none'>) => {
+    setOutcome(next);
+    setTrackingStage(4);
+    setOrderFormError('');
+    setOrderCopied(false);
+    if (next === 'rejected') {
+      setOrderExtractedFacts(rejectedOrder.extractedFacts.map((fact) => ({ ...fact, label: { ...fact.label }, sourceParagraphs: [...fact.sourceParagraphs] })));
+      setOrderConfirmedFactIds([]);
+      setOrderCompleteness(null);
+      setOrderMapReviews(createInitialOrderMapReviews(orderRows));
+      setOrderLimitationConfirmed(false);
+      setOrderNoteCreated(false);
+    } else {
+      clearOrderWorkflow();
+    }
+  };
+
+  const updateOrderFact = (id: string, value: string) => {
+    setOrderExtractedFacts((current) => {
+      const source = current.length === rejectedOrder.extractedFacts.length ? current : rejectedOrder.extractedFacts;
+      return source.map((fact) => fact.id === id ? { ...fact, value } : { ...fact });
+    });
+    setOrderConfirmedFactIds((current) => current.filter((factId) => factId !== id));
+    setOrderNoteCreated(false);
+    setOrderFormError('');
+  };
+
+  const confirmOrderFact = (id: string, checked: boolean) => {
+    setOrderConfirmedFactIds((current) => checked ? [...new Set([...current, id])] : current.filter((factId) => factId !== id));
+    setOrderNoteCreated(false);
+    setOrderFormError('');
+  };
+
+  const continueFromOrderReview = () => {
+    if (!orderFactValidation.complete) {
+      const error = language === 'hi'
+        ? 'आगे बढ़ने से पहले आदेश की हर जानकारी जाँचें और पन्नों की पूर्णता का जवाब दें।'
+        : 'Review every order fact and answer the document-completeness question before continuing.';
+      setOrderFormError(error);
+      const firstId = orderFactValidation.emptyFactIds[0] ?? orderFactValidation.invalidFactIds[0] ?? orderFactValidation.missingFactIds[0];
+      if (firstId) document.getElementById(`order-fact-${firstId}`)?.focus();
+      return;
+    }
+    const storedRowIds = Object.keys(orderMapReviews);
+    if (storedRowIds.length !== orderRows.length || !orderRows.every((row) => orderMapReviews[row.id])) setOrderMapReviews(createInitialOrderMapReviews(orderRows));
+    setOrderFormError('');
+    go('order-map');
+  };
+
+  const updateOrderMapReview = (rowId: string, patch: Partial<OrderMapReview>) => {
+    setOrderMapReviews((current) => ({ ...current, [rowId]: { ...current[rowId], ...patch } }));
+    setOrderNoteCreated(false);
+    setOrderFormError('');
+  };
+
+  const createOrderNote = () => {
+    if (!orderMapValidation.complete || !orderLimitationConfirmed) {
+      setOrderFormError(language === 'hi' ? 'नोट बनाने से पहले सभी मिलान और दायरे की सीमा जाँचें।' : 'Review every mapping and confirm the scope limitation before creating the note.');
+      const firstRow = orderMapValidation.unconfirmedRowIds[0] ?? orderMapValidation.invalidReferenceRowIds[0];
+      if (firstRow) document.getElementById(`mapping-card-${firstRow}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setOrderNoteCreated(true);
+    setOrderFormError('');
+    window.setTimeout(() => {
+      const note = document.getElementById('order-review-note');
+      note?.focus({ preventScroll: true });
+      note?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    }, 0);
+  };
+
+  const copyClarification = async () => {
+    if (!clarificationDraft) return;
+    try {
+      await navigator.clipboard.writeText(clarificationDraft);
+      setOrderCopied(true);
+    } catch {
+      setOrderFormError(language === 'hi' ? 'कॉपी नहीं हो सका। टेक्स्ट चुनकर कॉपी करें।' : 'Could not copy automatically. Select the text and copy it manually.');
+    }
+  };
+
+  const downloadOrderReview = () => {
+    if (!orderWorkflowComplete || !submittedRevisionId || !orderCompleteness) return;
+    const artifact = buildOrderReviewArtifact({
+      generatedOn: ORDER_REVIEW_REFERENCE_DATE,
+      order: rejectedOrder,
+      extractedFacts: effectiveOrderExtractedFacts,
+      completeness: orderCompleteness,
+      rows: orderRows,
+      reviews: orderMapReviews,
+      evidenceIndex,
+      submittedRevisionId,
+    });
+    downloadBlob(JSON.stringify(artifact, null, 2), 'application/json', `challansakshi-${rejectedOrder.id}-order-review.json`);
+  };
+
+  const downloadPostDecisionCalendar = () => {
+    if (!orderWorkflowComplete) return;
+    const calendar = buildPostDecisionCalendar({
+      orderDate: postRejectionClock.orderDate,
+      indicativeBoundary: postRejectionClock.indicativeBoundary,
+      orderId: rejectedOrder.id,
+      generatedOn: ORDER_REVIEW_REFERENCE_DATE,
+    });
+    downloadBlob(calendar, 'text/calendar;charset=utf-8', `challansakshi-${rejectedOrder.id}-indicative-reminder.ics`);
+  };
+
   const downloadCaseManifest = () => {
-    const contestClock = calculateContestWindow(fixture.issueDate, DEMO_REFERENCE_DATE);
+    const contestClock = calculateContestWindow(fixture.issueDate, latestLedgerDate);
+    const authorityClock = simulatedSubmitted ? calculateAuthorityWindow(ORDER_ACKNOWLEDGED_DATE, latestLedgerDate) : null;
+    const completedOrderReview = orderWorkflowComplete && submittedRevisionId && orderCompleteness
+      ? buildOrderReviewArtifact({
+        generatedOn: ORDER_REVIEW_REFERENCE_DATE,
+        order: rejectedOrder,
+        extractedFacts: effectiveOrderExtractedFacts,
+        completeness: orderCompleteness,
+        rows: orderRows,
+        reviews: orderMapReviews,
+        evidenceIndex,
+        submittedRevisionId,
+      })
+      : null;
     const manifest = {
-      schema: 'challansakshi.case-manifest.v1',
-      generatedOn: DEMO_REFERENCE_DATE,
+      schema: 'challansakshi.case-manifest.v2',
+      generatedOn: latestLedgerDate,
       syntheticOnly: true,
       case: {
         fixtureId,
@@ -783,41 +1142,58 @@ export default function ChallanSakshiApp() {
       },
       citizenReview: {
         confirmed,
-        confirmedFacts: confirmedVehicleFacts,
-        sourceLinkedFacts: facts.map((item) => ({ id: item.id, value: item.value, source: item.source, evidenceReference: item.evidenceRef, confidence: item.confidence, visibility: item.visibility })),
+        meaning: 'Citizen confirmed these source readings as reviewed; this is not official verification.',
+        analysisSnapshot: analysisFacts.map((item) => ({ id: item.id, value: item.value, source: item.source, evidenceReference: item.evidenceRef, confidence: item.confidence, visibility: item.visibility })),
+        activeFacts: (submittedFacts ?? facts).map((item) => ({ id: item.id, value: item.value, source: item.source, evidenceReference: item.evidenceRef, confidence: item.confidence, visibility: item.visibility })),
+        corrections,
       },
       deterministicAssessment: {
-        finding: classification.finding,
-        discrepancies: classification.discrepancies,
-        limitations: classification.limitations,
+        finding: submittedClassification.finding,
+        discrepancies: submittedClassification.discrepancies,
+        limitations: submittedClassification.limitations,
         readiness: { requiredPresent: readiness.requiredPresent, requiredTotal: readiness.requiredTotal, complete: readiness.complete },
       },
+      evidenceIndex,
+      submission: simulatedSubmitted ? {
+        grievanceNumber,
+        acknowledgedOn: ORDER_ACKNOWLEDGED_DATE,
+        revisionId: submittedRevisionId,
+        frozenLocalDemoSnapshot: true,
+      } : null,
+      ledger: { ...ledgerSnapshot, events: ledgerEvents },
+      activeOutcomeScenario: outcome,
+      orderReview: completedOrderReview ?? (outcome === 'rejected' ? {
+        status: 'citizen-review-incomplete',
+        sourceOrder: rejectedOrder,
+        extractedFacts: effectiveOrderExtractedFacts,
+        completeness: orderCompleteness,
+      } : null),
       clocks: {
         convention: 'Issue date is Day 0; D+45 is shown as an indicative boundary. Verify current official cutoffs and state route.',
         contest: contestClock,
+        authorityResponse: authorityClock,
+        postDecision: orderWorkflowComplete ? postRejectionClock : null,
       },
       generatedArtifact: {
-        kind: classification.finding === 'mismatch' ? 'vehicle-review-request' : classification.finding === 'inconclusive' ? 'evidence-clarification-request' : 'none',
-        draft: classification.finding === 'consistent' ? null : contestDraft,
+        kind: submittedClassification.finding === 'mismatch' ? 'vehicle-review-request' : submittedClassification.finding === 'inconclusive' ? 'evidence-clarification-request' : 'none',
+        draft: submittedClassification.finding === 'consistent' ? null : contestDraft,
+        orderReviewNote: orderWorkflowComplete ? orderReviewNote : null,
+        clarificationDraft: orderWorkflowComplete ? clarificationDraft : null,
       },
+      ruleset: { version: 'challansakshi.rules.2026-08', jurisdiction: 'India demo; official and state-specific routes must be verified' },
+      sources: [
+        { name: 'MoRTH parliamentary answer cited by the prototype', url: 'https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars', lastChecked: '2026-08-27' },
+        { name: 'e-Challan official service', url: 'https://echallan.parivahan.gov.in/', lastChecked: '2026-08-27' },
+      ],
       boundaries: [
         'Not a legal decision or legal advice.',
         'No real government, court, bank, or vehicle system was contacted.',
         'The designated authority makes the final decision.',
+        'Order mapping describes textual coverage only, not legal adequacy.',
       ],
     };
-    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = href;
-    anchor.download = `challansakshi-${fixture.challanNumber}-manifest.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(href), 0);
+    downloadBlob(JSON.stringify(manifest, null, 2), 'application/json', `challansakshi-${fixture.challanNumber}-manifest.json`);
   };
-
-  const grievanceNumber = fixture.id === 'mismatch' ? 'DEMO-GRV-A-0827-17' : 'DEMO-GRV-B-0827-09';
 
   return (
     <div className="app-root">
@@ -828,7 +1204,7 @@ export default function ChallanSakshiApp() {
 
       {renderStep === 'desk' && <><ResolutionDesk language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} /><Footer language={language} /></>}
 
-      {renderStep === 'route' && <><ResolutionRouteView language={language} issueId={resolutionIssue} onBack={() => go('desk')} onStartEvidence={startResolutionEvidence} /><Footer language={language} /></>}
+      {renderStep === 'route' && <><ResolutionRouteView language={language} issueId={resolutionIssue} onBack={() => go(orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? 'order-map' : 'desk')} onStartEvidence={startResolutionEvidence} postRejectionContext={orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? { orderDate: postRejectionClock.orderDate, referenceDate: postRejectionClock.referenceDate } : undefined} /><Footer language={language} /></>}
 
       {renderStep === 'intake' && (
         <>
@@ -864,7 +1240,7 @@ export default function ChallanSakshiApp() {
                       return (
                         <div className={`fact-row ${editable ? '' : 'fact-row-readonly'}`} key={item.id}>
                           <label htmlFor={`fact-${item.id}`}>{local(item.label, language)}{!editable && <small>{language === 'hi' ? 'स्रोत रिकॉर्ड' : 'source record'}</small>}</label>
-                          <input id={`fact-${item.id}`} value={item.value} readOnly={!editable} onChange={editable ? (event) => updateFact(item.id, { value: event.target.value }) : undefined} />
+                          <input id={`fact-${item.id}`} value={item.value} maxLength={180} readOnly={!editable} onChange={editable ? (event) => updateFact(item.id, { value: event.target.value }) : undefined} />
                           <div className="fact-meta"><span><b>{local(copy.source, language)}:</b> {item.evidenceRef}</span>{item.source === 'enforcement' && <label>{local(copy.confidence, language)}<select value={item.visibility} onChange={(event) => updateFact(item.id, { visibility: event.target.value as ExtractedFact['visibility'] })}><option value="clear">{local(copy.clear, language)}</option><option value="partial">{local(copy.partial, language)}</option><option value="unclear">{local(copy.unclear, language)}</option><option value="not-visible">{local(copy.notVisible, language)}</option></select></label>}</div>
                           {item.uncertainty && <p className="fact-note"><span aria-hidden="true">i</span>{local(item.uncertainty, language)}</p>}
                         </div>
@@ -874,7 +1250,7 @@ export default function ChallanSakshiApp() {
                 ))}
               </div>
             </div>
-            <div className={`confirmation-box ${formError ? 'has-error' : ''}`}><label><input id="fact-confirmation" type="checkbox" checked={confirmed} onChange={(event) => { setConfirmed(event.target.checked); setFormError(''); }} /><span><b aria-hidden="true">✓</b></span><strong>{local(copy.confirmFacts, language)}</strong></label>{formError && <p role="alert">{formError}</p>}</div>
+            <div className={`confirmation-box ${formError ? 'has-error' : ''}`}><label><input id="fact-confirmation" type="checkbox" checked={confirmed} onChange={(event) => { if (!event.target.checked) invalidateAfterEvidenceChange(); else setConfirmed(true); setFormError(''); }} /><span><b aria-hidden="true">✓</b></span><strong>{local(copy.confirmFacts, language)}</strong></label>{formError && <p role="alert">{formError}</p>}</div>
             <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('intake')}>{local(copy.back, language)}</Button><Button type="button" onClick={continueFromReview}>{local(copy.seeFinding, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
@@ -925,13 +1301,13 @@ export default function ChallanSakshiApp() {
               <section className="pack-summary"><div><small>{local(copy.caseSummary, language)}</small><h2>{classification.finding === 'mismatch' ? local(copy.possibleMismatch, language) : local(copy.inconclusive, language)}</h2><p>{fixture.challanNumber} · {fixture.amount} · {local(fixture.offence, language)}</p></div><div className="pack-clock"><b>{calculateContestWindow(fixture.issueDate, DEMO_REFERENCE_DATE).daysRemaining}</b><span>{local(copy.daysLeft, language)}</span></div></section>
               <section className="pack-section"><h3>01 · {language === 'hi' ? 'आपत्ति का मसौदा' : 'Contest draft'}</h3><pre>{contestDraft}</pre></section>
               <section className="pack-section"><h3>02 · {local(copy.discrepancies, language)}</h3>{classification.finding === 'mismatch' ? <><ol>{classification.discrepancies.map((item) => <li key={item.field}><b>{item.field}</b><span>{item.registeredValue} ≠ {item.observedValue}</span></li>)}</ol>{classification.limitations.length > 0 && <p>{classification.limitations.map((code) => describeLimitation(code, language)).join(' ')}</p>}</> : <p>{classification.limitations.map((code) => describeLimitation(code, language)).join(' ')} {language === 'hi' ? 'वाहन बेमेल का दावा नहीं किया गया।' : 'No vehicle mismatch is asserted.'}</p>}</section>
-              <section className="pack-section"><h3>03 · {local(copy.evidenceIndex, language)}</h3><ol className="evidence-index"><li><b>A1</b><span>{language === 'hi' ? 'सिंथेटिक ई-चालान' : 'Synthetic e-Challan'}</span><small>{fixture.challanNumber}</small></li><li><b>A2</b><span>{language === 'hi' ? 'सिंथेटिक वाहन रिकॉर्ड' : 'Synthetic vehicle record'}</span><small>{confirmedVehicleFacts.registeredPlate}</small></li><li><b>A3</b><span>{language === 'hi' ? 'प्रवर्तन फ़ोटो और तुलना' : 'Enforcement image and comparison'}</span><small>{confirmedVehicleFacts.observedPlate}</small></li><li><b>A4</b><span>{language === 'hi' ? 'नागरिक की डेमो फ़ोटो' : 'Citizen demo photograph'}</span><small>Synthetic</small></li></ol></section>
+              <section className="pack-section"><h3>03 · {local(copy.evidenceIndex, language)}</h3><ol className="evidence-index">{evidenceIndex.map((item) => <li key={item.id}><b>{item.id}</b><span>{local(item.label, language)}</span><small>{item.summary}</small></li>)}</ol></section>
               <section className="pack-two-col"><div><h3>04 · {local(copy.declaration, language)}</h3><p>{language === 'hi' ? 'मैं पुष्टि करता/करती हूँ कि ऊपर की जानकारी मेरी समीक्षा के अनुसार सही है।' : 'I confirm that the information above is accurate to the best of my review.'}</p><span className="signature-line">{language === 'hi' ? 'नाम / हस्ताक्षर / तारीख' : 'Name / signature / date'}</span></div><div><h3>05 · {local(copy.requestedAction, language)}</h3><p>{language === 'hi' ? 'दिए गए सबूत की कारण सहित समीक्षा और उचित आदेश।' : 'A reasoned review of the supplied evidence and an appropriate order.'}</p></div></section>
               <footer>{local(copy.disclaimer, language)} {local(copy.currentStateRoute, language)}</footer>
             </article>
             <div className="pack-tools"><Button variant="secondary" type="button" onClick={copyDraft}>{copied ? local(copy.copied, language) : local(copy.copyText, language)} <span aria-hidden="true">{copied ? '✓' : '⧉'}</span></Button><Button variant="secondary" type="button" onClick={downloadCaseManifest}>{language === 'hi' ? 'केस रिकॉर्ड (.json)' : 'Download case record (.json)'} <span aria-hidden="true">↓</span></Button><Button variant="secondary" type="button" onClick={() => window.print()}>{local(copy.printPack, language)} <span aria-hidden="true">↗</span></Button><Button variant="quiet" type="button" onClick={() => go('review')}>{local(copy.editFacts, language)}</Button></div>
             {analysisMessage && <p className="analysis-message" role="status">{analysisMessage}</p>}
-            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('readiness')}>{local(copy.back, language)}</Button><Button type="button" onClick={() => { setTrackingStage(2); setOutcome('none'); setSimulatedSubmitted(true); go('tracking'); }}>{local(copy.submitDemo, language)} <span aria-hidden="true">→</span></Button></div>
+            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('readiness')}>{local(copy.back, language)}</Button><Button type="button" onClick={submitDemo}>{local(copy.submitDemo, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
         </>
@@ -944,23 +1320,79 @@ export default function ChallanSakshiApp() {
             <div className="tracking-heading"><div><p className="eyebrow"><span />{local(copy.tracking, language)}</p><h1>{local(copy.tracking, language)}</h1><p>{local(copy.trackingLead, language)}</p></div><div className="fictional-reference"><small>{local(copy.fictionalRef, language)}</small><strong>{grievanceNumber}</strong><span>{local(copy.synthetic, language)}</span></div></div>
             <div className="simulation-banner strong"><span aria-hidden="true">!</span><div><strong>{language === 'hi' ? 'डेमो आपत्ति दर्ज की गई' : 'Simulated submission received'}</strong><p>{local(copy.trackingLead, language)} {language === 'hi' ? 'यह संदर्भ नंबर पूरी तरह काल्पनिक है।' : 'This reference number is entirely fictional.'}</p></div></div>
             <div className="tracking-layout">
-              <section className="timeline-card"><div className="card-title"><span>01</span><div><h2>{local(copy.timeline, language)}</h2><small>{language === 'hi' ? 'पहले के सबूत और पैक सुरक्षित हैं' : 'Earlier evidence and pack remain attached'}</small></div></div><Timeline stage={trackingStage} language={language} />{trackingStage < 3 && <Button type="button" onClick={() => setTrackingStage(3)}>{local(copy.moveForward, language)} <span aria-hidden="true">→</span></Button>}</section>
+              <section className="timeline-card"><div className="card-title"><span>01</span><div><h2>{language === 'hi' ? 'पता लगाने योग्य केस इतिहास' : 'Traceable case history'}</h2><small>{language === 'hi' ? 'स्रोत, नागरिक, नियम और काल्पनिक प्राधिकरण अलग दिखते हैं' : 'Source, citizen, rules, and simulated authority stay distinct'}</small></div></div><CaseLedgerTimeline events={ledgerEvents} language={language} />{trackingStage < 3 && <Button type="button" onClick={() => setTrackingStage(3)}>{local(copy.moveForward, language)} <span aria-hidden="true">→</span></Button>}</section>
               <aside className="track-summary"><div className="card-title"><span>02</span><div><h2>{language === 'hi' ? 'डेमो समय-सीमा' : 'Demo timing'}</h2><small>{language === 'hi' ? 'नियम से गणना' : 'Calculated by rules'}</small></div></div><dl><div><dt>{language === 'hi' ? 'डेमो जमा तारीख' : 'Demo acknowledged'}</dt><dd>27 Aug 2026</dd></div><div><dt>{language === 'hi' ? 'बताई गई अवधि' : 'Stated response period'}</dt><dd>30 days</dd></div><div><dt>{language === 'hi' ? 'स्थिति' : 'Status'}</dt><dd>{trackingStage < 3 ? local(copy.submissionReceived, language) : trackingStage === 3 ? local(copy.underReview, language) : local(copy.reasonedOutcome, language)}</dd></div></dl><button type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)} <span aria-hidden="true">→</span></button></aside>
             </div>
 
             {trackingStage >= 3 && (
-              <section className="outcome-simulator"><div className="section-heading"><p className="eyebrow"><span />{local(copy.chooseOutcome, language)}</p><h2>{language === 'hi' ? 'प्राधिकरण का काल्पनिक नतीजा चुनें' : 'Choose a fictional authority outcome'}</h2></div><div className="outcome-buttons"><button className={outcome === 'quashed' ? 'active' : ''} type="button" onClick={() => { setOutcome('quashed'); setTrackingStage(4); }}><span>✓</span><strong>{local(copy.quashed, language)}</strong><small>{language === 'hi' ? 'कारण रिकॉर्ड में दिखेंगे' : 'Reasons remain on record'}</small></button><button className={outcome === 'rejected' ? 'active' : ''} type="button" onClick={() => { setOutcome('rejected'); setTrackingStage(4); }}><span>×</span><strong>{local(copy.rejected, language)}</strong><small>{language === 'hi' ? 'तटस्थ अगला कदम' : 'Neutral next-step guidance'}</small></button><button className={outcome === 'no-resolution' ? 'active' : ''} type="button" onClick={() => { setOutcome('no-resolution'); setTrackingStage(4); }}><span>…</span><strong>{local(copy.noResolution, language)}</strong><small>{language === 'hi' ? '30 दिन के बाद स्थिति जाँचें' : 'Verify status after 30 days'}</small></button></div></section>
+              <section className="outcome-simulator"><div className="section-heading"><p className="eyebrow"><span />{local(copy.chooseOutcome, language)}</p><h2>{language === 'hi' ? 'प्राधिकरण का काल्पनिक नतीजा चुनें' : 'Choose a fictional authority outcome scenario'}</h2><p>{language === 'hi' ? 'हर विकल्प उसी डेमो की अलग शाखा है; केवल चुनी शाखा केस इतिहास में सक्रिय रहती है।' : 'Each option is a separate branch of the same demo; only the selected branch remains active in the case history.'}</p></div><div className="outcome-buttons"><button className={outcome === 'quashed' ? 'active' : ''} type="button" onClick={() => selectOutcome('quashed')}><span>✓</span><strong>{local(copy.quashed, language)}</strong><small>{language === 'hi' ? 'कारण रिकॉर्ड में दिखेंगे' : 'Reasons remain on record'}</small></button><button className={outcome === 'rejected' ? 'active' : ''} type="button" onClick={() => selectOutcome('rejected')}><span>×</span><strong>{local(copy.rejected, language)}</strong><small>{language === 'hi' ? 'आदेश को सबूत से मिलाएँ' : 'Map the order to evidence'}</small></button><button className={outcome === 'no-resolution' ? 'active' : ''} type="button" onClick={() => selectOutcome('no-resolution')}><span>…</span><strong>{local(copy.noResolution, language)}</strong><small>{language === 'hi' ? '30 दिन के बाद स्थिति जाँचें' : 'Verify status after 30 days'}</small></button></div></section>
             )}
 
             {outcome !== 'none' && (
               <section className={`outcome-card outcome-${outcome}`}>
                 <div className="outcome-mark" aria-hidden="true">{outcome === 'quashed' ? '✓' : outcome === 'rejected' ? '×' : '…'}</div>
-                <div><span className="synthetic-chip">FICTIONAL DEMO OUTCOME</span><h2>{outcome === 'quashed' ? local(copy.quashedTitle, language) : outcome === 'rejected' ? local(copy.rejectedTitle, language) : local(copy.noResolutionTitle, language)}</h2><p>{outcome === 'quashed' ? local(copy.quashedReason, language) : outcome === 'rejected' ? local(copy.rejectedReason, language) : local(copy.noResolutionBody, language)}</p>{outcome === 'rejected' && <p className="neutral-note">{local(copy.neutralNext, language)}</p>}{outcome === 'no-resolution' && (() => { const authorityClock = calculateAuthorityWindow('2026-08-27', '2026-09-27'); return <div className="authority-clock"><b>{authorityClock.elapsedDays}</b><span>{language === 'hi' ? '27 सितंबर तक बीते कैलेंडर दिन' : 'calendar days elapsed as of 27 Sep'}</span><small>{language === 'hi' ? '30 दिन की सीमा पार — आधिकारिक स्थिति जाँचें' : '30-day boundary passed — verify official status'}</small></div>; })()}<div className="outcome-links"><button type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</button>{outcome === 'rejected' && <button type="button" onClick={() => openResolutionRoute('grievance-rejected')}>{language === 'hi' ? 'फैसले के बाद रास्ता देखें' : 'Open post-decision route'} →</button>}{outcome === 'no-resolution' && <button type="button" onClick={() => openResolutionRoute('no-recorded-decision')}>{language === 'hi' ? 'स्थिति फॉलो-अप रास्ता देखें' : 'Open status follow-up route'} →</button>}<a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a><a href="https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars" target="_blank" rel="noreferrer">{local(copy.officialSource, language)} ↗</a></div></div>
+                <div><span className="synthetic-chip">FICTIONAL DEMO OUTCOME</span><h2>{outcome === 'quashed' ? local(copy.quashedTitle, language) : outcome === 'rejected' ? local(copy.rejectedTitle, language) : local(copy.noResolutionTitle, language)}</h2><p>{outcome === 'quashed' ? local(copy.quashedReason, language) : outcome === 'rejected' ? (classification.finding === 'mismatch' ? local(copy.rejectedReason, language) : (language === 'hi' ? 'दर्ज कारण: दी गई धुंधली सामग्री से चालान रिकॉर्ड बदलने का आधार स्पष्ट नहीं हुआ।' : 'Reason recorded: the supplied unclear material did not establish a basis to change the challan record.')) : local(copy.noResolutionBody, language)}</p>{outcome === 'rejected' && <><p className="neutral-note">{local(copy.neutralNext, language)}</p><div className="order-review-entry"><div><strong>{language === 'hi' ? 'आदेश में आपके सबूतों का उल्लेख कहाँ है?' : 'Where does the order mention your evidence?'}</strong><p>{language === 'hi' ? 'दिए काल्पनिक आदेश को उसी जमा रिविज़न के हर पक्के बिंदु से मिलाएँ।' : 'Compare the supplied fictional order with every confirmed point in the frozen local submission revision.'}</p><small>{submittedRevisionId}</small></div><Button type="button" onClick={() => go('order-review')}>{language === 'hi' ? 'इस आदेश को मेरे सबूतों से मिलाएँ' : 'Compare this order with my evidence'} <span aria-hidden="true">→</span></Button></div></>}{outcome === 'no-resolution' && (() => { const authorityClock = calculateAuthorityWindow('2026-08-27', '2026-09-27'); return <div className="authority-clock"><b>{authorityClock.elapsedDays}</b><span>{language === 'hi' ? '27 सितंबर तक बीते कैलेंडर दिन' : 'calendar days elapsed as of 27 Sep'}</span><small>{language === 'hi' ? '30 दिन की सीमा पार — आधिकारिक स्थिति जाँचें' : '30-day boundary passed — verify official status'}</small></div>; })()}<div className="outcome-links"><button type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</button>{outcome === 'no-resolution' && <button type="button" onClick={() => openResolutionRoute('no-recorded-decision')}>{language === 'hi' ? 'स्थिति फॉलो-अप रास्ता देखें' : 'Open status follow-up route'} →</button>}<a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a><a href="https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars" target="_blank" rel="noreferrer">{local(copy.officialSource, language)} ↗</a></div></div>
               </section>
             )}
-            <div className="resolution-reveal"><div><p className="eyebrow"><span />{language === 'hi' ? 'एक प्रणाली · सात मुश्किल पल' : 'One system · seven moments of failure'}</p><h2>{language === 'hi' ? 'गलत सबूत से भुगतान और कोर्ट हैंडऑफ़ तक' : 'From wrong evidence to payment and court handoff'}</h2><p>{language === 'hi' ? 'मुख्य डेमो पूरा हुआ। अब देखें कि वही सबूत-आधारित तरीका अस्वीकृति, जवाब न मिलने, वर्चुअल कोर्ट, पेंडिंग भुगतान और पहुँच की समस्या में कैसे काम करता है।' : 'The flagship story is complete. Now see how the same evidence-first method handles rejection, no recorded decision, Virtual Court, pending payments, and access problems.'}</p></div><Button type="button" onClick={() => go('desk')}>{language === 'hi' ? 'पूरा रिज़ॉल्यूशन डेस्क खोलें' : 'Explore the full resolution desk'} <span aria-hidden="true">→</span></Button></div>
+            <div className="resolution-reveal"><div><p className="eyebrow"><span />{language === 'hi' ? 'दूसरा चरण · आगे बढ़ने की संभावना' : 'SECONDARY SCALE PATH'}</p><h2>{language === 'hi' ? 'इसी भरोसेमंद तरीके से जुड़े रास्ते' : 'Adjacent routes using the same trust pattern'}</h2><p>{language === 'hi' ? 'मुख्य सबूत-से-आदेश डेमो पूरा हुआ। अलग रिज़ॉल्यूशन डेस्क दिखाता है कि यही सावधानी बाद में जवाब न मिलने, वर्चुअल कोर्ट, पेंडिंग भुगतान और पहुँच की समस्या तक कैसे बढ़ सकती है।' : 'The flagship evidence-to-order story is complete. A separate Resolution Desk shows how the same safeguards could later extend to no recorded decision, Virtual Court, pending payment, and access problems.'}</p></div><Button type="button" onClick={() => go('desk')}>{language === 'hi' ? 'दूसरे रास्ते देखें' : 'Explore adjacent routes'} <span aria-hidden="true">→</span></Button></div>
             <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</Button><Button variant="secondary" type="button" onClick={downloadCaseManifest}>{language === 'hi' ? 'केस रिकॉर्ड डाउनलोड करें' : 'Download case record'} <span aria-hidden="true">↓</span></Button><Button type="button" onClick={() => go('intake')}>{local(copy.anotherDemo, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
+          <Footer language={language} />
+        </>
+      )}
+
+      {renderStep === 'order-review' && outcome === 'rejected' && simulatedSubmitted && (
+        <>
+          <OrderReviewScreen
+            language={language}
+            order={rejectedOrder}
+            extractedFacts={effectiveOrderExtractedFacts}
+            confirmedFactIds={orderConfirmedFactIds}
+            completeness={orderCompleteness}
+            error={orderFormError}
+            onFactChange={updateOrderFact}
+            onFactConfirmation={confirmOrderFact}
+            onCompletenessChange={(value) => {
+              setOrderCompleteness(value);
+              setOrderMapReviews((current) => invalidateOrderMapConfirmations(current));
+              setOrderLimitationConfirmed(false);
+              setOrderNoteCreated(false);
+              setOrderFormError('');
+            }}
+            onContinue={continueFromOrderReview}
+            onBack={() => go('tracking')}
+          />
+          <Footer language={language} />
+        </>
+      )}
+
+      {renderStep === 'order-map' && outcome === 'rejected' && simulatedSubmitted && orderCompleteness && submittedRevisionId && (
+        <>
+          <OrderMapScreen
+            language={language}
+            order={rejectedOrder}
+            completeness={orderCompleteness}
+            rows={orderRows}
+            reviews={orderMapReviews}
+            evidenceIndex={evidenceIndex}
+            ledgerEvents={ledgerEvents}
+            postClock={postRejectionClock}
+            limitationConfirmed={orderLimitationConfirmed}
+            noteCreated={effectiveOrderNoteCreated}
+            note={orderReviewNote}
+            clarificationDraft={clarificationDraft}
+            error={orderFormError}
+            copied={orderCopied}
+            onReviewChange={updateOrderMapReview}
+            onLimitationConfirmation={(checked) => { setOrderLimitationConfirmed(checked); setOrderNoteCreated(false); setOrderFormError(''); }}
+            onCreateNote={createOrderNote}
+            onCopyClarification={copyClarification}
+            onDownloadNote={downloadOrderReview}
+            onDownloadManifest={downloadCaseManifest}
+            onDownloadCalendar={downloadPostDecisionCalendar}
+            onOpenRoute={() => openResolutionRoute('grievance-rejected')}
+            onBack={() => go('order-review')}
+          />
           <Footer language={language} />
         </>
       )}

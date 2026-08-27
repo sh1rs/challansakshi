@@ -2,13 +2,13 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first e-Challan resolution desk. Its flagship journey helps a citizen review a notice whose photograph may show a different vehicle or may not clearly support the allegation. The expanded desk continues through a reasoned rejection, a Virtual Court handoff, a payment/status conflict, and access or receipt recovery—without collecting real documents or pretending to complete an official action.
+ChallanSakshi is an independent, evidence-first e-Challan resolver for one continuous citizen problem: **does the supplied evidence match my vehicle, and if my contest is rejected, does the supplied order address the evidence I actually submitted?** It carries one frozen local demo revision from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. A secondary Resolution Desk demonstrates adjacent routing potential without changing the submitted problem or pretending to complete an official action.
 
 > Independent Build What Moves India hackathon prototype. Not affiliated with MoRTH, Parivahan, traffic police, or any court. Synthetic demo data only. Not legal advice.
 
 ## The exact citizen problem
 
-A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve what matters, and navigate fragmented authority, court, payment, and recovery states. The flagship case begins with a blurry plate, a visibly different vehicle, or a photograph that does not support reliable assessment of the allegation; the same evidence trail still matters after submission, rejection, court handoff, or a conflicting payment status.
+A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve what was submitted, and determine whether the supplied response addresses those same evidence points. The flagship case begins with a blurry plate, a visibly different vehicle, or a photograph that does not support reliable assessment of the allegation; the same evidence trail remains useful after submission and a reasoned response.
 
 The official e-Challan and Virtual Courts services already support status, payment, grievance, verification, and court workflows. ChallanSakshi does not replace or imitate those functions. It adds the missing evidence-understanding and next-route layer before a citizen acts:
 
@@ -19,16 +19,22 @@ The official e-Challan and Virtual Courts services already support status, payme
 5. Calculate indicative clocks with deterministic TypeScript.
 6. Build an indexed, factual pack from confirmed information only.
 7. Refuse to manufacture a dispute when the records appear consistent.
-8. Preserve a machine-readable case manifest made from confirmed facts.
-9. Route selected post-decision, court, payment, and recovery problems to the appropriate official service with explicit safety boundaries.
+8. Freeze the core submitted facts under a stable deterministic local revision ID and preserve a traceable demo ledger.
+9. Compare a supplied fictional order with the submitted evidence, with mandatory citizen review of every mapping.
+10. Generate a versioned Order Review Note and neutral reason-clarification request when supported.
+11. Offer adjacent official-service routing as a clearly secondary scale path.
 
 ## What is working
 
 - A complete mobile-first six-stage evidence journey, plus landing and Resolution Desk routes, with sensible browser back/forward behaviour.
-- A bilingual **Resolution Desk** covering seven moments in one e-Challan lifecycle: wrong evidence, unclear evidence, grievance rejection, no recorded decision, Virtual Court transfer, payment/status conflict, and phone/receipt recovery.
+- A secondary bilingual **Resolution Desk** showing how the same evidence-first pattern could later route seven adjacent lifecycle moments; it is not the flagship submission journey.
 - Plain-language English and Hindi routing that only suggests a help path, exposes ambiguity, and requires citizen confirmation.
 - A working three-state payment reconciler: supplied-record conflict, identifier mismatch, and aligned-record refusal.
 - A deterministic post-rejection D+30 clock with state-specific implementation cautions.
+- A deeply integrated **Order-to-Evidence Review** for the rejected hero case: seven extracted order facts, a document-completeness gate, six source-linked mapping rows, three neutral statuses, editable paragraph references, and mandatory per-row confirmation.
+- A versioned **Order Review Note**, neutral reason-clarification wording, downloadable JSON artifact, indicative `.ics` reminder, and full case manifest.
+- A derived ten-event local case ledger that distinguishes supplied records, analysis, citizen confirmation, deterministic rules, and the simulated authority. It is explicitly not an official record or legal chain of custody.
+- A frozen local demo snapshot with a stable deterministic revision ID tying the pack, grievance, fictional order, evidence map, ledger, and downloads to the same core citizen-confirmed facts. It is not a cryptographic integrity proof. Editing evidence clears every downstream simulated event.
 - An official Virtual Courts handoff checklist that never handles OTPs, filing, or payment.
 - Downloadable JSON route notes and a versioned, source-linked case manifest.
 - Refresh persistence for current demo step, selected fixture, verified facts, tracking state, and selected resolution route.
@@ -50,17 +56,21 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 ```text
 app/page.tsx
-  └─ components/ChallanSakshiApp.tsx     UI, localization, persistence, demo flow
-       ├─ components/ResolutionDesk.tsx   triage, routes, payment demo, official handoffs
-       ├─ lib/fixtures.ts                 typed synthetic records and precomputed analysis
-       ├─ lib/domain.ts                   pure date, evidence, readiness, and state rules
-       └─ lib/resolution.ts               triage, post-order, route, and payment rules
+  └─ components/ChallanSakshiApp.tsx       UI, localization, V4 persistence, demo flow
+       ├─ components/ResolutionDesk.tsx     triage, routes, payment demo, official handoffs
+       ├─ components/OrderEvidenceReview.tsx locked order, mapping, note, and ledger UI
+       ├─ lib/fixtures.ts                   typed synthetic records and precomputed analysis
+       ├─ lib/domain.ts                     pure date, evidence, readiness, and state rules
+       ├─ lib/resolution.ts                 triage, post-order, route, and payment rules
+       ├─ lib/case-ledger.ts                evidence registry, revisions, provenance, ledger
+       └─ lib/order-evidence.ts             order fixture, mapping, validation, artifacts
 
-app/api/analyze/route.ts                  optional Responses API image extraction
-tests/domain.test.ts                      core deterministic rule coverage
-tests/resolution.test.ts                  resolution and reconciliation rule coverage
-public/evidence-contact-sheet.png         synthetic evidence photography
-public/og.png                             social preview
+app/api/analyze/route.ts                    optional Responses API image extraction
+tests/domain.test.ts                        core deterministic rule coverage
+tests/resolution.test.ts                    resolution and reconciliation rule coverage
+tests/case-ledger.test.ts                   provenance, ledger, order map, artifact invariants
+public/evidence-contact-sheet.png           synthetic evidence photography
+public/og.png                               social preview
 ```
 
 The application uses the Sites Next-compatible scaffold (React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, Cloudflare Worker-compatible ESM output). There is no account system, database, payment, real filing, or live government integration.
@@ -78,7 +88,14 @@ Normal TypeScript code handles:
 - evidence completeness;
 - mismatch/inconclusive/consistent classification after confirmation;
 - allowed case transitions and available actions;
-- outcome display.
+- outcome display;
+- submitted-revision identity and downstream invalidation;
+- order-fact and document-completeness gates;
+- valid evidence and paragraph references;
+- per-row Order-to-Evidence confirmation;
+- case-ledger chronology and active scenario branching;
+- eligibility for a neutral clarification artifact;
+- post-order reminder generation;
 - plain-language route matching;
 - post-rejection indicative clock calculation;
 - payment-record reconciliation and refusal states;
@@ -146,6 +163,7 @@ For another common host, install dependencies, configure the optional environmen
 - Live analysis covers the synthetic demonstration image; real personal documents are intentionally outside this prototype’s scope.
 - The interface and guidance are bilingual across the core journey, while synthetic identifiers and a few source values remain in English for recognisability.
 - Simulated authority outcomes do not represent a prediction or guarantee.
+- The Order-to-Evidence map describes textual coverage only. “Not found” never means a point was ignored, an order is invalid, or an appeal is warranted; content may exist in another page, annexure, or official record.
 
 ## Official sources
 
@@ -162,4 +180,4 @@ The parliamentary answer describes the 45-day action window, supporting-document
 
 ## How Codex was used meaningfully
 
-Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes, drafted and tested the domain state machine and payment reconciler, built the bilingual evidence-review and resolution journeys, generated wholly synthetic visual assets, verified official-source wording, and exercised the end-to-end flow through browser-based responsive QA. Human verification remains intentional: no model observation or keyword match silently becomes a conclusion or official action.
+Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes; built the bilingual evidence, case-ledger, and order-review journey; typed and tested correction provenance, stable submission revisions, citation validation, and refusal states; generated wholly synthetic visual assets; verified official-source wording; and exercised the complete flow through desktop and 390 px browser QA. Human verification remains intentional: no model observation, order mapping, or keyword match silently becomes a conclusion or official action.

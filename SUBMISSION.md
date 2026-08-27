@@ -1,22 +1,22 @@
 # ChallanSakshi — Evidence before action
 
-> **ChallanSakshi helps a citizen determine whether an e-Challan’s supplied evidence matches their vehicle, prepare an indexed evidence-backed contest or clarification pack, and navigate the next authority, court, payment, or recovery step.**
+> **ChallanSakshi helps a citizen determine whether an e-Challan’s supplied evidence matches their vehicle, preserve an indexed contest, and check whether a supplied rejection order addresses the evidence they actually submitted.**
 
 ## Polished summary (under 250 words)
 
 Asha owns a blue scooter ending in `3317`. Her fictional ₹1,000 helmet e-Challan records that scooter—but the supplied enforcement image appears to show a white motorcycle ending in `3817`.
 
-Today, a citizen in that situation must inspect a blurry image, decide which differences matter, gather documents, draft a factual grievance, watch the contest deadline, and then track the result across separate official states. The official portal provides grievance and status workflows; ChallanSakshi adds a guided, side-by-side evidence review before the citizen uses those workflows.
+Today, a citizen in that situation must inspect an image, decide which differences matter, gather documents, draft a factual grievance, watch the deadline, and preserve the trail after a decision. The official portal provides grievance and status workflows; ChallanSakshi adds the missing evidence-understanding layer around them.
 
-ChallanSakshi fills that evidence gap. It reads synthetic records, shows every extracted fact with its source, requires citizen confirmation, and uses deterministic code to classify comparisons and calculate indicative clocks. If records conflict, it creates an indexed contest pack. If an image is unclear, it describes the limitation without inventing a plate. If records align, it refuses to manufacture a dispute.
+It reads synthetic records, shows every extracted fact with its source, requires citizen confirmation, and uses deterministic code to classify comparisons and calculate indicative clocks. Conflicting records create an indexed pack; unclear evidence stays inconclusive; matching evidence triggers a refusal to manufacture a dispute.
 
-The Resolution Desk carries that evidence discipline through seven fictional failure points: wrong or unclear evidence, grievance rejection, no recorded decision, Virtual Court transfer, payment/status conflict, and phone or receipt recovery. A three-state payment reconciler checks identifiers and amounts; each route ends at an official service without collecting an OTP, payment credential, or real document.
+After a fictional rejection, ChallanSakshi freezes the core submitted facts under a stable local revision ID, verifies seven extracted order facts, and compares six submitted points against the supplied six-paragraph order. Every row must be citizen-confirmed as **explicitly mentioned**, **reference unclear**, or **not found in the supplied text**. It then creates a neutral Order Review Note, reason-clarification wording, case ledger, JSON record, and indicative calendar reminder. “Not found” never means ignored or invalid.
 
-The prototype works without an API key through three typed fixtures; optional OpenAI Responses API extraction uses strict validation and fallback. All filing and outcomes are simulated. ChallanSakshi never declares innocence, invalidates a challan, or promises cancellation.
+The prototype works without an API key through typed fixtures; optional OpenAI vision uses strict validation and fallback. A secondary Resolution Desk shows adjacent scale potential, but the submitted journey remains the single evidence-to-response problem. No real upload, filing, payment, or government connection exists. ChallanSakshi never declares innocence, invalidates an order, or predicts an outcome.
 
 ## Problem
 
-A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve what matters, and navigate fragmented authority, court, payment, and recovery states. Camera-generated notices can include the wrong vehicle, a misread plate, or an image that does not visibly establish the allegation; later, the citizen may face a reasoned rejection, no recorded decision, a Virtual Court transfer, a payment-status conflict, or an access problem without losing the original evidence trail.
+A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve exactly which core facts were submitted, and check whether the supplied response addresses those points. Camera-generated notices can include the wrong vehicle, a misread plate, or an image that does not visibly establish the allegation; after contesting, the citizen still needs the original evidence trail to understand a reasoned response.
 
 The March 2026 Rajya Sabha answer reports:
 
@@ -40,9 +40,10 @@ The journey is:
 5. See a mismatch, inconclusive, or consistent finding.
 6. Review the deterministic deadline and evidence readiness.
 7. Generate and print an indexed factual pack.
-8. Simulate submission and switch among three reasoned outcomes.
-9. Open a post-decision, court, payment, or access route in the Resolution Desk.
-10. Download a source-linked case manifest or route note.
+8. Simulate submission and switch among three mutually exclusive outcome scenarios.
+9. For a rejection, verify the fictional order and review every evidence-to-paragraph mapping.
+10. Generate an Order Review Note, neutral clarification wording, calendar reminder, and versioned case manifest.
+11. Continue to a neutral official-service handoff; adjacent court, payment, and access routes remain secondary scale demonstrations.
 
 ## What actually works
 
@@ -55,7 +56,10 @@ The journey is:
 - Print/save-as-PDF contest pack.
 - Refresh persistence and browser back/forward behaviour.
 - Three complete tracking outcomes.
-- Seven bilingual resolution routes with confirmable plain-language triage.
+- A source/actor-separated local case ledger tied to one frozen local demo snapshot and stable deterministic revision ID, explicitly not a cryptographic integrity proof.
+- A complete rejected-order workflow with locked source text, seven extracted facts, order-completeness scope, six mappings, three neutral statuses, editable paragraph citations, and mandatory confirmation.
+- A versioned Order Review Note, neutral clarification request, JSON download, full case manifest, print view, and `.ics` reminder.
+- Seven bilingual adjacent resolution routes with confirmable plain-language triage, clearly secondary to the flagship evidence journey.
 - A deterministic post-rejection D+30 clock and neutral official handoff.
 - Three payment examples: record conflict, identifier mismatch, and aligned-record refusal.
 - A Virtual Courts search/verification/contest checklist and access/receipt recovery guidance.
@@ -96,6 +100,8 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 - Typed local fixtures and maintainable English/Hindi copy.
 - Pure domain module for dates, classification, readiness, actions, and transitions.
 - Separate resolution module for triage, payment reconciliation, and post-order clocks.
+- Pure case-ledger and order-evidence modules for revisions, provenance, citations, validation, artifacts, and timeline events.
+- Dedicated accessible order-review component with bilingual source, field, mapping, and note states.
 - Vitest rule coverage.
 - Optional server-side Responses API endpoint with image input, strict JSON Schema, response validation, `store: false`, and no raw-payload logging.
 - Local storage only for demo step and verified synthetic state; no database.
