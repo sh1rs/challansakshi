@@ -1,83 +1,83 @@
-# ChallanSakshi demo script — 1:30 target
+# ChallanSakshi demo script — 1:50 target
 
-Use **Case A — Clear vehicle mismatch** and the precomputed analysis during the official recording. The optional live rerun can be shown after the main story if time remains.
+Use **Case A — Clear vehicle mismatch** and the precomputed analysis during the official recording. The first minute is the citizen journey; the second explains what was built and why.
 
-## 0:00–0:08 · Human problem
+## 0:00–0:07 · Human problem
 
 **Screen:** Landing page with the scooter/motorcycle comparison visible.
 
-**Narration:**
-
-> “Asha received a helmet challan, but its photograph appears to show a different vehicle. She needs to understand the evidence and act before time runs out.”
+> “Asha received a helmet challan, but its photograph appears to show a different vehicle. She needs to understand the evidence before time runs out.”
 
 **Click:** `Try the demo challan`.
 
-## 0:08–0:18 · Evidence intake
+## 0:07–0:15 · Supplied evidence
 
 **Screen:** Evidence intake with Case A selected.
 
-**Narration:**
-
-> “ChallanSakshi compares the challan, a fictional vehicle record, and a current vehicle photo. Everything in this demo is synthetic.”
+> “ChallanSakshi places the fictional challan, vehicle record, and current vehicle photograph side by side. No real documents are accepted.”
 
 **Click:** `Analyse the evidence`.
 
-## 0:18–0:31 · Human verification
+## 0:15–0:26 · Human verification
 
-**Screen:** Extracted facts. Point to the source labels and visibility controls.
+**Screen:** Source-linked facts and visibility controls.
 
-**Narration:**
-
-> “It extracts the recorded plate, the visible plate, vehicle category, colour, and whether the allegation can be assessed. Asha can correct every observation, and nothing becomes a finding until she confirms it.”
+> “It reads the visible plate, category, colour, and offence context. Asha can correct comparison observations, while source identifiers stay locked. Nothing becomes a finding until she confirms it.”
 
 **Click:** Check `I reviewed these extracted facts…`, then `See the evidence finding`.
 
-## 0:31–0:47 · Hero mismatch moment
+## 0:26–0:39 · Hero mismatch
 
-**Screen:** Possible vehicle mismatch. Pause on the side-by-side comparison.
+**Screen:** Possible vehicle mismatch; pause on the side-by-side comparison.
 
-**Narration:**
-
-> “The record says blue scooter ending `3317`; the image appears to show a white motorcycle ending `3817`. ChallanSakshi says ‘possible mismatch’—never ‘illegal’ or ‘innocent’. Rules, not AI, show Day 8 of the 45-day window.”
+> “The record says blue scooter ending `3317`; the image appears to show a white motorcycle ending `3817`. It says ‘possible mismatch’—never ‘illegal’ or ‘innocent’. Rules show Day 8 of the indicative 45-day window.”
 
 **Click:** `Evidence readiness`.
 
-## 0:47–0:58 · Evidence readiness
+## 0:39–0:48 · Readiness
 
-**Screen:** Readiness checklist.
+**Screen:** Evidence-readiness checklist.
 
-**Narration:**
-
-> “The checklist separates what Asha can supply, what the authority should hold, and optional support. Missing evidence is never invented.”
+> “The checklist separates citizen records, authority-held evidence, and optional support. Missing or unclear evidence is never invented.”
 
 **Click:** `Prepare my contest pack`.
 
-## 0:58–1:11 · Evidence-pack moment
+## 0:48–0:56 · Pack and outcome
 
-**Screen:** Contest pack.
+**Screen:** Indexed pack, then tracking.
 
-**Narration:**
+> “The pack uses only confirmed facts and keeps every source indexed.”
 
-> “The pack contains a factual draft, exact discrepancies, an indexed evidence list, the indicative deadline, and a declaration placeholder—all from facts Asha confirmed.”
+**Click sequence:** `Proceed to simulated submission` → `Move demo case forward` → `Quashed with reasons`.
 
-**Click:** `Proceed to simulated submission`.
+## 0:56–1:00 · Close the citizen story
 
-## 1:11–1:24 · Mocked outcome
+> “The submission and outcome are clearly fictional, but the complete evidence trail works.”
 
-**Screen:** Tracking.
+## 1:00–1:18 · Build decision: AI and rules
 
-**Click sequence:** `Move demo case forward` → `Quashed with reasons`.
+**Screen:** Keep the tracker or briefly return to reviewed facts.
 
-**Narration:**
+> “The optional OpenAI vision route receives only a fixture ID, loads a bundled synthetic image server-side, and returns strict structured observations. Human confirmation is mandatory. Deterministic TypeScript—not AI—controls classifications, dates, readiness, and allowed states.”
 
-> “No government system was contacted. The fictional tracker preserves the evidence trail and a reasoned outcome. Judges can also switch to rejection or no recorded resolution.”
+## 1:18–1:31 · Resilience and deliberate boundaries
 
-## 1:24–1:30 · Honest close
+> “Three typed fixtures cover mismatch, inconclusive evidence, and evidence that supports the notice. The full demo works without a key through an honest precomputed fallback. We deliberately excluded login, real uploads, OTPs, payment, filing, and live government integration.”
 
-**Narration:**
+## 1:31–1:43 · Coherent lifecycle breadth
 
-> “ChallanSakshi makes evidence understandable, deadlines visible, and contests complete enough for an authority to decide.”
+**Click:** `Explore the full resolution desk`.
+
+**Screen:** Resolution Desk with seven fictional guided scenarios.
+
+> “The same evidence discipline continues through rejection, no recorded decision, Virtual Court, payment-status conflict, and access or receipt recovery. These are branches of one dispute lifecycle, not seven unrelated products.”
+
+Optionally click `Payment succeeded, but status is pending` → `Confirm this route` to reveal the working deterministic reconciler.
+
+## 1:43–1:50 · Build proof and final line
+
+> “Codex helped implement and test the bilingual state engine, full payment matrix, privacy guards, responsive UI, and browser flows. ChallanSakshi prepares a safer official handoff; it never replaces the authority.”
 
 ## Recording fallback if live AI is slow
 
-Do not wait on the API during the 1:30 recording. The visible label **Precomputed demo analysis** is intentional and honest. The typed fixture drives the same verification, rules, pack, and tracking flow. After the main demo, optionally return to fact review and click **Re-run AI analysis**; any API or validation failure keeps the fixture and displays **Precomputed fallback active**.
+Do not wait on the API during the official recording. The visible label **Precomputed demo analysis** is intentional. The typed fixture drives the same verification, rules, pack, and tracker. After the main recording, the optional **Re-run AI analysis** control can demonstrate the live route; any API or validation failure preserves the fixture and displays **Precomputed fallback active**.

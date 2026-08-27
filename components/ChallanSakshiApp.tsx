@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   calculateAuthorityWindow,
   calculateContestWindow,
   classifyEvidenceComparison,
+  deriveConfirmedVehicleFacts,
   evaluateEvidenceReadiness,
+  guardEvidenceNavigation,
+  isReviewFactEditable,
+  validateEvidenceReviewFacts,
   type ConfirmedVehicleFacts,
+  type DemoStep as StepId,
   type ExtractedFact,
   type FixtureId,
   type FindingKind,
@@ -15,14 +20,44 @@ import {
   type OutcomeState,
 } from '../lib/domain';
 import { fixtureList, fixtures, type DemoFixture, type EvidenceCardData } from '../lib/fixtures';
+import { ResolutionDesk, ResolutionRouteView } from './ResolutionDesk';
+import { resolutionIssues, type ResolutionIssueId } from '../lib/resolution';
 
-type StepId = 'landing' | 'intake' | 'review' | 'finding' | 'readiness' | 'pack' | 'tracking';
 type AnalysisMode = 'precomputed' | 'live' | 'fallback';
 type Pair = { en: string; hi: string };
+interface PersistedDemoStateV2 {
+  version: 2;
+  language: Language;
+  step: StepId;
+  fixtureId: FixtureId;
+  facts: ExtractedFact[];
+  confirmed: boolean;
+  analysisMode: AnalysisMode;
+  trackingStage: number;
+  outcome: OutcomeState;
+  resolutionIssue: ResolutionIssueId;
+  simulatedSubmitted: boolean;
+}
 
 const DEMO_REFERENCE_DATE = '2026-08-27';
-const STORAGE_KEY = 'challansakshi-demo-v1';
-const steps: StepId[] = ['landing', 'intake', 'review', 'finding', 'readiness', 'pack', 'tracking'];
+const STORAGE_KEY = 'challansakshi-demo-v2';
+const OLD_STORAGE_KEY = 'challansakshi-demo-v1';
+const steps: StepId[] = ['landing', 'desk', 'route', 'intake', 'review', 'finding', 'readiness', 'pack', 'tracking'];
+const evidenceSteps: StepId[] = ['intake', 'review', 'finding', 'readiness', 'pack', 'tracking'];
+
+function parseAppHash(hash: string): { step: StepId; issueId?: ResolutionIssueId } | null {
+  const raw = hash.replace(/^#/, '');
+  if (raw === 'how-it-works') return { step: 'landing' };
+  if (raw.startsWith('route/')) {
+    const issueId = raw.slice('route/'.length) as ResolutionIssueId;
+    return resolutionIssues.some((item) => item.id === issueId) ? { step: 'route', issueId } : null;
+  }
+  return steps.includes(raw as StepId) ? { step: raw as StepId } : null;
+}
+
+function hashForStep(step: StepId, issueId: ResolutionIssueId): string {
+  return step === 'route' ? `#route/${issueId}` : `#${step}`;
+}
 
 const copy = {
   prototype: { en: 'Independent hackathon prototype · Synthetic demo data', hi: 'स्वतंत्र हैकाथॉन प्रोटोटाइप · सिंथेटिक डेमो डेटा' },
@@ -67,7 +102,7 @@ const copy = {
   fallback: { en: 'Precomputed fallback active', hi: 'पहले से तैयार विश्लेषण चालू है' },
   back: { en: 'Back', hi: 'पीछे' },
   reviewFacts: { en: 'Review the extracted facts', hi: 'मिली जानकारी जाँचें' },
-  reviewLead: { en: 'Confirm or correct every fact before it can be used in a finding.', hi: 'नतीजे में इस्तेमाल से पहले हर जानकारी को पक्का करें या सुधारें।' },
+  reviewLead: { en: 'Review every source. Correct the comparison fields; synthetic challan identifiers stay locked to their source fixture.', hi: 'हर स्रोत जाँचें। तुलना वाली जानकारी सुधारें; सिंथेटिक चालान पहचान अपने स्रोत रिकॉर्ड के अनुसार लॉक रहती है।' },
   rerun: { en: 'Re-run AI analysis', hi: 'AI विश्लेषण फिर चलाएँ' },
   rerunning: { en: 'Re-running analysis…', hi: 'विश्लेषण फिर चल रहा है…' },
   source: { en: 'Source', hi: 'स्रोत' },
@@ -83,7 +118,7 @@ const copy = {
   possibleMismatch: { en: 'Possible vehicle mismatch', hi: 'वाहन शायद मेल नहीं खाता' },
   mismatchLead: { en: 'The supplied records contain multiple inconsistencies that may support a grievance.', hi: 'दिए गए रिकॉर्ड में कई अंतर हैं, जो आपत्ति में मदद कर सकते हैं।' },
   inconclusive: { en: 'Evidence is inconclusive', hi: 'सबूत साफ़ नहीं हैं' },
-  inconclusiveLead: { en: 'The image is too unclear to verify the vehicle or the alleged offence. The product will not invent a mismatch.', hi: 'वाहन या बताए गए उल्लंघन की पुष्टि के लिए फ़ोटो काफ़ी साफ़ नहीं है। यह प्रोडक्ट कोई अंतर नहीं गढ़ेगा।' },
+  inconclusiveLead: { en: 'One or more supplied observations are not clear enough for a reliable conclusion. The product will not invent a mismatch.', hi: 'दी गई एक या अधिक जानकारियाँ भरोसेमंद नतीजे के लिए पर्याप्त साफ़ नहीं हैं। यह प्रोडक्ट कोई अंतर नहीं गढ़ेगा।' },
   consistent: { en: 'No material mismatch found', hi: 'कोई बड़ा अंतर नहीं मिला' },
   consistentLead: { en: 'The supplied records appear to describe the same vehicle, and the visible evidence appears consistent with the allegation.', hi: 'दिए गए रिकॉर्ड एक ही वाहन से जुड़े दिखते हैं और दिखाई दे रहा सबूत आरोप से मेल खाता है।' },
   notLegalDecision: { en: 'This is not a legal decision. The designated authority makes the final decision.', hi: 'यह कानूनी फैसला नहीं है। अंतिम निर्णय संबंधित प्राधिकरण करता है।' },
@@ -143,7 +178,7 @@ const copy = {
   rejectedReason: { en: 'Reason recorded: the submitted material was not sufficient to establish a material vehicle mismatch.', hi: 'दर्ज कारण: दिए गए रिकॉर्ड से वाहन का बड़ा अंतर स्पष्ट नहीं हुआ।' },
   neutralNext: { en: 'Read the recorded reasons, preserve the pack, and verify current official options and deadlines. This prototype does not recommend legal action.', hi: 'दर्ज कारण पढ़ें, पैक सुरक्षित रखें और आधिकारिक विकल्प व तारीखें जाँचें। यह प्रोटोटाइप कानूनी कार्रवाई की सलाह नहीं देता।' },
   noResolutionTitle: { en: 'No decision recorded within the stated response period', hi: 'बताई गई अवधि में कोई निर्णय दर्ज नहीं' },
-  noResolutionBody: { en: 'The official answer describes a 30-day resolution period for a properly contested challan. ChallanSakshi cannot verify every legal condition or the current state implementation. Check the official portal and designated state authority before acting.', hi: 'आधिकारिक उत्तर सही तरह दर्ज आपत्ति के लिए 30 दिन की निर्णय अवधि बताता है। ChallanSakshi सभी कानूनी शर्तें या राज्य का मौजूदा तरीका पक्का नहीं कर सकता। आगे बढ़ने से पहले आधिकारिक पोर्टल और संबंधित राज्य प्राधिकरण जाँचें।' },
+  noResolutionBody: { en: 'As of the fictional status snapshot dated 27 Sep 2026, no decision is recorded. The official answer describes a 30-day resolution period for a properly contested challan, but ChallanSakshi cannot verify every legal condition or the current state implementation. Check the official portal and designated state authority before acting.', hi: '27 सितंबर 2026 की काल्पनिक स्थिति में कोई निर्णय दर्ज नहीं है। आधिकारिक उत्तर सही तरह दर्ज आपत्ति के लिए 30 दिन की निर्णय अवधि बताता है, लेकिन ChallanSakshi सभी कानूनी शर्तें या राज्य का मौजूदा तरीका पक्का नहीं कर सकता। आगे बढ़ने से पहले आधिकारिक पोर्टल और संबंधित राज्य प्राधिकरण जाँचें।' },
   viewPack: { en: 'View contest pack', hi: 'आपत्ति पैक देखें' },
   anotherDemo: { en: 'Choose another demo', hi: 'दूसरा डेमो चुनें' },
   consistentRefusal: { en: 'ChallanSakshi will not create an accusatory contest when the supplied evidence appears consistent.', hi: 'जब दिए गए सबूत आपस में मिलते हैं, ChallanSakshi आरोप लगाने वाली आपत्ति तैयार नहीं करेगा।' },
@@ -157,8 +192,26 @@ const sourceNames: Record<ExtractedFact['source'], Pair> = {
   'citizen-photo': { en: 'Citizen photograph', hi: 'नागरिक की फ़ोटो' },
 };
 
+const limitationCopy: Record<string, Pair> = {
+  'registration-unreadable': { en: 'The enforcement-image registration cannot be read reliably.', hi: 'प्रवर्तन फ़ोटो में वाहन नंबर भरोसे से नहीं पढ़ा जा सकता।' },
+  'category-not-fully-clear': { en: 'The vehicle category is not fully clear in the supplied image.', hi: 'दी गई फ़ोटो में वाहन का प्रकार पूरी तरह साफ़ नहीं है।' },
+  'colour-not-fully-clear': { en: 'The vehicle colour is not fully clear in the supplied image.', hi: 'दी गई फ़ोटो में वाहन का रंग पूरी तरह साफ़ नहीं है।' },
+  'offence-not-assessable': { en: 'The alleged offence cannot be assessed reliably from the supplied image.', hi: 'दी गई फ़ोटो से बताए गए उल्लंघन की भरोसेमंद जाँच नहीं हो सकती।' },
+};
+
+const resolutionStageCopy: Record<(typeof resolutionIssues)[number]['stage'], Pair> = {
+  evidence: { en: 'Evidence', hi: 'सबूत' },
+  authority: { en: 'Authority', hi: 'प्राधिकरण' },
+  court: { en: 'Court', hi: 'अदालत' },
+  payment: { en: 'Payment', hi: 'भुगतान' },
+};
+
 function local(pair: LocalizedText | Pair, language: Language): string {
   return pair[language];
+}
+
+function describeLimitation(code: string, language: Language): string {
+  return local(limitationCopy[code] ?? { en: 'The supplied record has an unresolved evidence limitation.', hi: 'दिए गए रिकॉर्ड में सबूत की एक सीमा अभी बाकी है।' }, language);
 }
 
 function formatDate(value: string, language: Language): string {
@@ -177,22 +230,24 @@ function StatusPill({ mode, language }: { mode: AnalysisMode; language: Language
   return <span className={`status-pill status-${mode}`}><span aria-hidden="true" />{local(labels, language)}</span>;
 }
 
-function AppHeader({ language, setLanguage, step, onReset }: {
+function AppHeader({ language, setLanguage, step, onReset, onHome, onDesk }: {
   language: Language;
   setLanguage: (language: Language) => void;
   step: StepId;
   onReset: () => void;
+  onHome: () => void;
+  onDesk: () => void;
 }) {
   return (
     <>
       <div className="prototype-bar"><span className="prototype-dot" aria-hidden="true" />{local(copy.prototype, language)}</div>
       <header className="site-header shell">
-        <a className="brand" href="#landing" aria-label="ChallanSakshi home">
+        <button type="button" className="brand brand-button" onClick={onHome} aria-label="ChallanSakshi home">
           <ShieldMark />
           <span><strong>ChallanSakshi</strong><small>चालान साक्षी</small></span>
-        </a>
+        </button>
         <nav aria-label={language === 'hi' ? 'मुख्य नेविगेशन' : 'Primary navigation'}>
-          {step === 'landing' && <a href="#how-it-works">{local(copy.navHow, language)}</a>}
+          {step === 'landing' && <><button type="button" className="reset-link resolution-nav-link" onClick={onDesk}>{language === 'hi' ? 'रिज़ॉल्यूशन डेस्क' : 'Resolution desk'}</button><a href="#how-it-works">{local(copy.navHow, language)}</a></>}
           {step !== 'landing' && <button type="button" className="reset-link" onClick={onReset}>{local(copy.reset, language)}</button>}
           <div className="language-switch" role="group" aria-label={language === 'hi' ? 'भाषा' : 'Language'}>
             <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')} aria-pressed={language === 'en'}>EN</button>
@@ -205,7 +260,7 @@ function AppHeader({ language, setLanguage, step, onReset }: {
 }
 
 function Progress({ step, language }: { step: StepId; language: Language }) {
-  if (step === 'landing') return null;
+  if (!evidenceSteps.includes(step)) return null;
   const items: Array<{ id: StepId; label: Pair }> = [
     { id: 'intake', label: { en: 'Evidence', hi: 'सबूत' } },
     { id: 'review', label: { en: 'Verify', hi: 'जाँच' } },
@@ -238,11 +293,11 @@ function BackButton({ onClick, language }: { onClick: () => void; language: Lang
 
 function FixturePicker({ fixtureId, language, onSelect }: { fixtureId: FixtureId; language: Language; onSelect: (id: FixtureId) => void }) {
   return (
-    <div className="fixture-picker" role="radiogroup" aria-label={local(copy.chooseCase, language)}>
+    <div className="fixture-picker" role="group" aria-label={local(copy.chooseCase, language)}>
       {fixtureList.map((item) => {
         const active = item.id === fixtureId;
         return (
-          <button key={item.id} type="button" className={`fixture-option finding-${item.expectedFinding} ${active ? 'active' : ''}`} onClick={() => onSelect(item.id)} role="radio" aria-checked={active}>
+          <button key={item.id} type="button" className={`fixture-option finding-${item.expectedFinding} ${active ? 'active' : ''}`} onClick={() => onSelect(item.id)} aria-pressed={active}>
             <span className="fixture-code">{item.code}</span>
             <strong>{local(item.title, language)}</strong>
             <small>{local(item.shortDescription, language)}</small>
@@ -296,14 +351,11 @@ function VehicleRecordPreview({ fixture, language }: { fixture: DemoFixture; lan
   );
 }
 
-function EvidenceCard({ card, fixture, language, uploadedName, onFile }: {
+function EvidenceCard({ card, fixture, language }: {
   card: EvidenceCardData;
   fixture: DemoFixture;
   language: Language;
-  uploadedName?: string;
-  onFile: (cardId: string, event: ChangeEvent<HTMLInputElement>) => void;
 }) {
-  const inputId = `file-${card.id}`;
   return (
     <article className="evidence-card" id={`source-${card.id}`}>
       <div className="evidence-card-head">
@@ -316,17 +368,16 @@ function EvidenceCard({ card, fixture, language, uploadedName, onFile }: {
       {card.id === 'citizen-photo' && <EvidencePhoto fixture={fixture} citizen label={local(card.title, language)} />}
       <div className="evidence-why"><strong>{local(copy.whyMatters, language)}</strong><p>{local(card.why, language)}</p></div>
       <div className="replace-row">
-        <span>{uploadedName || (language === 'hi' ? 'पहले से लोड काल्पनिक फ़ाइल' : 'Preloaded fictional fixture')}</span>
-        <label htmlFor={inputId}>{local(copy.replace, language)}</label>
-        <input id={inputId} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => onFile(card.id, event)} />
+        <span>{language === 'hi' ? 'पहले से लोड काल्पनिक फ़ाइल' : 'Preloaded fictional fixture'}</span>
+        <b>{language === 'hi' ? 'कोई अपलोड नहीं' : 'No uploads accepted'}</b>
       </div>
     </article>
   );
 }
 
-function Landing({ language, onStart }: { language: Language; onStart: () => void }) {
+function Landing({ language, onStart, onOpenDesk, onOpenRoute }: { language: Language; onStart: () => void; onOpenDesk: () => void; onOpenRoute: (issueId: ResolutionIssueId) => void }) {
   return (
-    <main>
+    <main tabIndex={-1}>
       <section className="hero shell" id="landing">
         <div className="hero-copy">
           <p className="eyebrow"><span />{local(copy.evidenceBefore, language)}</p>
@@ -334,7 +385,7 @@ function Landing({ language, onStart }: { language: Language; onStart: () => voi
           <p className="hero-lede">{local(copy.landingLead, language)}</p>
           <div className="hero-actions">
             <Button type="button" onClick={onStart}>{local(copy.tryDemo, language)} <span aria-hidden="true">→</span></Button>
-            <a className="button button-secondary" href="#how-it-works">{local(copy.navHow, language)}</a>
+            <Button variant="secondary" type="button" onClick={onOpenDesk}>{language === 'hi' ? 'अपनी अगली राह खोजें' : 'Find my next step'}</Button>
           </div>
           <p className="microcopy"><span aria-hidden="true">◉</span>{local(copy.noSignup, language)}</p>
         </div>
@@ -356,6 +407,16 @@ function Landing({ language, onStart }: { language: Language; onStart: () => voi
           <p><strong>{local(copy.evidenceLinked, language)}</strong><span>{local(copy.evidenceLinkedSub, language)}</span></p>
           <p><strong>{local(copy.deadlineAware, language)}</strong><span>{local(copy.deadlineAwareSub, language)}</span></p>
           <p><strong>{local(copy.honest, language)}</strong><span>{local(copy.honestSub, language)}</span></p>
+        </div>
+      </section>
+
+      <section className="breadth-section shell" id="resolution-coverage">
+        <div className="breadth-heading">
+          <div><p className="eyebrow"><span />{language === 'hi' ? 'एक सबूत प्रणाली · सात मुश्किल पड़ाव' : 'One evidence system · seven difficult moments'}</p><h2>{language === 'hi' ? 'पहली सूचना से नतीजे, कोर्ट हैंडऑफ़ या भुगतान-स्थिति तक साफ़ अगला कदम।' : 'A clear next step through outcome, court handoff, or payment-status recovery.'}</h2></div>
+          <div><p>{language === 'hi' ? 'गलत या धुंधली फ़ोटो, अस्वीकार आपत्ति, वर्चुअल कोर्ट, पेंडिंग भुगतान और रसीद/फ़ोन की समस्या—हर रास्ता स्रोत, सीमा और आधिकारिक हैंडऑफ़ दिखाता है।' : 'Wrong or unclear evidence, a rejected grievance, Virtual Court, a pending payment, or access trouble—every route shows sources, limits, and an official handoff.'}</p><button type="button" onClick={onOpenDesk}>{language === 'hi' ? 'पूरा रिज़ॉल्यूशन डेस्क खोलें' : 'Explore the full resolution desk'} <span aria-hidden="true">→</span></button></div>
+        </div>
+        <div className="breadth-grid">
+          {resolutionIssues.map((issue) => <button type="button" key={issue.id} onClick={() => issue.id === 'wrong-evidence' ? onStart() : onOpenRoute(issue.id)}><span aria-hidden="true">{issue.icon}</span><div><small>{local(resolutionStageCopy[issue.stage], language).toUpperCase()}</small><strong>{local(issue.title, language)}</strong><p>{local(issue.resultLabel, language)}</p></div><b aria-hidden="true">→</b></button>)}
         </div>
       </section>
 
@@ -383,31 +444,13 @@ function Footer({ language }: { language: Language }) {
 }
 
 function Screen({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <main className={`screen-shell shell ${className}`}>{children}</main>;
+  return <main className={`screen-shell shell ${className}`} tabIndex={-1}>{children}</main>;
 }
 
-function deriveConfirmedFacts(fixture: DemoFixture, facts: ExtractedFact[]): ConfirmedVehicleFacts {
-  const value = (id: string, fallback: string) => facts.find((factItem) => factItem.id === id)?.value || fallback;
-  const visibility = (id: string, fallback: ExtractedFact['visibility']) => facts.find((factItem) => factItem.id === id)?.visibility || fallback;
-  const offenceValue = value('offence-visible', 'unclear').toLowerCase();
-  return {
-    registeredPlate: value('record-registration', fixture.confirmedFacts.registeredPlate),
-    registeredCategory: value('record-category', fixture.confirmedFacts.registeredCategory),
-    registeredColour: value('record-colour', fixture.confirmedFacts.registeredColour),
-    observedPlate: value('observed-registration', fixture.confirmedFacts.observedPlate),
-    observedCategory: value('observed-category', fixture.confirmedFacts.observedCategory),
-    observedColour: value('observed-colour', fixture.confirmedFacts.observedColour),
-    offenceAssessable: offenceValue.startsWith('yes') ? 'yes' : offenceValue.startsWith('no') ? 'no' : 'unclear',
-    observedPlateVisibility: visibility('observed-registration', fixture.confirmedFacts.observedPlateVisibility),
-    observedCategoryVisibility: visibility('observed-category', fixture.confirmedFacts.observedCategoryVisibility),
-    observedColourVisibility: visibility('observed-colour', fixture.confirmedFacts.observedColourVisibility),
-  };
-}
-
-function SourcePreview({ fixture, language, kind }: { fixture: DemoFixture; language: Language; kind: 'record' | 'image' }) {
+function SourcePreview({ fixture, confirmed, language, kind }: { fixture: DemoFixture; confirmed: ConfirmedVehicleFacts; language: Language; kind: 'record' | 'image' }) {
   return (
     <section className="source-preview" id={kind === 'record' ? 'finding-record' : 'finding-enforcement'}>
-      <div className="source-preview-label"><span>{kind === 'record' ? 'RC' : 'IMG'}</span><div><small>{kind === 'record' ? local(copy.recordSource, language) : local(copy.imageSource, language)}</small><strong>{kind === 'record' ? fixture.confirmedFacts.registeredPlate : fixture.confirmedFacts.observedPlate}</strong></div></div>
+      <div className="source-preview-label"><span>{kind === 'record' ? 'RC' : 'IMG'}</span><div><small>{kind === 'record' ? local(copy.recordSource, language) : local(copy.imageSource, language)}</small><strong>{kind === 'record' ? confirmed.registeredPlate : confirmed.observedPlate}</strong><em>{language === 'hi' ? 'नागरिक द्वारा पक्की पढ़ाई' : 'Citizen-confirmed reading'}</em></div></div>
       {kind === 'record' ? <VehicleRecordPreview fixture={fixture} language={language} /> : <EvidencePhoto fixture={fixture} label={local(copy.imageSource, language)} />}
     </section>
   );
@@ -427,7 +470,7 @@ function ContestClock({ fixture, language }: { fixture: DemoFixture; language: L
 }
 
 function FindingPanel({ finding, fixture, facts, language }: { finding: FindingKind; fixture: DemoFixture; facts: ExtractedFact[]; language: Language }) {
-  const confirmed = deriveConfirmedFacts(fixture, facts);
+  const confirmed = deriveConfirmedVehicleFacts(fixture.confirmedFacts, facts);
   const result = classifyEvidenceComparison(confirmed);
   const title = finding === 'mismatch' ? copy.possibleMismatch : finding === 'inconclusive' ? copy.inconclusive : copy.consistent;
   const lead = finding === 'mismatch' ? copy.mismatchLead : finding === 'inconclusive' ? copy.inconclusiveLead : copy.consistentLead;
@@ -439,9 +482,9 @@ function FindingPanel({ finding, fixture, facts, language }: { finding: FindingK
       </section>
 
       <div className="source-comparison">
-        <SourcePreview fixture={fixture} language={language} kind="record" />
+        <SourcePreview fixture={fixture} confirmed={confirmed} language={language} kind="record" />
         <span className={`comparison-symbol symbol-${finding}`} aria-hidden="true">{finding === 'consistent' ? '=' : finding === 'mismatch' ? '≠' : '?'}</span>
-        <SourcePreview fixture={fixture} language={language} kind="image" />
+        <SourcePreview fixture={fixture} confirmed={confirmed} language={language} kind="image" />
       </div>
 
       {finding === 'mismatch' && (
@@ -460,14 +503,10 @@ function FindingPanel({ finding, fixture, facts, language }: { finding: FindingK
         </section>
       )}
 
-      {finding === 'inconclusive' && (
+      {result.limitations.length > 0 && (
         <section className="limitations-panel">
-          <div><span aria-hidden="true">?</span><h2>{language === 'hi' ? 'क्या साफ़ नहीं है?' : 'What remains unclear?'}</h2></div>
-          <ul>
-            <li>{language === 'hi' ? 'वाहन नंबर भरोसे से नहीं पढ़ा जा सकता।' : 'The registration cannot be read reliably.'}</li>
-            <li>{language === 'hi' ? 'वाहन का प्रकार केवल कुछ हद तक दिखता है।' : 'The vehicle category is only partly visible.'}</li>
-            <li>{language === 'hi' ? 'बताया गया उल्लंघन फ़ोटो में जाँचा नहीं जा सकता।' : 'The alleged offence cannot be assessed from the image.'}</li>
-          </ul>
+          <div><span aria-hidden="true">?</span><h2>{finding === 'mismatch' ? (language === 'hi' ? 'सबूत की अतिरिक्त सीमाएँ' : 'Additional evidence limits') : (language === 'hi' ? 'क्या साफ़ नहीं है?' : 'What remains unclear?')}</h2></div>
+          <ul>{result.limitations.map((code) => <li key={code}>{describeLimitation(code, language)}</li>)}</ul>
         </section>
       )}
 
@@ -476,7 +515,11 @@ function FindingPanel({ finding, fixture, facts, language }: { finding: FindingK
       )}
 
       <section className="meaning-grid">
-        <article><span className="meaning-number">01</span><h3>{local(copy.whatMeans, language)}</h3><p>{fixture.imageNote[language]}</p></article>
+        <article><span className="meaning-number">01</span><h3>{local(copy.whatMeans, language)}</h3><p>{finding === 'mismatch'
+          ? (language === 'hi' ? `नागरिक द्वारा पक्की जानकारी में ${result.discrepancies.length} खास वाहन अंतर हैं।` : `The citizen-confirmed comparison contains ${result.discrepancies.length} specific vehicle ${result.discrepancies.length === 1 ? 'difference' : 'differences'}.`)
+          : finding === 'inconclusive'
+            ? (language === 'hi' ? `नतीजा केवल इन ${result.limitations.length} दर्ज सीमाओं के कारण अधूरा है।` : `The finding is inconclusive only because of the ${result.limitations.length} evidence ${result.limitations.length === 1 ? 'limit' : 'limits'} listed above.`)
+            : (language === 'hi' ? 'नागरिक द्वारा पक्की वाहन जानकारी में कोई बड़ा अंतर नहीं मिला।' : 'No material difference was found in the citizen-confirmed vehicle facts.')}</p></article>
         <article><span className="meaning-number">02</span><h3>{local(copy.whatNotProve, language)}</h3><p>{local(copy.notLegalDecision, language)} {language === 'hi' ? 'फ़ोटो से चालक की पहचान या चालान की कानूनी स्थिति अपने आप तय नहीं होती।' : 'The supplied image does not by itself establish rider identity or the challan’s legal status.'}</p></article>
       </section>
     </>
@@ -484,16 +527,26 @@ function FindingPanel({ finding, fixture, facts, language }: { finding: FindingK
 }
 
 function buildContestDraft(fixture: DemoFixture, facts: ExtractedFact[], language: Language): string {
-  const confirmed = deriveConfirmedFacts(fixture, facts);
+  const confirmed = deriveConfirmedVehicleFacts(fixture.confirmedFacts, facts);
   const result = classifyEvidenceComparison(confirmed);
   if (result.finding === 'mismatch') {
+    const observations = result.discrepancies.map((item) => {
+      const label = item.field === 'registration'
+        ? (language === 'hi' ? 'वाहन नंबर' : 'registration')
+        : item.field === 'category'
+          ? (language === 'hi' ? 'वाहन प्रकार' : 'vehicle category')
+          : (language === 'hi' ? 'रंग' : 'colour');
+      return `${label}: ${item.registeredValue} ≠ ${item.observedValue}`;
+    }).join(language === 'hi' ? '; ' : '; ');
+    const limits = result.limitations.map((code) => describeLimitation(code, language)).join(' ');
     return language === 'hi'
-      ? `विषय: वाहन के संभावित बेमेल के कारण ई-चालान की समीक्षा का अनुरोध\n\nकृपया चालान ${fixture.challanNumber} की समीक्षा करें। चालान की फ़ोटो में ${confirmed.observedColour} ${confirmed.observedCategory} (${confirmed.observedPlate}) दिखता है, जबकि सिंथेटिक वाहन रिकॉर्ड में ${confirmed.registeredColour} ${confirmed.registeredCategory} (${confirmed.registeredPlate}) दर्ज है। संलग्न तुलना में वाहन नंबर, प्रकार और रंग के अंतर दिखाए गए हैं। कृपया दिए गए सबूत की समीक्षा कर कारण सहित उचित आदेश दर्ज करें।`
-      : `Subject: Request to review e-Challan for a possible vehicle mismatch\n\nI request review of e-Challan ${fixture.challanNumber}. The enforcement image appears to show a ${confirmed.observedColour.toLowerCase()} ${confirmed.observedCategory.toLowerCase()} (${confirmed.observedPlate}), while the supplied vehicle record describes a ${confirmed.registeredColour.toLowerCase()} ${confirmed.registeredCategory.toLowerCase()} (${confirmed.registeredPlate}). The attached comparison identifies the differences in registration, category, and colour. I request a reasoned review of the supplied evidence and an appropriate order on the designated portal.`;
+      ? `विषय: वाहन के संभावित बेमेल के कारण ई-चालान की समीक्षा का अनुरोध\n\nकृपया चालान ${fixture.challanNumber} की समीक्षा करें। नागरिक द्वारा जाँची गई तुलना में ये खास अंतर हैं: ${observations}।${limits ? ` सबूत की अतिरिक्त सीमा: ${limits}` : ''} यह मसौदा केवल दिए और पक्के किए गए रिकॉर्ड की तुलना करता है; इससे चालान की वैधता या चालक की पहचान तय नहीं होती। कृपया दिए गए सबूत की समीक्षा कर कारण सहित उचित आदेश दर्ज करें।`
+      : `Subject: Request to review e-Challan for a possible vehicle mismatch\n\nI request review of e-Challan ${fixture.challanNumber}. The citizen-confirmed comparison contains these specific observations: ${observations}.${limits ? ` Additional evidence limitation: ${limits}` : ''} This draft only compares the supplied and confirmed records; it does not decide the challan's validity or rider identity. I request a reasoned review of the supplied evidence and an appropriate order on the designated portal.`;
   }
+  const limitations = result.limitations.map((code) => describeLimitation(code, language)).join(' ');
   return language === 'hi'
-    ? `विषय: उपलब्ध फ़ोटो और रिकॉर्ड की समीक्षा का अनुरोध\n\nकृपया चालान ${fixture.challanNumber} की समीक्षा करें। उपलब्ध प्रवर्तन फ़ोटो में वाहन नंबर और बताया गया उल्लंघन साफ़ नहीं दिख रहे हैं। मैं कोई वाहन बेमेल दावा नहीं कर रहा/रही हूँ। कृपया मूल फ़ोटो और संबंधित रिकॉर्ड की समीक्षा कर कारण सहित निर्णय दें।`
-    : `Subject: Request to review the available image and record\n\nI request review of e-Challan ${fixture.challanNumber}. The supplied enforcement image does not show the registration or the alleged offence clearly enough for reliable verification. I am not asserting a vehicle mismatch. Please review the original image and related record and provide a reasoned decision.`;
+    ? `विषय: उपलब्ध फ़ोटो और रिकॉर्ड की समीक्षा का अनुरोध\n\nकृपया चालान ${fixture.challanNumber} की समीक्षा करें। नागरिक द्वारा जाँची गई जानकारी में ये सीमाएँ दर्ज हैं: ${limitations} मैं कोई वाहन बेमेल दावा नहीं कर रहा/रही हूँ। कृपया मूल फ़ोटो और संबंधित रिकॉर्ड की समीक्षा कर कारण सहित निर्णय दें।`
+    : `Subject: Request to review the available image and record\n\nI request review of e-Challan ${fixture.challanNumber}. The citizen-confirmed record contains these evidence limitations: ${limitations} I am not asserting a vehicle mismatch. Please review the original image and related record and provide a reasoned decision.`;
 }
 
 function Timeline({ stage, language }: { stage: number; language: Language }) {
@@ -515,25 +568,34 @@ export default function ChallanSakshiApp() {
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisMessage, setAnalysisMessage] = useState('');
   const [formError, setFormError] = useState('');
-  const [fileError, setFileError] = useState('');
-  const [uploadedNames, setUploadedNames] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [trackingStage, setTrackingStage] = useState(2);
   const [outcome, setOutcome] = useState<OutcomeState>('none');
+  const [resolutionIssue, setResolutionIssue] = useState<ResolutionIssueId>('wrong-evidence');
+  const [simulatedSubmitted, setSimulatedSubmitted] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   const fixture = fixtures[fixtureId];
-  const confirmedVehicleFacts = useMemo(() => deriveConfirmedFacts(fixture, facts), [fixture, facts]);
+  const confirmedVehicleFacts = useMemo(() => deriveConfirmedVehicleFacts(fixture.confirmedFacts, facts), [fixture, facts]);
   const classification = useMemo(() => classifyEvidenceComparison(confirmedVehicleFacts), [confirmedVehicleFacts]);
-  const readiness = useMemo(() => evaluateEvidenceReadiness(fixture.readiness), [fixture]);
+  const reviewValidation = useMemo(() => validateEvidenceReviewFacts(facts), [facts]);
+  const readiness = useMemo(() => {
+    const items = fixture.readiness.filter((item) => item.id !== 'clearer-image');
+    if (classification.finding === 'inconclusive') {
+      items.push({ id: 'clearer-image', label: { en: 'Clearer original enforcement image or clarification', hi: 'साफ़ मूल प्रवर्तन फ़ोटो या स्पष्टीकरण' }, category: 'authority', status: 'missing' });
+    }
+    return evaluateEvidenceReadiness(items);
+  }, [classification.finding, fixture]);
   const contestDraft = useMemo(() => buildContestDraft(fixture, facts, language), [fixture, facts, language]);
+  const renderStep = guardEvidenceNavigation(step, classification.finding, confirmed && reviewValidation.complete, simulatedSubmitted);
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
       try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const saved = JSON.parse(stored) as { language?: Language; step?: StepId; fixtureId?: FixtureId; facts?: ExtractedFact[]; confirmed?: boolean; analysisMode?: AnalysisMode; trackingStage?: number; outcome?: OutcomeState };
+          const saved = JSON.parse(stored) as Partial<PersistedDemoStateV2>;
+          if (saved.version !== 2) throw new Error('Unsupported persisted state');
           if (saved.language === 'en' || saved.language === 'hi') setLanguage(saved.language);
           if (saved.fixtureId && fixtures[saved.fixtureId]) {
             setFixtureId(saved.fixtureId);
@@ -544,13 +606,21 @@ export default function ChallanSakshiApp() {
           if (saved.analysisMode) setAnalysisMode(saved.analysisMode);
           if (typeof saved.trackingStage === 'number') setTrackingStage(saved.trackingStage);
           if (saved.outcome) setOutcome(saved.outcome);
+          if (saved.resolutionIssue && resolutionIssues.some((item) => item.id === saved.resolutionIssue)) setResolutionIssue(saved.resolutionIssue);
+          setSimulatedSubmitted(Boolean(saved.simulatedSubmitted));
         }
-        const hashStep = window.location.hash.replace('#', '') as StepId;
-        if (steps.includes(hashStep)) setStep(hashStep);
-        else window.history.replaceState({ step: 'landing' }, '', '#landing');
+        const location = parseAppHash(window.location.hash);
+        if (location) {
+          setStep(location.step);
+          if (location.issueId) setResolutionIssue(location.issueId);
+        } else {
+          setStep('landing');
+          window.history.replaceState({ step: 'landing' }, '', '#landing');
+        }
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
       } finally {
+        window.localStorage.removeItem(OLD_STORAGE_KEY);
         setHydrated(true);
       }
     }, 0);
@@ -559,8 +629,10 @@ export default function ChallanSakshiApp() {
 
   useEffect(() => {
     const onPopState = () => {
-      const next = window.location.hash.replace('#', '') as StepId;
-      if (steps.includes(next)) setStep(next);
+      const location = parseAppHash(window.location.hash);
+      if (!location) return;
+      setStep(location.step);
+      if (location.issueId) setResolutionIssue(location.issueId);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -568,15 +640,29 @@ export default function ChallanSakshiApp() {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ language, step, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome }));
+    const persisted: PersistedDemoStateV2 = { version: 2, language, step: renderStep, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, simulatedSubmitted };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
     document.documentElement.lang = language === 'hi' ? 'hi' : 'en';
-  }, [language, step, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome, hydrated]);
+  }, [language, renderStep, fixtureId, facts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, simulatedSubmitted, hydrated]);
 
-  const go = (next: StepId) => {
+  useEffect(() => {
+    if (!hydrated || renderStep === step) return;
+    window.history.replaceState({ step: renderStep, issueId: resolutionIssue }, '', hashForStep(renderStep, resolutionIssue));
+  }, [hydrated, renderStep, step, resolutionIssue]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const focusTimer = window.setTimeout(() => document.querySelector<HTMLElement>('main')?.focus({ preventScroll: true }), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [hydrated, renderStep, resolutionIssue]);
+
+  const go = (next: StepId, nextIssueId?: ResolutionIssueId) => {
     setFormError('');
     setCopied(false);
+    if (nextIssueId) setResolutionIssue(nextIssueId);
     setStep(next);
-    window.history.pushState({ step: next }, '', `#${next}`);
+    const issueForHistory = nextIssueId ?? resolutionIssue;
+    window.history.pushState({ step: next, issueId: issueForHistory }, '', hashForStep(next, issueForHistory));
     window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
 
@@ -588,7 +674,7 @@ export default function ChallanSakshiApp() {
     setAnalysisMessage('');
     setOutcome('none');
     setTrackingStage(2);
-    setUploadedNames({});
+    setSimulatedSubmitted(false);
   };
 
   const resetDemo = () => {
@@ -600,28 +686,17 @@ export default function ChallanSakshiApp() {
     setConfirmed(false);
     setAnalysisMode('precomputed');
     setAnalysisMessage('');
-    setUploadedNames({});
     setOutcome('none');
     setTrackingStage(2);
+    setResolutionIssue('wrong-evidence');
+    setSimulatedSubmitted(false);
     go('landing');
-  };
-
-  const handleFile = (cardId: string, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    setFileError('');
-    if (!file) return;
-    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(file.type) || file.size > 5 * 1024 * 1024) {
-      setFileError(language === 'hi' ? 'केवल PNG, JPG, WebP या PDF चुनें; अधिकतम आकार 5 MB है।' : 'Choose a PNG, JPG, WebP, or PDF up to 5 MB.');
-      event.target.value = '';
-      return;
-    }
-    setUploadedNames((current) => ({ ...current, [cardId]: file.name }));
-    event.target.value = '';
   };
 
   const runInitialAnalysis = () => {
     setAnalysisBusy(true);
+    setConfirmed(false);
+    setSimulatedSubmitted(false);
     window.setTimeout(() => { setAnalysisBusy(false); setAnalysisMode('precomputed'); go('review'); }, 650);
   };
 
@@ -629,18 +704,9 @@ export default function ChallanSakshiApp() {
     setAnalysisBusy(true);
     setAnalysisMessage('');
     try {
-      const imageResponse = await fetch('/evidence-contact-sheet.png');
-      if (!imageResponse.ok) throw new Error('Synthetic image unavailable');
-      const blob = await imageResponse.blob();
-      const imageDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Could not read synthetic image'));
-        reader.readAsDataURL(blob);
-      });
       const response = await fetch('/api/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fixtureId, imageDataUrl }),
+        body: JSON.stringify({ fixtureId }),
       });
       const data = await response.json() as { analysis?: { facts?: Array<{ field?: string; value?: string; confidence?: string; visibility?: string; uncertainty?: string; evidence_reference?: string }> }; error?: string; fallback?: boolean };
       if (!response.ok || !data.analysis?.facts) throw new Error(data.error || 'Live analysis unavailable');
@@ -655,6 +721,7 @@ export default function ChallanSakshiApp() {
         return { ...item, value: incoming.value, visibility, confidence, evidenceRef: incoming.evidence_reference || item.evidenceRef };
       }));
       setConfirmed(false);
+      setSimulatedSubmitted(false);
       setAnalysisMode('live');
       setAnalysisMessage(language === 'hi' ? 'लाइव विश्लेषण पूरा हुआ। इस्तेमाल से पहले हर जानकारी फिर जाँचें।' : 'Live analysis completed. Review every observation again before using it.');
     } catch {
@@ -668,9 +735,15 @@ export default function ChallanSakshiApp() {
   const updateFact = (id: string, patch: Partial<ExtractedFact>) => {
     setFacts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
     setConfirmed(false);
+    setSimulatedSubmitted(false);
   };
 
   const continueFromReview = () => {
+    if (!reviewValidation.complete) {
+      setFormError(language === 'hi' ? 'खाली तुलना फ़ील्ड भरें, या फ़ोटो की स्पष्टता “साफ़ नहीं” या “दिखाई नहीं देता” चुनें।' : 'Complete blank comparison fields, or mark an unavailable image observation as unclear or not visible.');
+      document.getElementById(`fact-${reviewValidation.invalidIds[0]}`)?.focus();
+      return;
+    }
     if (!confirmed) {
       setFormError(local(copy.confirmationNeeded, language));
       document.getElementById('fact-confirmation')?.focus();
@@ -684,16 +757,80 @@ export default function ChallanSakshiApp() {
     catch { setAnalysisMessage(language === 'hi' ? 'कॉपी नहीं हो सका। टेक्स्ट चुनकर कॉपी करें।' : 'Could not copy automatically. Select the draft and copy it manually.'); }
   };
 
+  const openResolutionRoute = (issueId: ResolutionIssueId) => {
+    go('route', issueId);
+  };
+
+  const startResolutionEvidence = (issueId: 'wrong-evidence' | 'unclear-evidence') => {
+    setResolutionIssue(issueId);
+    chooseFixture(issueId === 'unclear-evidence' ? 'inconclusive' : 'mismatch');
+    go('intake');
+  };
+
+  const downloadCaseManifest = () => {
+    const contestClock = calculateContestWindow(fixture.issueDate, DEMO_REFERENCE_DATE);
+    const manifest = {
+      schema: 'challansakshi.case-manifest.v1',
+      generatedOn: DEMO_REFERENCE_DATE,
+      syntheticOnly: true,
+      case: {
+        fixtureId,
+        challanNumber: fixture.challanNumber,
+        issueDate: fixture.issueDate,
+        allegedOffence: fixture.offence.en,
+        amount: fixture.amount,
+        authority: fixture.authority.en,
+      },
+      citizenReview: {
+        confirmed,
+        confirmedFacts: confirmedVehicleFacts,
+        sourceLinkedFacts: facts.map((item) => ({ id: item.id, value: item.value, source: item.source, evidenceReference: item.evidenceRef, confidence: item.confidence, visibility: item.visibility })),
+      },
+      deterministicAssessment: {
+        finding: classification.finding,
+        discrepancies: classification.discrepancies,
+        limitations: classification.limitations,
+        readiness: { requiredPresent: readiness.requiredPresent, requiredTotal: readiness.requiredTotal, complete: readiness.complete },
+      },
+      clocks: {
+        convention: 'Issue date is Day 0; D+45 is shown as an indicative boundary. Verify current official cutoffs and state route.',
+        contest: contestClock,
+      },
+      generatedArtifact: {
+        kind: classification.finding === 'mismatch' ? 'vehicle-review-request' : classification.finding === 'inconclusive' ? 'evidence-clarification-request' : 'none',
+        draft: classification.finding === 'consistent' ? null : contestDraft,
+      },
+      boundaries: [
+        'Not a legal decision or legal advice.',
+        'No real government, court, bank, or vehicle system was contacted.',
+        'The designated authority makes the final decision.',
+      ],
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `challansakshi-${fixture.challanNumber}-manifest.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 0);
+  };
+
   const grievanceNumber = fixture.id === 'mismatch' ? 'DEMO-GRV-A-0827-17' : 'DEMO-GRV-B-0827-09';
 
   return (
     <div className="app-root">
-      <AppHeader language={language} setLanguage={setLanguage} step={step} onReset={resetDemo} />
-      <Progress step={step} language={language} />
+      <AppHeader language={language} setLanguage={setLanguage} step={renderStep} onReset={resetDemo} onHome={() => go('landing')} onDesk={() => go('desk')} />
+      <Progress step={renderStep} language={language} />
 
-      {step === 'landing' && <Landing language={language} onStart={() => go('intake')} />}
+      {renderStep === 'landing' && <Landing language={language} onStart={() => startResolutionEvidence('wrong-evidence')} onOpenDesk={() => go('desk')} onOpenRoute={openResolutionRoute} />}
 
-      {step === 'intake' && (
+      {renderStep === 'desk' && <><ResolutionDesk language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} /><Footer language={language} /></>}
+
+      {renderStep === 'route' && <><ResolutionRouteView language={language} issueId={resolutionIssue} onBack={() => go('desk')} onStartEvidence={startResolutionEvidence} /><Footer language={language} /></>}
+
+      {renderStep === 'intake' && (
         <>
           <Screen>
             <BackButton onClick={() => go('landing')} language={language} />
@@ -702,16 +839,15 @@ export default function ChallanSakshiApp() {
             <div className="privacy-warning" role="note"><span aria-hidden="true">!</span><div><strong>{language === 'hi' ? 'असली दस्तावेज़ अपलोड न करें' : 'Keep real documents out of this prototype'}</strong><p>{local(copy.uploadWarning, language)}</p></div></div>
             <div className="analysis-row"><StatusPill mode={analysisMode} language={language} /><span>{language === 'hi' ? 'AI गलती कर सकता है। अगला चरण हर जानकारी की जाँच करवाता है।' : 'AI can misread evidence. The next step requires human verification.'}</span></div>
             <div className="evidence-grid">
-              {fixture.evidenceCards.map((card) => <EvidenceCard key={card.id} card={card} fixture={fixture} language={language} uploadedName={uploadedNames[card.id]} onFile={handleFile} />)}
+              {fixture.evidenceCards.map((card) => <EvidenceCard key={card.id} card={card} fixture={fixture} language={language} />)}
             </div>
-            {fileError && <p className="inline-error" role="alert">{fileError}</p>}
-            <div className="sticky-action"><div><strong>{language === 'hi' ? '3 में से 3 रिकॉर्ड तैयार' : '3 of 3 records ready'}</strong><span>{language === 'hi' ? 'डेमो फ़ाइलें केवल इस सत्र की याददाश्त में हैं।' : 'Raw replacement files are not persisted.'}</span></div><Button type="button" onClick={runInitialAnalysis} disabled={analysisBusy}>{analysisBusy ? local(copy.analysing, language) : local(copy.analyse, language)} <span aria-hidden="true">→</span></Button></div>
+            <div className="sticky-action"><div><strong>{language === 'hi' ? '3 में से 3 काल्पनिक रिकॉर्ड तैयार' : '3 of 3 fictional records ready'}</strong><span>{language === 'hi' ? 'यह प्रोटोटाइप असली फ़ाइल अपलोड स्वीकार नहीं करता।' : 'This prototype does not accept real file uploads.'}</span></div><Button type="button" onClick={runInitialAnalysis} disabled={analysisBusy}>{analysisBusy ? local(copy.analysing, language) : local(copy.analyse, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
         </>
       )}
 
-      {step === 'review' && (
+      {renderStep === 'review' && (
         <>
           <Screen>
             <BackButton onClick={() => go('intake')} language={language} />
@@ -722,15 +858,18 @@ export default function ChallanSakshiApp() {
               <div className="fact-groups">
                 {(['challan', 'enforcement', 'vehicle-record'] as ExtractedFact['source'][]).map((source) => (
                   <section className="fact-group" key={source}>
-                    <div className="fact-group-heading"><span>{source === 'challan' ? '01' : source === 'enforcement' ? '02' : '03'}</span><div><h2>{local(sourceNames[source], language)}</h2><small>{language === 'hi' ? 'हर फ़ील्ड सुधार सकते हैं' : 'Every field is editable'}</small></div></div>
-                    {facts.filter((item) => item.source === source).map((item) => (
-                      <div className="fact-row" key={item.id}>
-                        <label htmlFor={`fact-${item.id}`}>{local(item.label, language)}</label>
-                        <input id={`fact-${item.id}`} value={item.value} onChange={(event) => updateFact(item.id, { value: event.target.value })} />
-                        <div className="fact-meta"><span><b>{local(copy.source, language)}:</b> {item.evidenceRef}</span>{item.source === 'enforcement' && <label>{local(copy.confidence, language)}<select value={item.visibility} onChange={(event) => updateFact(item.id, { visibility: event.target.value as ExtractedFact['visibility'] })}><option value="clear">{local(copy.clear, language)}</option><option value="partial">{local(copy.partial, language)}</option><option value="unclear">{local(copy.unclear, language)}</option><option value="not-visible">{local(copy.notVisible, language)}</option></select></label>}</div>
-                        {item.uncertainty && <p className="fact-note"><span aria-hidden="true">i</span>{local(item.uncertainty, language)}</p>}
-                      </div>
-                    ))}
+                    <div className="fact-group-heading"><span>{source === 'challan' ? '01' : source === 'enforcement' ? '02' : '03'}</span><div><h2>{local(sourceNames[source], language)}</h2><small>{facts.some((item) => item.source === source && isReviewFactEditable(item.id)) ? (language === 'hi' ? 'तुलना वाली जानकारी सुधार सकते हैं' : 'Comparison fields can be corrected') : (language === 'hi' ? 'काल्पनिक स्रोत पहचान · केवल पढ़ने के लिए' : 'Fictional source metadata · read only')}</small></div></div>
+                    {facts.filter((item) => item.source === source).map((item) => {
+                      const editable = isReviewFactEditable(item.id);
+                      return (
+                        <div className={`fact-row ${editable ? '' : 'fact-row-readonly'}`} key={item.id}>
+                          <label htmlFor={`fact-${item.id}`}>{local(item.label, language)}{!editable && <small>{language === 'hi' ? 'स्रोत रिकॉर्ड' : 'source record'}</small>}</label>
+                          <input id={`fact-${item.id}`} value={item.value} readOnly={!editable} onChange={editable ? (event) => updateFact(item.id, { value: event.target.value }) : undefined} />
+                          <div className="fact-meta"><span><b>{local(copy.source, language)}:</b> {item.evidenceRef}</span>{item.source === 'enforcement' && <label>{local(copy.confidence, language)}<select value={item.visibility} onChange={(event) => updateFact(item.id, { visibility: event.target.value as ExtractedFact['visibility'] })}><option value="clear">{local(copy.clear, language)}</option><option value="partial">{local(copy.partial, language)}</option><option value="unclear">{local(copy.unclear, language)}</option><option value="not-visible">{local(copy.notVisible, language)}</option></select></label>}</div>
+                          {item.uncertainty && <p className="fact-note"><span aria-hidden="true">i</span>{local(item.uncertainty, language)}</p>}
+                        </div>
+                      );
+                    })}
                   </section>
                 ))}
               </div>
@@ -742,19 +881,19 @@ export default function ChallanSakshiApp() {
         </>
       )}
 
-      {step === 'finding' && (
+      {renderStep === 'finding' && (
         <>
           <Screen className="finding-screen">
             <BackButton onClick={() => go('review')} language={language} />
             <FindingPanel finding={classification.finding} fixture={fixture} facts={facts} language={language} />
-            <div className="finding-bottom-grid"><ContestClock fixture={fixture} language={language} /><div className="authority-note"><span aria-hidden="true">§</span><div><h3>{language === 'hi' ? 'राज्य का तरीका अलग हो सकता है' : 'The state route may vary'}</h3><p>{language === 'hi' ? 'राज्य सरकार आपत्ति जमा करने का तरीका और संबंधित प्राधिकरण तय करती है। मौजूदा तरीका आधिकारिक पोर्टल पर जाँचें।' : 'The State Government specifies how a contest is submitted and which authority handles it. Verify the current route before acting.'}</p><a href="https://echallan.parivahan.nic.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} <span aria-hidden="true">↗</span></a></div></div></div>
-            <div className="page-actions finding-actions"><Button variant="secondary" type="button" onClick={() => go('review')}>{local(copy.editFacts, language)}</Button>{classification.finding === 'consistent' ? <><Button variant="secondary" type="button" onClick={() => go('intake')}>{local(copy.anotherDemo, language)}</Button><a className="button button-primary" href="https://echallan.parivahan.nic.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a></> : <Button type="button" onClick={() => go('readiness')}>{local(copy.evidenceReadiness, language)} <span aria-hidden="true">→</span></Button>}</div>
+            <div className="finding-bottom-grid"><ContestClock fixture={fixture} language={language} /><div className="authority-note"><span aria-hidden="true">§</span><div><h3>{language === 'hi' ? 'राज्य का तरीका अलग हो सकता है' : 'The state route may vary'}</h3><p>{language === 'hi' ? 'राज्य सरकार आपत्ति जमा करने का तरीका और संबंधित प्राधिकरण तय करती है। मौजूदा तरीका आधिकारिक पोर्टल पर जाँचें।' : 'The State Government specifies how a contest is submitted and which authority handles it. Verify the current route before acting.'}</p><a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} <span aria-hidden="true">↗</span></a></div></div></div>
+            <div className="page-actions finding-actions"><Button variant="secondary" type="button" onClick={() => go('review')}>{local(copy.editFacts, language)}</Button>{classification.finding === 'consistent' ? <><Button variant="secondary" type="button" onClick={() => go('intake')}>{local(copy.anotherDemo, language)}</Button><a className="button button-primary" href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a></> : <Button type="button" onClick={() => go('readiness')}>{local(copy.evidenceReadiness, language)} <span aria-hidden="true">→</span></Button>}</div>
           </Screen>
           <Footer language={language} />
         </>
       )}
 
-      {step === 'readiness' && classification.finding !== 'consistent' && (
+      {renderStep === 'readiness' && classification.finding !== 'consistent' && (
         <>
           <Screen>
             <BackButton onClick={() => go('finding')} language={language} />
@@ -775,7 +914,7 @@ export default function ChallanSakshiApp() {
         </>
       )}
 
-      {step === 'pack' && classification.finding !== 'consistent' && (
+      {renderStep === 'pack' && classification.finding !== 'consistent' && (
         <>
           <Screen className="pack-screen">
             <BackButton onClick={() => go('readiness')} language={language} />
@@ -785,20 +924,20 @@ export default function ChallanSakshiApp() {
               <header><div className="pack-brand"><ShieldMark /><div><strong>ChallanSakshi</strong><span>चालान साक्षी · {local(copy.evidenceBefore, language)}</span></div></div><div className="pack-meta"><span>SYNTHETIC DEMO DATA</span><b>{language === 'hi' ? 'बनाया गया: 27 अगस्त 2026' : 'Generated: 27 Aug 2026'}</b></div></header>
               <section className="pack-summary"><div><small>{local(copy.caseSummary, language)}</small><h2>{classification.finding === 'mismatch' ? local(copy.possibleMismatch, language) : local(copy.inconclusive, language)}</h2><p>{fixture.challanNumber} · {fixture.amount} · {local(fixture.offence, language)}</p></div><div className="pack-clock"><b>{calculateContestWindow(fixture.issueDate, DEMO_REFERENCE_DATE).daysRemaining}</b><span>{local(copy.daysLeft, language)}</span></div></section>
               <section className="pack-section"><h3>01 · {language === 'hi' ? 'आपत्ति का मसौदा' : 'Contest draft'}</h3><pre>{contestDraft}</pre></section>
-              <section className="pack-section"><h3>02 · {local(copy.discrepancies, language)}</h3>{classification.finding === 'mismatch' ? <ol>{classification.discrepancies.map((item) => <li key={item.field}><b>{item.field}</b><span>{item.registeredValue} ≠ {item.observedValue}</span></li>)}</ol> : <p>{language === 'hi' ? 'नंबर पढ़ने योग्य नहीं; वाहन प्रकार आंशिक; उल्लंघन जाँचा नहीं जा सकता। वाहन बेमेल का दावा नहीं किया गया।' : 'Registration unreadable; category partial; alleged offence not assessable. No vehicle mismatch is asserted.'}</p>}</section>
+              <section className="pack-section"><h3>02 · {local(copy.discrepancies, language)}</h3>{classification.finding === 'mismatch' ? <><ol>{classification.discrepancies.map((item) => <li key={item.field}><b>{item.field}</b><span>{item.registeredValue} ≠ {item.observedValue}</span></li>)}</ol>{classification.limitations.length > 0 && <p>{classification.limitations.map((code) => describeLimitation(code, language)).join(' ')}</p>}</> : <p>{classification.limitations.map((code) => describeLimitation(code, language)).join(' ')} {language === 'hi' ? 'वाहन बेमेल का दावा नहीं किया गया।' : 'No vehicle mismatch is asserted.'}</p>}</section>
               <section className="pack-section"><h3>03 · {local(copy.evidenceIndex, language)}</h3><ol className="evidence-index"><li><b>A1</b><span>{language === 'hi' ? 'सिंथेटिक ई-चालान' : 'Synthetic e-Challan'}</span><small>{fixture.challanNumber}</small></li><li><b>A2</b><span>{language === 'hi' ? 'सिंथेटिक वाहन रिकॉर्ड' : 'Synthetic vehicle record'}</span><small>{confirmedVehicleFacts.registeredPlate}</small></li><li><b>A3</b><span>{language === 'hi' ? 'प्रवर्तन फ़ोटो और तुलना' : 'Enforcement image and comparison'}</span><small>{confirmedVehicleFacts.observedPlate}</small></li><li><b>A4</b><span>{language === 'hi' ? 'नागरिक की डेमो फ़ोटो' : 'Citizen demo photograph'}</span><small>Synthetic</small></li></ol></section>
               <section className="pack-two-col"><div><h3>04 · {local(copy.declaration, language)}</h3><p>{language === 'hi' ? 'मैं पुष्टि करता/करती हूँ कि ऊपर की जानकारी मेरी समीक्षा के अनुसार सही है।' : 'I confirm that the information above is accurate to the best of my review.'}</p><span className="signature-line">{language === 'hi' ? 'नाम / हस्ताक्षर / तारीख' : 'Name / signature / date'}</span></div><div><h3>05 · {local(copy.requestedAction, language)}</h3><p>{language === 'hi' ? 'दिए गए सबूत की कारण सहित समीक्षा और उचित आदेश।' : 'A reasoned review of the supplied evidence and an appropriate order.'}</p></div></section>
               <footer>{local(copy.disclaimer, language)} {local(copy.currentStateRoute, language)}</footer>
             </article>
-            <div className="pack-tools"><Button variant="secondary" type="button" onClick={copyDraft}>{copied ? local(copy.copied, language) : local(copy.copyText, language)} <span aria-hidden="true">{copied ? '✓' : '⧉'}</span></Button><Button variant="secondary" type="button" onClick={() => window.print()}>{local(copy.printPack, language)} <span aria-hidden="true">↗</span></Button><Button variant="quiet" type="button" onClick={() => go('review')}>{local(copy.editFacts, language)}</Button></div>
+            <div className="pack-tools"><Button variant="secondary" type="button" onClick={copyDraft}>{copied ? local(copy.copied, language) : local(copy.copyText, language)} <span aria-hidden="true">{copied ? '✓' : '⧉'}</span></Button><Button variant="secondary" type="button" onClick={downloadCaseManifest}>{language === 'hi' ? 'केस रिकॉर्ड (.json)' : 'Download case record (.json)'} <span aria-hidden="true">↓</span></Button><Button variant="secondary" type="button" onClick={() => window.print()}>{local(copy.printPack, language)} <span aria-hidden="true">↗</span></Button><Button variant="quiet" type="button" onClick={() => go('review')}>{local(copy.editFacts, language)}</Button></div>
             {analysisMessage && <p className="analysis-message" role="status">{analysisMessage}</p>}
-            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('readiness')}>{local(copy.back, language)}</Button><Button type="button" onClick={() => { setTrackingStage(2); setOutcome('none'); go('tracking'); }}>{local(copy.submitDemo, language)} <span aria-hidden="true">→</span></Button></div>
+            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('readiness')}>{local(copy.back, language)}</Button><Button type="button" onClick={() => { setTrackingStage(2); setOutcome('none'); setSimulatedSubmitted(true); go('tracking'); }}>{local(copy.submitDemo, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
         </>
       )}
 
-      {step === 'tracking' && classification.finding !== 'consistent' && (
+      {renderStep === 'tracking' && classification.finding !== 'consistent' && (
         <>
           <Screen className="tracking-screen">
             <BackButton onClick={() => go('pack')} language={language} />
@@ -816,10 +955,11 @@ export default function ChallanSakshiApp() {
             {outcome !== 'none' && (
               <section className={`outcome-card outcome-${outcome}`}>
                 <div className="outcome-mark" aria-hidden="true">{outcome === 'quashed' ? '✓' : outcome === 'rejected' ? '×' : '…'}</div>
-                <div><span className="synthetic-chip">FICTIONAL DEMO OUTCOME</span><h2>{outcome === 'quashed' ? local(copy.quashedTitle, language) : outcome === 'rejected' ? local(copy.rejectedTitle, language) : local(copy.noResolutionTitle, language)}</h2><p>{outcome === 'quashed' ? local(copy.quashedReason, language) : outcome === 'rejected' ? local(copy.rejectedReason, language) : local(copy.noResolutionBody, language)}</p>{outcome === 'rejected' && <p className="neutral-note">{local(copy.neutralNext, language)}</p>}{outcome === 'no-resolution' && (() => { const authorityClock = calculateAuthorityWindow('2026-07-27', DEMO_REFERENCE_DATE); return <div className="authority-clock"><b>{authorityClock.elapsedDays}</b><span>{language === 'hi' ? 'डेमो जमा होने के बाद कैलेंडर दिन' : 'calendar days since demo acknowledgement'}</span><small>{language === 'hi' ? '30 दिन की सीमा पार — आधिकारिक स्थिति जाँचें' : '30-day boundary passed — verify official status'}</small></div>; })()}<div className="outcome-links"><button type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</button><a href="https://echallan.parivahan.nic.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a><a href="https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars" target="_blank" rel="noreferrer">{local(copy.officialSource, language)} ↗</a></div></div>
+                <div><span className="synthetic-chip">FICTIONAL DEMO OUTCOME</span><h2>{outcome === 'quashed' ? local(copy.quashedTitle, language) : outcome === 'rejected' ? local(copy.rejectedTitle, language) : local(copy.noResolutionTitle, language)}</h2><p>{outcome === 'quashed' ? local(copy.quashedReason, language) : outcome === 'rejected' ? local(copy.rejectedReason, language) : local(copy.noResolutionBody, language)}</p>{outcome === 'rejected' && <p className="neutral-note">{local(copy.neutralNext, language)}</p>}{outcome === 'no-resolution' && (() => { const authorityClock = calculateAuthorityWindow('2026-08-27', '2026-09-27'); return <div className="authority-clock"><b>{authorityClock.elapsedDays}</b><span>{language === 'hi' ? '27 सितंबर तक बीते कैलेंडर दिन' : 'calendar days elapsed as of 27 Sep'}</span><small>{language === 'hi' ? '30 दिन की सीमा पार — आधिकारिक स्थिति जाँचें' : '30-day boundary passed — verify official status'}</small></div>; })()}<div className="outcome-links"><button type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</button>{outcome === 'rejected' && <button type="button" onClick={() => openResolutionRoute('grievance-rejected')}>{language === 'hi' ? 'फैसले के बाद रास्ता देखें' : 'Open post-decision route'} →</button>}{outcome === 'no-resolution' && <button type="button" onClick={() => openResolutionRoute('no-recorded-decision')}>{language === 'hi' ? 'स्थिति फॉलो-अप रास्ता देखें' : 'Open status follow-up route'} →</button>}<a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} ↗</a><a href="https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars" target="_blank" rel="noreferrer">{local(copy.officialSource, language)} ↗</a></div></div>
               </section>
             )}
-            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</Button><Button type="button" onClick={() => go('intake')}>{local(copy.anotherDemo, language)} <span aria-hidden="true">→</span></Button></div>
+            <div className="resolution-reveal"><div><p className="eyebrow"><span />{language === 'hi' ? 'एक प्रणाली · सात मुश्किल पल' : 'One system · seven moments of failure'}</p><h2>{language === 'hi' ? 'गलत सबूत से भुगतान और कोर्ट हैंडऑफ़ तक' : 'From wrong evidence to payment and court handoff'}</h2><p>{language === 'hi' ? 'मुख्य डेमो पूरा हुआ। अब देखें कि वही सबूत-आधारित तरीका अस्वीकृति, जवाब न मिलने, वर्चुअल कोर्ट, पेंडिंग भुगतान और पहुँच की समस्या में कैसे काम करता है।' : 'The flagship story is complete. Now see how the same evidence-first method handles rejection, no recorded decision, Virtual Court, pending payments, and access problems.'}</p></div><Button type="button" onClick={() => go('desk')}>{language === 'hi' ? 'पूरा रिज़ॉल्यूशन डेस्क खोलें' : 'Explore the full resolution desk'} <span aria-hidden="true">→</span></Button></div>
+            <div className="page-actions"><Button variant="secondary" type="button" onClick={() => go('pack')}>{local(copy.viewPack, language)}</Button><Button variant="secondary" type="button" onClick={downloadCaseManifest}>{language === 'hi' ? 'केस रिकॉर्ड डाउनलोड करें' : 'Download case record'} <span aria-hidden="true">↓</span></Button><Button type="button" onClick={() => go('intake')}>{local(copy.anotherDemo, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
         </>

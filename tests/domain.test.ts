@@ -3,9 +3,12 @@ import {
   calculateAuthorityWindow,
   calculateContestWindow,
   classifyEvidenceComparison,
+  deriveConfirmedVehicleFacts,
   evaluateEvidenceReadiness,
   getAvailableCaseActions,
+  guardEvidenceNavigation,
   transitionDemoCase,
+  validateEvidenceReviewFacts,
 } from '../lib/domain';
 import { fixtures } from '../lib/fixtures';
 
@@ -64,6 +67,26 @@ describe('evidence classification', () => {
     const result = classifyEvidenceComparison(fixtures.consistent.confirmedFacts);
     expect(result).toEqual({ finding: 'consistent', discrepancies: [], limitations: [] });
   });
+
+  it('keeps an explicitly blank reviewed observation instead of restoring fixture data', () => {
+    const facts = fixtures.mismatch.extractedFacts.map((fact) => fact.id === 'observed-registration' ? { ...fact, value: '' } : { ...fact });
+    const reviewed = deriveConfirmedVehicleFacts(fixtures.mismatch.confirmedFacts, facts);
+    expect(reviewed.observedPlate).toBe('');
+    expect(validateEvidenceReviewFacts(facts)).toEqual({ complete: false, invalidIds: ['observed-registration'] });
+  });
+
+  it('allows an unavailable image observation only when its visibility is explicitly unclear', () => {
+    const facts = fixtures.mismatch.extractedFacts.map((fact) => fact.id === 'observed-registration' ? { ...fact, value: '', visibility: 'unclear' as const } : { ...fact });
+    const reviewed = deriveConfirmedVehicleFacts(fixtures.mismatch.confirmedFacts, facts);
+    expect(validateEvidenceReviewFacts(facts).complete).toBe(true);
+    expect(classifyEvidenceComparison(reviewed)).toMatchObject({ finding: 'inconclusive', discrepancies: [] });
+  });
+
+  it('reports only the limitation supported by edited facts', () => {
+    const facts = fixtures.consistent.extractedFacts.map((fact) => fact.id === 'observed-colour' ? { ...fact, visibility: 'partial' as const } : { ...fact });
+    const reviewed = deriveConfirmedVehicleFacts(fixtures.consistent.confirmedFacts, facts);
+    expect(classifyEvidenceComparison(reviewed)).toEqual({ finding: 'inconclusive', discrepancies: [], limitations: ['colour-not-fully-clear'] });
+  });
 });
 
 describe('evidence readiness', () => {
@@ -91,5 +114,12 @@ describe('demo state machine', () => {
 
   it('rejects invalid state transitions', () => {
     expect(() => transitionDemoCase('intake', 'SUBMIT')).toThrow('Invalid demo transition');
+  });
+
+  it('guards protected screens until review and simulated submission are complete', () => {
+    expect(guardEvidenceNavigation('pack', 'mismatch', false, false)).toBe('review');
+    expect(guardEvidenceNavigation('tracking', 'mismatch', true, false)).toBe('pack');
+    expect(guardEvidenceNavigation('tracking', 'mismatch', true, true)).toBe('tracking');
+    expect(guardEvidenceNavigation('pack', 'consistent', true, true)).toBe('finding');
   });
 });

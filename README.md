@@ -2,15 +2,15 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first prototype for citizens who receive an e-Challan whose supplied photograph may show a different vehicle or may not clearly support the allegation. It helps a citizen review the supplied evidence, verify each extracted fact, see a deterministic deadline estimate, prepare an indexed contest pack, and follow a fully simulated case to a reasoned outcome.
+ChallanSakshi is an independent, evidence-first e-Challan resolution desk. Its flagship journey helps a citizen review a notice whose photograph may show a different vehicle or may not clearly support the allegation. The expanded desk continues through a reasoned rejection, a Virtual Court handoff, a payment/status conflict, and access or receipt recovery—without collecting real documents or pretending to complete an official action.
 
 > Independent Build What Moves India hackathon prototype. Not affiliated with MoRTH, Parivahan, traffic police, or any court. Synthetic demo data only. Not legal advice.
 
 ## The exact citizen problem
 
-A camera-generated challan can contain a blurry plate, an image of a different category or colour of vehicle, or a photograph that does not visibly establish the alleged offence. The citizen then has to decide which details matter, gather supporting material, draft a factual grievance, and act before a procedural deadline.
+A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve what matters, and navigate fragmented authority, court, payment, and recovery states. The flagship case begins with a blurry plate, a visibly different vehicle, or a photograph that does not support reliable assessment of the allegation; the same evidence trail still matters after submission, rejection, court handoff, or a conflicting payment status.
 
-The official e-Challan portal already supports checking a challan, raising a grievance, and checking grievance status. ChallanSakshi does not replace or imitate those functions. It adds the missing evidence-understanding layer before a citizen acts:
+The official e-Challan and Virtual Courts services already support status, payment, grievance, verification, and court workflows. ChallanSakshi does not replace or imitate those functions. It adds the missing evidence-understanding and next-route layer before a citizen acts:
 
 1. Read the challan and supplied records.
 2. Compare image observations with a citizen-verified vehicle record.
@@ -19,22 +19,31 @@ The official e-Challan portal already supports checking a challan, raising a gri
 5. Calculate indicative clocks with deterministic TypeScript.
 6. Build an indexed, factual pack from confirmed information only.
 7. Refuse to manufacture a dispute when the records appear consistent.
+8. Preserve a machine-readable case manifest made from confirmed facts.
+9. Route selected post-decision, court, payment, and recovery problems to the appropriate official service with explicit safety boundaries.
 
 ## What is working
 
-- A complete mobile-first seven-step journey with sensible browser back/forward behaviour.
-- Refresh persistence for current demo step, selected fixture, verified facts, and tracking state.
+- A complete mobile-first six-stage evidence journey, plus landing and Resolution Desk routes, with sensible browser back/forward behaviour.
+- A bilingual **Resolution Desk** covering seven moments in one e-Challan lifecycle: wrong evidence, unclear evidence, grievance rejection, no recorded decision, Virtual Court transfer, payment/status conflict, and phone/receipt recovery.
+- Plain-language English and Hindi routing that only suggests a help path, exposes ambiguity, and requires citizen confirmation.
+- A working three-state payment reconciler: supplied-record conflict, identifier mismatch, and aligned-record refusal.
+- A deterministic post-rejection D+30 clock with state-specific implementation cautions.
+- An official Virtual Courts handoff checklist that never handles OTPs, filing, or payment.
+- Downloadable JSON route notes and a versioned, source-linked case manifest.
+- Refresh persistence for current demo step, selected fixture, verified facts, tracking state, and selected resolution route.
 - Three typed synthetic fixtures:
   - **Case A:** blue scooter record versus white motorcycle image → possible vehicle mismatch.
   - **Case B:** unreadable image and unassessable allegation → inconclusive evidence.
   - **Case C:** registration, category, colour, and visible allegation align → no material mismatch; no accusatory pack.
-- Source-linked editable facts and an explicit human-confirmation gate.
+- Source-linked, editable comparison facts; locked synthetic notice metadata; and an explicit human-confirmation gate.
 - Pure, tested rules for contest windows, authority-response windows, evidence classification, readiness, actions, and state transitions.
 - Evidence readiness separated into citizen-supplied, authority-held, and optional items.
-- English and plain-human Hindi across the core flow.
+- Bilingual interface and guidance across the core journey; synthetic identifiers and a few source values remain in English for recognisability.
 - An indexed, print-friendly contest or clarification pack generated from confirmed facts only.
 - A clearly fictional grievance reference, full tracking timeline, and three switchable reasoned outcomes.
 - Optional Responses API vision extraction with strict Structured Outputs and a reliable precomputed fallback.
+- No real-document upload surface: every route and record remains visibly synthetic.
 - Accessible labels, visible focus states, reduced-motion support, 360 px layout support, and large touch targets.
 
 ## Architecture
@@ -42,11 +51,14 @@ The official e-Challan portal already supports checking a challan, raising a gri
 ```text
 app/page.tsx
   └─ components/ChallanSakshiApp.tsx     UI, localization, persistence, demo flow
+       ├─ components/ResolutionDesk.tsx   triage, routes, payment demo, official handoffs
        ├─ lib/fixtures.ts                 typed synthetic records and precomputed analysis
-       └─ lib/domain.ts                   pure date, evidence, readiness, and state rules
+       ├─ lib/domain.ts                   pure date, evidence, readiness, and state rules
+       └─ lib/resolution.ts               triage, post-order, route, and payment rules
 
 app/api/analyze/route.ts                  optional Responses API image extraction
-tests/domain.test.ts                      deterministic rule coverage
+tests/domain.test.ts                      core deterministic rule coverage
+tests/resolution.test.ts                  resolution and reconciliation rule coverage
 public/evidence-contact-sheet.png         synthetic evidence photography
 public/og.png                             social preview
 ```
@@ -67,6 +79,10 @@ Normal TypeScript code handles:
 - mismatch/inconclusive/consistent classification after confirmation;
 - allowed case transitions and available actions;
 - outcome display.
+- plain-language route matching;
+- post-rejection indicative clock calculation;
+- payment-record reconciliation and refusal states;
+- permitted official handoff content.
 
 The product treats the issue date as Day 0 and displays D+45 as an **indicative, provisionally included deadline day**. The acknowledgement date is Day 0 for the D+30 authority boundary. The source does not settle cutoff time, holiday rollover, or every state implementation, so the interface labels these dates as estimates and always directs the citizen to verify the official portal.
 
@@ -79,7 +95,7 @@ The complete journey works without an API key. To enable the optional “Re-run 
 3. Set `OPENAI_MODEL` to a vision-capable Responses API model available to your OpenAI project. The app deliberately does not hard-code an unverified model.
 4. Restart the development server.
 
-The route uses the OpenAI Responses API with image input, `store: false`, and a strict JSON Schema. It validates the request and the returned object before any observation reaches the UI. It does not log image data or raw document contents. If configuration, network, model access, or validation fails, the UI keeps the typed fixture and shows **Precomputed fallback active**.
+The route uses the OpenAI Responses API with image input, `store: false`, and a strict JSON Schema. The client sends only a known fixture ID; the server loads the bundled synthetic contact sheet and never accepts caller-supplied document data. It validates both the request and returned object before any observation reaches the UI. It does not log image data or raw document contents. If configuration, network, model access, or validation fails, the UI keeps the typed fixture and shows **Precomputed fallback active**.
 
 ## Synthetic-data and privacy policy
 
@@ -87,8 +103,9 @@ The route uses the OpenAI Responses API with image input, `store: false`, and a 
 - Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
 - The generic vehicle data card is intentionally not a replica of an official RC.
 - The prototype warns against uploading real identity or vehicle records.
-- Replacement inputs accept PNG, JPG, WebP, or PDF up to 5 MB and are kept only as the current in-memory file selection; raw file contents are not placed in local storage.
+- The prototype does not accept real uploads. All source records are preloaded, typed, fictional fixtures.
 - No demo submission reaches a government system.
+- No real registration, OTP, Aadhaar, transaction reference, engine number, or chassis number is requested.
 - Reset clears local demo state and restores the fictional fixtures.
 - The designated authority remains the final decision-maker.
 
@@ -121,22 +138,28 @@ For another common host, install dependencies, configure the optional environmen
 ## Known limitations
 
 - The product does not file, pay, cancel, or legally determine an e-Challan.
+- The resolution desk is an informational router, not a state-specific legal adviser or live status checker.
+- Payment reconciliation compares supplied fictional records only; it does not verify a bank or government ledger.
+- The Virtual Courts route does not retrieve, list, transfer, or file any real case.
 - The government route, designated authority, required declaration, and implementation can vary by state.
 - The date boundary convention is an explicit product estimate, not a legal opinion.
 - Live analysis covers the synthetic demonstration image; real personal documents are intentionally outside this prototype’s scope.
-- Hindi is provided for the complete core flow, while a few synthetic identifiers and source codes remain in English for recognisability.
+- The interface and guidance are bilingual across the core journey, while synthetic identifiers and a few source values remain in English for recognisability.
 - Simulated authority outcomes do not represent a prediction or guarantee.
 
 ## Official sources
 
-- [Build What Moves India](https://buildwhatmovesindia.com/)
+- [Build What Moves India brief](https://buildwhatmovesindia.com/brief)
+- [Build What Moves India FAQ](https://buildwhatmovesindia.com/faq)
 - [Rajya Sabha Unstarred Question No. 3764, answered 25 March 2026](https://sansad.in/getFile/annex/270/AU3764_TntZ75.pdf?source=pqars)
-- [Official NextGen e-Challan portal](https://echallan.parivahan.nic.in/)
+- [Amended Rule 167 and 167A notification](https://morth.gov.in/sites/default/files/Final%20Notification%20for%20amendement%20in%20Rule%20167%20and%20167A-1.pdf)
+- [Official NextGen e-Challan portal](https://echallan.parivahan.gov.in/)
+- [Official Virtual Courts service](https://vcourts.gov.in/virtualcourt/index.php)
+- [Official Virtual Courts FAQ](https://vcourts.gov.in/virtualcourt/faq.php/web_info.php)
 - [OpenAI Responses API reference](https://developers.openai.com/api/reference/resources/responses/methods/create)
 
-The parliamentary answer describes the 45-day action window, supporting-document requirement, 30-day resolution period for a properly contested challan, reasoned rejection, and state-specific submission mechanism. The portal confirms that grievance and status functions already exist and that configuration can vary across states and departments.
+The parliamentary answer describes the 45-day action window, supporting-document requirement, 30-day resolution period for a properly contested challan, reasoned rejection, and state-specific submission mechanism. The amended rule describes the post-rejection choice and deposit condition, while leaving the manner state-specific. The official portals document pending-transaction checks, the warning against paying on both e-Challan and Virtual Courts, court-request handoff, alternative verification, and receipt reprint. Every screen keeps the official-service verification step visible.
 
 ## How Codex was used meaningfully
 
-Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic legal clocks, drafted and tested the domain state machine, built the bilingual evidence-review journey, generated wholly synthetic visual assets, verified official-source wording, and exercised the end-to-end flow through browser-based responsive QA. Human verification remains an intentional part of the product itself: no model observation silently becomes a conclusion.
-
+Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes, drafted and tested the domain state machine and payment reconciler, built the bilingual evidence-review and resolution journeys, generated wholly synthetic visual assets, verified official-source wording, and exercised the end-to-end flow through browser-based responsive QA. Human verification remains intentional: no model observation or keyword match silently becomes a conclusion or official action.

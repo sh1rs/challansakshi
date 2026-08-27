@@ -1,6 +1,12 @@
 const allowedFixtureIds = ['mismatch', 'inconclusive', 'consistent'] as const;
 type AllowedFixtureId = (typeof allowedFixtureIds)[number];
 
+const analysisTargets: Record<AllowedFixtureId, { panel: 'left' | 'middle' | 'right'; offenceCriterion: string }> = {
+  mismatch: { panel: 'left', offenceCriterion: 'whether the rider head area and helmet presence are visible enough to assess' },
+  inconclusive: { panel: 'middle', offenceCriterion: 'whether the signal phase, stop line, and vehicle position are visible enough to assess together' },
+  consistent: { panel: 'right', offenceCriterion: 'whether the rider head area and helmet presence are visible enough to assess' },
+};
+
 interface StructuredFact {
   field: 'observed_registration' | 'observed_category' | 'observed_colour' | 'offence_assessable';
   value: string;
@@ -87,10 +93,15 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Live analysis is not configured.', fallback: true }, { status: 503 });
   }
 
-  const contentLength = Number(request.headers.get('content-length') || 0);
-  if (contentLength > 4_000_000) return Response.json({ error: 'Synthetic demo image is too large.', fallback: true }, { status: 413 });
+  const requestUrl = new URL(request.url);
+  if (request.headers.get('origin') !== requestUrl.origin) {
+    return Response.json({ error: 'This demo endpoint accepts same-origin requests only.', fallback: true }, { status: 403 });
+  }
 
-  let body: { fixtureId?: unknown; imageDataUrl?: unknown };
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > 2_000) return Response.json({ error: 'Invalid demo request.', fallback: true }, { status: 413 });
+
+  let body: { fixtureId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -100,22 +111,31 @@ export async function POST(request: Request) {
   if (typeof body.fixtureId !== 'string' || !allowedFixtureIds.includes(body.fixtureId as AllowedFixtureId)) {
     return Response.json({ error: 'Unknown synthetic fixture.', fallback: true }, { status: 400 });
   }
-  if (typeof body.imageDataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(body.imageDataUrl) || body.imageDataUrl.length > 3_500_000) {
-    return Response.json({ error: 'A valid synthetic demo image is required.', fallback: true }, { status: 400 });
-  }
-
-  const panel = body.fixtureId === 'mismatch' ? 'left' : body.fixtureId === 'inconclusive' ? 'middle' : 'right';
+  const target = analysisTargets[body.fixtureId as AllowedFixtureId];
+  const panel = target.panel;
   const instructions = [
     'Read only the specified panel of this wholly synthetic three-panel evidence contact sheet.',
     `Analyse the ${panel} panel only. Ignore the other two panels.`,
     'Extract observations; do not decide guilt, innocence, legality, validity, strategy, deadline, or likely outcome.',
     'Never identify a person or infer identity from appearance. Do not describe a face.',
     'Never fabricate plate characters. If the plate is blank, absent, or unreadable, use value "Unreadable" and visibility "unclear" or "not-visible".',
-    'For offence_assessable, describe only whether a helmet-related fact is visibly assessable; do not make a legal conclusion.',
+    `For offence_assessable, assess only ${target.offenceCriterion}; do not make a legal conclusion.`,
+    'The offence_assessable value must begin with exactly "Yes", "No", or "Unclear", followed by a short visual observation.',
     'Every observation requires user confirmation. State concrete visual limitations.',
   ].join(' ');
 
   try {
+    const syntheticAsset = await fetch(new URL('/evidence-contact-sheet.png', requestUrl));
+    if (!syntheticAsset.ok || syntheticAsset.headers.get('content-type')?.startsWith('image/') !== true) {
+      return Response.json({ error: 'Synthetic demo image is unavailable.', fallback: true }, { status: 503 });
+    }
+    const bytes = new Uint8Array(await syntheticAsset.arrayBuffer());
+    if (bytes.byteLength > 3_000_000) return Response.json({ error: 'Synthetic demo image is unavailable.', fallback: true }, { status: 503 });
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 32_768) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 32_768));
+    }
+    const imageDataUrl = `data:${syntheticAsset.headers.get('content-type')};base64,${btoa(binary)}`;
     const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -127,7 +147,7 @@ export async function POST(request: Request) {
           role: 'user',
           content: [
             { type: 'input_text', text: `Synthetic fixture: ${body.fixtureId}. Return four source-linked observations for the ${panel} image panel.` },
-            { type: 'input_image', image_url: body.imageDataUrl, detail: 'high' },
+            { type: 'input_image', image_url: imageDataUrl, detail: 'high' },
           ],
         }],
         text: { format: { type: 'json_schema', name: 'challansakshi_evidence_analysis', strict: true, schema: responseSchema } },

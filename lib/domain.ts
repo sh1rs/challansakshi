@@ -6,6 +6,7 @@ export type Confidence = 'high' | 'medium' | 'low';
 export type FindingKind = 'mismatch' | 'inconclusive' | 'consistent';
 export type DemoCaseState = 'intake' | 'review' | 'finding' | 'readiness' | 'pack' | 'submitted' | 'under-review' | 'resolved';
 export type OutcomeState = 'none' | 'quashed' | 'rejected' | 'no-resolution';
+export type DemoStep = 'landing' | 'desk' | 'route' | 'intake' | 'review' | 'finding' | 'readiness' | 'pack' | 'tracking';
 
 export type LocalizedText = { en: string; hi: string };
 
@@ -72,6 +73,57 @@ export interface ClassificationResult {
   finding: FindingKind;
   discrepancies: Discrepancy[];
   limitations: string[];
+}
+
+export function guardEvidenceNavigation(requested: DemoStep, finding: FindingKind, confirmed: boolean, simulatedSubmitted: boolean): DemoStep {
+  if (['finding', 'readiness', 'pack', 'tracking'].includes(requested) && !confirmed) return 'review';
+  if (finding === 'consistent' && ['readiness', 'pack', 'tracking'].includes(requested)) return 'finding';
+  if (requested === 'tracking' && !simulatedSubmitted) return 'pack';
+  return requested;
+}
+
+const editableReviewFactIds = new Set([
+  'observed-registration',
+  'observed-category',
+  'observed-colour',
+  'offence-visible',
+  'record-registration',
+  'record-category',
+  'record-colour',
+]);
+
+export function isReviewFactEditable(factId: string): boolean {
+  return editableReviewFactIds.has(factId);
+}
+
+export function validateEvidenceReviewFacts(facts: ExtractedFact[]): { complete: boolean; invalidIds: string[] } {
+  const invalidIds = facts.filter((fact) => {
+    if (!isReviewFactEditable(fact.id) || fact.value.trim()) return false;
+    const canBeUnavailable = fact.source === 'enforcement' && (fact.visibility === 'unclear' || fact.visibility === 'not-visible');
+    return !canBeUnavailable;
+  }).map((fact) => fact.id);
+  return { complete: invalidIds.length === 0, invalidIds };
+}
+
+export function deriveConfirmedVehicleFacts(fallbacks: ConfirmedVehicleFacts, facts: ExtractedFact[]): ConfirmedVehicleFacts {
+  const value = (id: string, fallback: string) => {
+    const reviewed = facts.find((fact) => fact.id === id);
+    return reviewed ? reviewed.value.trim() : fallback;
+  };
+  const visibility = (id: string, fallback: Visibility) => facts.find((fact) => fact.id === id)?.visibility ?? fallback;
+  const offenceValue = value('offence-visible', 'unclear').toLowerCase();
+  return {
+    registeredPlate: value('record-registration', fallbacks.registeredPlate),
+    registeredCategory: value('record-category', fallbacks.registeredCategory),
+    registeredColour: value('record-colour', fallbacks.registeredColour),
+    observedPlate: value('observed-registration', fallbacks.observedPlate),
+    observedCategory: value('observed-category', fallbacks.observedCategory),
+    observedColour: value('observed-colour', fallbacks.observedColour),
+    offenceAssessable: offenceValue.startsWith('yes') ? 'yes' : offenceValue.startsWith('no') ? 'no' : 'unclear',
+    observedPlateVisibility: visibility('observed-registration', fallbacks.observedPlateVisibility),
+    observedCategoryVisibility: visibility('observed-category', fallbacks.observedCategoryVisibility),
+    observedColourVisibility: visibility('observed-colour', fallbacks.observedColourVisibility),
+  };
 }
 
 const DAY_MS = 86_400_000;
@@ -218,4 +270,3 @@ export function transitionDemoCase(current: DemoCaseState, event: string): DemoC
 export function getAvailableCaseActions(state: DemoCaseState): string[] {
   return Object.keys(transitions[state]);
 }
-
