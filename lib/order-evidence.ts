@@ -28,6 +28,12 @@ export interface SyntheticRejectedOrder {
   syntheticAuthority: true;
 }
 
+export interface OrderCustodyContext {
+  evidenceId: EvidenceItemId;
+  label: LocalizedText;
+  submittedPoint: LocalizedText;
+}
+
 export interface OrderEvidenceRow {
   id: `P${number}`;
   label: LocalizedText;
@@ -69,15 +75,20 @@ export function buildSyntheticRejectedOrder(input: {
   grievanceNumber: string;
   challanNumber: string;
   registeredPlate: string;
+  custodyContext?: OrderCustodyContext | null;
 }): SyntheticRejectedOrder {
   const mismatch = input.finding === 'mismatch';
   const reason = mismatch
     ? 'The submitted material does not establish a material vehicle mismatch.'
+    : input.custodyContext
+      ? 'The submitted timeline does not establish a change in the official vehicle record or decide responsibility for the alleged event.'
     : 'The supplied material does not establish a basis to change the challan record.';
   const reasonHi = mismatch
     ? 'जमा सामग्री से वाहन का ठोस बेमेल स्थापित नहीं होता।'
+    : input.custodyContext
+      ? 'जमा समय-रेखा आधिकारिक वाहन रिकॉर्ड में बदलाव स्थापित नहीं करती और कथित घटना की जिम्मेदारी तय नहीं करती।'
     : 'दी गई सामग्री से चालान रिकॉर्ड बदलने का आधार स्थापित नहीं होता।';
-  const orderId = input.challanNumber.endsWith('-B') ? 'DEMO-ORD-B-01' : 'DEMO-ORD-A-01';
+  const orderId = input.challanNumber.endsWith('-B') ? 'DEMO-ORD-B-01' : input.challanNumber.endsWith('-C') ? 'DEMO-ORD-C-01' : 'DEMO-ORD-A-01';
   const paragraphs: OrderParagraph[] = [
     {
       id: 'O1',
@@ -93,7 +104,12 @@ export function buildSyntheticRejectedOrder(input: {
           en: 'The applicant states that the vehicle shown in the enforcement image differs from the vehicle described in the submitted record.',
           hi: 'आवेदक का कहना है कि प्रवर्तन फ़ोटो में दिखता वाहन जमा रिकॉर्ड में बताए वाहन से अलग है।',
         }
-        : {
+        : input.custodyContext
+          ? {
+            en: 'The applicant states that the alleged event falls outside the supplied vehicle relationship or custody interval.',
+            hi: 'आवेदक का कहना है कि कथित घटना दी गई वाहन संबंध या उपयोग अवधि के बाहर आती है।',
+          }
+          : {
           en: 'The applicant states that the supplied enforcement image is unclear and does not visibly support the recorded allegation.',
           hi: 'आवेदक का कहना है कि दी गई प्रवर्तन फ़ोटो साफ़ नहीं है और दर्ज आरोप को स्पष्ट रूप से नहीं दिखाती।',
         },
@@ -124,6 +140,15 @@ export function buildSyntheticRejectedOrder(input: {
       },
     },
   ];
+  if (input.custodyContext) {
+    paragraphs.push({
+      id: 'O7',
+      text: {
+        en: 'The supplied vehicle relationship timeline and its supporting record were reviewed. The submitted material does not establish official transfer status or identify the driver.',
+        hi: 'दी गई वाहन संबंध समय-रेखा और उसके सहायक रिकॉर्ड की समीक्षा की गई। जमा सामग्री आधिकारिक ट्रांसफ़र स्थिति स्थापित नहीं करती और ड्राइवर की पहचान नहीं करती।',
+      },
+    });
+  }
   return {
     id: orderId,
     orderDate: ORDER_DATE,
@@ -139,7 +164,7 @@ export function buildSyntheticRejectedOrder(input: {
       { id: 'order-date', label: { en: 'Order date', hi: 'आदेश की तारीख' }, value: ORDER_DATE, sourceParagraphs: ['header.orderDate'] },
       { id: 'outcome', label: { en: 'Recorded outcome', hi: 'दर्ज नतीजा' }, value: 'Grievance rejected', sourceParagraphs: ['O5'] },
       { id: 'reason', label: { en: 'Stated reason', hi: 'दर्ज कारण' }, value: reason, sourceParagraphs: ['O5'] },
-      { id: 'next-route', label: { en: 'Next-route wording', hi: 'अगले रास्ते का पाठ' }, value: paragraphs[5].text.en, sourceParagraphs: ['O6'] },
+      { id: 'next-route', label: { en: 'Next-route wording', hi: 'अगले रास्ते का पाठ' }, value: paragraphs.find((paragraph) => paragraph.id === 'O6')!.text.en, sourceParagraphs: ['O6'] },
     ],
   };
 }
@@ -148,6 +173,7 @@ export function buildOrderEvidenceMap(input: {
   classification: ClassificationResult;
   confirmedFacts: ConfirmedVehicleFacts;
   evidenceIndex: EvidenceIndexItem[];
+  custodyContext?: OrderCustodyContext | null;
 }): OrderEvidenceRow[] {
   const availableEvidence = new Set(input.evidenceIndex.map((item) => item.id));
   const rows: OrderEvidenceRow[] = [];
@@ -247,6 +273,20 @@ export function buildOrderEvidenceMap(input: {
       evidenceIds: requireEvidence(['A1', 'A3']), factIds: ['offence-visible'],
       suggestedStatus: 'unclear', suggestedReasonRefs: ['O4'], matchBasis: 'possible-semantic-reference',
       explanation: { en: 'O4 says the image was considered sufficient, but does not explicitly describe rider or offence visibility.', hi: 'O4 में फ़ोटो को पर्याप्त कहा गया है, लेकिन चालक या उल्लंघन की दृश्यता साफ़ नहीं बताई गई।' },
+    });
+  }
+
+  if (input.custodyContext) {
+    const custodyReasonRefs = input.classification.finding === 'mismatch' ? ['O7'] : ['O2', 'O7'];
+    rows.push({
+      id: `P${rows.length + 1}` as const,
+      label: input.custodyContext.label,
+      submittedPoint: input.custodyContext.submittedPoint,
+      evidenceIds: requireEvidence([input.custodyContext.evidenceId]), factIds: ['custody-interval'],
+      suggestedStatus: 'mentioned', suggestedReasonRefs: custodyReasonRefs, matchBasis: 'direct-phrase',
+      explanation: input.classification.finding === 'mismatch'
+        ? { en: 'O7 expressly discusses the supplied relationship record while preserving its limits. O2 addresses only the separate vehicle-mismatch statement.', hi: 'O7 में दिए संबंध रिकॉर्ड की सीमाओं सहित सीधी चर्चा है। O2 केवल अलग वाहन-बेमेल कथन बताता है।' }
+        : { en: 'O2 records the timeline claim and O7 expressly discusses the supplied relationship record while preserving its limits.', hi: 'O2 में समय-रेखा का दावा और O7 में दिए संबंध रिकॉर्ड की सीमाओं सहित सीधी चर्चा है।' },
     });
   }
 
@@ -389,7 +429,7 @@ export function buildOrderReviewNote(input: {
     : '';
   const factValue = (id: OrderFactId, fallback: string) => input.extractedFacts.find((fact) => fact.id === id)?.value ?? fallback;
   const completenessLabel: Record<OrderCompleteness, LocalizedText> = {
-    yes: { en: 'Complete order supplied', hi: 'पूरा आदेश दिया गया' },
+    yes: { en: 'Citizen indicated the supplied order appears complete', hi: 'नागरिक के अनुसार दिया आदेश पूरा दिखता है' },
     no: { en: 'Pages or annexures missing', hi: 'पन्ने या परिशिष्ट नहीं मिले' },
     'not-sure': { en: 'Completeness not certain', hi: 'पूर्णता पक्की नहीं' },
   };

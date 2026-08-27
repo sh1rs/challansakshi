@@ -2,7 +2,7 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first e-Challan resolver for one continuous citizen problem: **does the supplied evidence match my vehicle, and if my contest is rejected, does the supplied order address the evidence I actually submitted?** It carries one frozen local demo revision from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. A secondary Resolution Desk demonstrates adjacent routing potential without changing the submitted problem or pretending to complete an official action.
+ChallanSakshi is an independent, evidence-first e-Challan resolver for one continuous citizen problem: **does the challan’s own evidence, timestamp, vehicle-relationship record, and case state agree with the citizen it is accusing—and, if contested, does the supplied order address the evidence actually submitted?** It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. A compact notice-safety preflight and a secondary Resolution Desk broaden prevention and routing without pretending to authenticate a notice or complete an official action.
 
 > Independent Build What Moves India hackathon prototype. Not affiliated with MoRTH, Parivahan, traffic police, or any court. Synthetic demo data only. Not legal advice.
 
@@ -17,27 +17,35 @@ The official e-Challan and Virtual Courts services already support status, payme
 3. Show each inconsistency or limitation with its source.
 4. Require the citizen to confirm or correct every extracted fact.
 5. Calculate indicative clocks with deterministic TypeScript.
-6. Build an indexed, factual pack from confirmed information only.
-7. Refuse to manufacture a dispute when the records appear consistent.
-8. Freeze the core submitted facts under a stable deterministic local revision ID and preserve a traceable demo ledger.
-9. Compare a supplied fictional order with the submitted evidence, with mandatory citizen review of every mapping.
-10. Generate a versioned Order Review Note and neutral reason-clarification request when supported.
-11. Offer adjacent official-service routing as a clearly secondary scale path.
+6. Record which evidence elements were supplied, unclear, not found in this packet, not applicable, or still require official verification.
+7. Compare an optional citizen-reviewed vehicle relationship/custody interval with the alleged event time without inferring the driver, legal owner, or responsibility.
+8. Build an indexed, factual pack only when the combined visual and timeline assessment supports a bounded review request.
+9. Refuse to manufacture a dispute when both the visual records and selected time record align.
+10. Freeze the reviewed facts, completeness inventory, and timeline under stable deterministic local revision IDs and preserve a traceable demo ledger.
+11. Compare a supplied fictional order with the submitted evidence, with mandatory citizen review of every mapping.
+12. Generate a versioned Order Review Note and neutral reason-clarification request when supported.
+13. Offer adjacent official-service routing as a clearly secondary scale path.
 
 ## What is working
 
 - A complete mobile-first six-stage evidence journey, plus landing and Resolution Desk routes, with sensible browser back/forward behaviour.
+- A full-screen bilingual **Local Evidence Passport** that joins three questions—vehicle identity, event-time relationship, and supplied-packet completeness—without adding noise to the six-stage progress rail.
+- Four typed vehicle relationship/custody scenarios: owner-aligned, sold before the event, unclear rental handoff, and aligned fleet assignment. Exact timestamps use deterministic interval rules; unclear or unverified records remain abstentions.
+- A combined case-assessment gate: Case C still refuses an unsupported visual dispute, but can prepare a narrowly scoped relationship-timeline review when a separately confirmed sold-before-event record supports it.
+- A supplied-evidence completeness inventory with eight stable elements and five non-interchangeable states. “Not found” is always scoped to the fictional packet and never treated as legal insufficiency.
+- A deterministic scam-notice preflight over three wholly synthetic messages. It recognises exact-host, hidden-link, APK, OTP/credential, remote-access, personal-payment, urgency, lookalike, punycode, HTTP, port, and embedded-credential warning signals without fetching suspicious destinations.
+- Independent **Simpler view** and **Text first · fewer visuals** preferences. Simpler view adds a persistent plain-language summary and roomier single-column layouts; text-first mode does not mount the 1.6 MB evidence sheet until the citizen explicitly reveals it and blocks live image analysis while enabled.
 - A secondary bilingual **Resolution Desk** showing how the same evidence-first pattern could later route seven adjacent lifecycle moments; it is not the flagship submission journey.
 - Plain-language English and Hindi routing that only suggests a help path, exposes ambiguity, and requires citizen confirmation.
 - A working three-state payment reconciler: supplied-record conflict, identifier mismatch, and aligned-record refusal.
 - A deterministic post-rejection D+30 clock with state-specific implementation cautions.
 - A deeply integrated **Order-to-Evidence Review** for the rejected hero case: seven extracted order facts, a document-completeness gate, six source-linked mapping rows, three neutral statuses, editable paragraph references, and mandatory per-row confirmation.
 - A versioned **Order Review Note**, neutral reason-clarification wording, downloadable JSON artifact, indicative `.ics` reminder, and full case manifest.
-- A derived ten-event local case ledger that distinguishes supplied records, analysis, citizen confirmation, deterministic rules, and the simulated authority. It is explicitly not an official record or legal chain of custody.
+- A derived local case ledger that distinguishes supplied records, analysis, citizen confirmation, deterministic rules, the Passport revision, and the simulated authority. It is explicitly not an official record or legal chain of custody.
 - A frozen local demo snapshot with a stable deterministic revision ID tying the pack, grievance, fictional order, evidence map, ledger, and downloads to the same core citizen-confirmed facts. It is not a cryptographic integrity proof. Editing evidence clears every downstream simulated event.
 - An official Virtual Courts handoff checklist that never handles OTPs, filing, or payment.
 - Downloadable JSON route notes and a versioned, source-linked case manifest.
-- Refresh persistence for current demo step, selected fixture, verified facts, tracking state, and selected resolution route.
+- V5 refresh persistence for current demo step, selected fixture, verified facts, Passport/custody confirmations, frozen submitted Passport, tracking state, and selected resolution route. V4 states migrate conservatively; accessibility/data preferences live in a separate V1 store and survive “Start over.”
 - Three typed synthetic fixtures:
   - **Case A:** blue scooter record versus white motorcycle image → possible vehicle mismatch.
   - **Case B:** unreadable image and unassessable allegation → inconclusive evidence.
@@ -56,11 +64,14 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 ```text
 app/page.tsx
-  └─ components/ChallanSakshiApp.tsx       UI, localization, V4 persistence, demo flow
+  └─ components/ChallanSakshiApp.tsx       UI, localization, V5 persistence, demo flow
+       ├─ components/EvidencePassport.tsx  notice preflight, preferences, Passport UI
        ├─ components/ResolutionDesk.tsx     triage, routes, payment demo, official handoffs
        ├─ components/OrderEvidenceReview.tsx locked order, mapping, note, and ledger UI
        ├─ lib/fixtures.ts                   typed synthetic records and precomputed analysis
        ├─ lib/domain.ts                     pure date, evidence, readiness, and state rules
+       ├─ lib/evidence-passport.ts          custody intervals, completeness, combined gate, revisions
+       ├─ lib/notice-safety.ts              deterministic synthetic-message warning signals
        ├─ lib/resolution.ts                 triage, post-order, route, and payment rules
        ├─ lib/case-ledger.ts                evidence registry, revisions, provenance, ledger
        └─ lib/order-evidence.ts             order fixture, mapping, validation, artifacts
@@ -69,6 +80,7 @@ app/api/analyze/route.ts                    optional Responses API image extract
 tests/domain.test.ts                        core deterministic rule coverage
 tests/resolution.test.ts                    resolution and reconciliation rule coverage
 tests/case-ledger.test.ts                   provenance, ledger, order map, artifact invariants
+tests/evidence-passport.test.ts             timeline, Passport, combined-gate, preflight rules
 public/evidence-contact-sheet.png           synthetic evidence photography
 public/og.png                               social preview
 ```
@@ -86,6 +98,10 @@ Normal TypeScript code handles:
 - the indicative 45-day contest clock;
 - the 30-day authority-response clock;
 - evidence completeness;
+- supplied-packet status and Local Evidence Passport revision identity;
+- vehicle relationship/custody interval validation and event-time comparison;
+- combined visual/timeline review grounds and permitted artifact type;
+- scam-notice warning-signal precedence and exact-host checks;
 - mismatch/inconclusive/consistent classification after confirmation;
 - allowed case transitions and available actions;
 - outcome display;
@@ -123,7 +139,9 @@ The route uses the OpenAI Responses API with image input, `store: false`, and a 
 - The prototype does not accept real uploads. All source records are preloaded, typed, fictional fixtures.
 - No demo submission reaches a government system.
 - No real registration, OTP, Aadhaar, transaction reference, engine number, or chassis number is requested.
-- Reset clears local demo state and restores the fictional fixtures.
+- Reset clears local case state and restores the fictional fixtures while keeping the citizen’s Simpler view and text-first preferences.
+- Suspicious synthetic text is displayed as inert text; the prototype never fetches or makes its supplied destination clickable.
+- Text-first mode prevents the evidence contact sheet from being requested until explicit reveal. Choosing “I could not inspect this image” creates an inconclusive evidence state instead of silently confirming visual facts.
 - The designated authority remains the final decision-maker.
 
 ## Local setup
@@ -155,6 +173,9 @@ For another common host, install dependencies, configure the optional environmen
 ## Known limitations
 
 - The product does not file, pay, cancel, or legally determine an e-Challan.
+- The notice preflight identifies observable warning signs in supplied synthetic text; it does not certify a link as safe, authenticate a notice, detect malware, or prove fraud.
+- The Local Evidence Passport is local and synthetic. It is not government-issued identity, official verification, a legal chain of custody, document forensics, or a legal-admissibility assessment.
+- Vehicle relationship timing does not identify the driver, complete an official transfer, establish legal ownership, or decide responsibility.
 - The resolution desk is an informational router, not a state-specific legal adviser or live status checker.
 - Payment reconciliation compares supplied fictional records only; it does not verify a bank or government ledger.
 - The Virtual Courts route does not retrieve, list, transfer, or file any real case.
@@ -180,4 +201,4 @@ The parliamentary answer describes the 45-day action window, supporting-document
 
 ## How Codex was used meaningfully
 
-Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes; built the bilingual evidence, case-ledger, and order-review journey; typed and tested correction provenance, stable submission revisions, citation validation, and refusal states; generated wholly synthetic visual assets; verified official-source wording; and exercised the complete flow through desktop and 390 px browser QA. Human verification remains intentional: no model observation, order mapping, or keyword match silently becomes a conclusion or official action.
+Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes; built the bilingual evidence, Passport, custody-timeline, case-ledger, and order-review journey; typed and tested correction provenance, stable submission revisions, warning-signal precedence, citation validation, and refusal states; generated wholly synthetic visual assets; verified official-source wording; and exercised the complete flow through desktop and 360 px browser QA. Human verification remains intentional: no model observation, notice keyword, custody interval, order mapping, or route match silently becomes a legal conclusion or official action.

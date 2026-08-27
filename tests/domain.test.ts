@@ -118,12 +118,16 @@ describe('demo state machine', () => {
 
   it('guards protected screens until review and simulated submission are complete', () => {
     expect(guardEvidenceNavigation('pack', 'mismatch', false, false)).toBe('review');
-    expect(guardEvidenceNavigation('tracking', 'mismatch', true, false)).toBe('pack');
+    expect(guardEvidenceNavigation('tracking', 'mismatch', true, false)).toBe('passport');
+    expect(guardEvidenceNavigation('tracking', 'mismatch', true, false, 'none', false, true, true)).toBe('pack');
     expect(guardEvidenceNavigation('tracking', 'mismatch', true, true)).toBe('tracking');
     expect(guardEvidenceNavigation('pack', 'consistent', true, true)).toBe('finding');
     expect(guardEvidenceNavigation('order-review', 'mismatch', true, true, 'none')).toBe('tracking');
     expect(guardEvidenceNavigation('order-review', 'mismatch', true, true, 'rejected')).toBe('order-review');
     expect(guardEvidenceNavigation('order-map', 'mismatch', true, true, 'rejected', false)).toBe('order-review');
     expect(guardEvidenceNavigation('order-map', 'mismatch', true, true, 'rejected', true)).toBe('order-map');
+    expect(guardEvidenceNavigation('passport', 'consistent', true, false)).toBe('passport');
+    expect(guardEvidenceNavigation('pack', 'consistent', true, false, 'none', false, true)).toBe('passport');
+    expect(guardEvidenceNavigation('pack', 'consistent', true, false, 'none', false, true, true)).toBe('pack');
   });
 });

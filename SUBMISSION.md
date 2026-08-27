@@ -4,15 +4,15 @@
 
 ## Polished summary (under 250 words)
 
-Asha owns a blue scooter ending in `3317`. Her fictional ₹1,000 helmet e-Challan records that scooter—but the supplied enforcement image appears to show a white motorcycle ending in `3817`.
+Asha owns a blue scooter ending `3317`. Her fictional helmet e-Challan records that scooter—but the supplied image appears to show a white motorcycle ending `3817`.
 
-Today, a citizen in that situation must inspect an image, decide which differences matter, gather documents, draft a factual grievance, watch the deadline, and preserve the trail after a decision. The official portal provides grievance and status workflows; ChallanSakshi adds the missing evidence-understanding layer around them.
+ChallanSakshi asks whether the notice is safe to act on, whether its own evidence matches, what was supplied or remains unclear, and whether the vehicle-relationship timeline agrees with the alleged event. It adds this evidence-understanding layer around existing official services; it does not replace them.
 
-It reads synthetic records, shows every extracted fact with its source, requires citizen confirmation, and uses deterministic code to classify comparisons and calculate indicative clocks. Conflicting records create an indexed pack; unclear evidence stays inconclusive; matching evidence triggers a refusal to manufacture a dispute.
+Every extracted fact remains source-linked and citizen-reviewed. Deterministic TypeScript—not AI—classifies the comparison, evaluates event-time intervals, records packet completeness, calculates indicative clocks, and decides which neutral artifact is permitted. A Local Evidence Passport freezes identity, time, completeness, limitations, and revision linkage. Conflicts can support a factual review request; unclear material stays inconclusive; aligned records refuse to manufacture a dispute. A visually aligned case proceeds only if an independent, confirmed custody-time ground exists.
 
-After a fictional rejection, ChallanSakshi freezes the core submitted facts under a stable local revision ID, verifies seven extracted order facts, and compares six submitted points against the supplied six-paragraph order. Every row must be citizen-confirmed as **explicitly mentioned**, **reference unclear**, or **not found in the supplied text**. It then creates a neutral Order Review Note, reason-clarification wording, case ledger, JSON record, and indicative calendar reminder. “Not found” never means ignored or invalid.
+After a fictional rejection, the same frozen revision is compared with the supplied order. Every row must be confirmed as **mentioned**, **unclear**, or **not found in the supplied text**. “Not found” never means ignored or invalid.
 
-The prototype works without an API key through typed fixtures; optional OpenAI vision uses strict validation and fallback. A secondary Resolution Desk shows adjacent scale potential, but the submitted journey remains the single evidence-to-response problem. No real upload, filing, payment, or government connection exists. ChallanSakshi never declares innocence, invalidates an order, or predicts an outcome.
+The compact preflight never opens suspicious destinations and stops on synthetic APK, credential, remote-access, or personal-payment requests. Text-first mode leaves the 1.6 MB evidence image unloaded until requested; the independent Simpler view adds a plain-language summary and roomier layout. The app works from typed fixtures, with optional structured OpenAI vision and fallback. No real upload, filing, payment, authentication, or government connection exists, and no result declares innocence, fraud, legal ownership, or invalidity.
 
 ## Problem
 
@@ -33,28 +33,35 @@ ChallanSakshi starts with one precise question: **does the challan’s supplied 
 
 The journey is:
 
-1. Select one of three synthetic cases.
-2. Review the fictional challan, vehicle record, and photographs.
-3. Inspect and correct source-linked extracted facts.
-4. Explicitly confirm those facts.
-5. See a mismatch, inconclusive, or consistent finding.
-6. Review the deterministic deadline and evidence readiness.
-7. Generate and print an indexed factual pack.
-8. Simulate submission and switch among three mutually exclusive outcome scenarios.
-9. For a rejection, verify the fictional order and review every evidence-to-paragraph mapping.
-10. Generate an Order Review Note, neutral clarification wording, calendar reminder, and versioned case manifest.
-11. Continue to a neutral official-service handoff; adjacent court, payment, and access routes remain secondary scale demonstrations.
+1. Check three synthetic notice-message patterns without opening the supplied destination.
+2. Select one of three synthetic evidence cases.
+3. Review the fictional challan, vehicle record, and photographs; text-first mode loads the image only on request.
+4. Inspect, correct, and explicitly confirm source-linked facts.
+5. See a mismatch, inconclusive, or consistent visual finding.
+6. Open the Local Evidence Passport, select and review a synthetic vehicle relationship timeline, and inspect eight supplied-packet elements.
+7. Let deterministic rules combine visual and custody-time grounds while preserving abstentions and refusal states.
+8. Review the indicative deadline and citizen-pack readiness, then generate an indexed factual pack.
+9. Simulate submission and switch among three mutually exclusive outcome scenarios.
+10. For a rejection, verify the fictional order and review every evidence-to-paragraph mapping.
+11. Generate an Order Review Note, neutral clarification wording, calendar reminder, and versioned V3 case manifest.
+12. Continue to a neutral official-service handoff; adjacent court, payment, and access routes remain secondary scale demonstrations.
 
 ## What actually works
 
 - Three materially different typed demo fixtures.
 - Editable comparison facts with source and visibility status; synthetic notice identifiers remain visibly read-only.
 - Mandatory human confirmation before classification.
+- A Local Evidence Passport joining identity, vehicle relationship/custody time, packet completeness, limitations, local history, and frozen revisions.
+- Four deterministic custody scenarios and a combined-artifact gate that allows a consistent-image case to proceed only on a supported independent time ground.
+- Eight supplied-evidence elements across five honest states; missing-in-this-packet and unreadable are never conflated.
+- A deterministic three-fixture scam preflight with exact-host and high-risk-request checks; suspicious destinations are inert text.
+- Independent Simpler view and text-first preferences. The evidence contact sheet is not requested before explicit reveal, and an uninspected image produces an inconclusive state.
 - Deterministic contest and response clocks.
 - Deterministic evidence readiness and case state transitions.
 - Bilingual interface and guidance across the core journey, with synthetic identifiers and a few source values retained in English.
 - Print/save-as-PDF contest pack.
 - Refresh persistence and browser back/forward behaviour.
+- Conservative V4-to-V5 migration, immutable submitted Passport snapshots, and separately persisted presentation preferences.
 - Three complete tracking outcomes.
 - A source/actor-separated local case ledger tied to one frozen local demo snapshot and stable deterministic revision ID, explicitly not a cryptographic integrity proof.
 - A complete rejected-order workflow with locked source text, seven extracted facts, order-completeness scope, six mappings, three neutral statuses, editable paragraph citations, and mandatory confirmation.
@@ -85,6 +92,9 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 ## Safety and honesty
 
 - Uses “possible vehicle mismatch,” never “illegal challan” or “you are innocent.”
+- Uses “Stop and verify independently,” never “safe link,” “genuine notice,” or “definitely a scam.”
+- Treats relationship timing as citizen-reviewed context, never proof of the driver, legal owner, official transfer, or responsibility.
+- Treats “not found” as a statement about the supplied packet only, never proof that another record does not exist.
 - Requires citizen verification before any finding.
 - Never fabricates unreadable characters or missing evidence.
 - Refuses to create an accusatory contest for the consistent fixture.
@@ -101,6 +111,7 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 - Pure domain module for dates, classification, readiness, actions, and transitions.
 - Separate resolution module for triage, payment reconciliation, and post-order clocks.
 - Pure case-ledger and order-evidence modules for revisions, provenance, citations, validation, artifacts, and timeline events.
+- Pure evidence-passport and notice-safety modules for custody-time intervals, completeness states, combined review grounds, revision IDs, exact-host checks, and high-risk signal precedence.
 - Dedicated accessible order-review component with bilingual source, field, mapping, and note states.
 - Vitest rule coverage.
 - Optional server-side Responses API endpoint with image input, strict JSON Schema, response validation, `store: false`, and no raw-payload logging.

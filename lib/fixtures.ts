@@ -26,6 +26,7 @@ export interface DemoFixture {
   allegedRegistration: string;
   offence: LocalizedText;
   location: LocalizedText;
+  incidentAt: string;
   timestamp: string;
   amount: string;
   authority: LocalizedText;
@@ -110,6 +111,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     allegedRegistration: 'TEST-26-SC-3317',
     offence: { en: 'Riding without a protective helmet', hi: 'सुरक्षा हेलमेट के बिना वाहन चलाना' },
     location: { en: 'Demo Junction, Pilot City', hi: 'डेमो जंक्शन, पायलट सिटी' },
+    incidentAt: '2026-08-20T09:42:00+05:30',
     timestamp: '20 Aug 2026 · 09:42 IST',
     amount: '₹1,000',
     authority: { en: 'Synthetic Pilot Traffic Authority', hi: 'सिंथेटिक पायलट यातायात प्राधिकरण' },
@@ -159,6 +161,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     allegedRegistration: 'TEST-26-SC-4412',
     offence: { en: 'Signal-line violation', hi: 'सिग्नल लाइन का उल्लंघन' },
     location: { en: 'Sample Road, Pilot City', hi: 'सैंपल रोड, पायलट सिटी' },
+    incidentAt: '2026-08-20T18:16:00+05:30',
     timestamp: '20 Aug 2026 · 18:16 IST',
     amount: '₹500',
     authority: { en: 'Synthetic Pilot Traffic Authority', hi: 'सिंथेटिक पायलट यातायात प्राधिकरण' },
@@ -211,6 +214,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     allegedRegistration: 'TEST-26-SC-9024',
     offence: { en: 'Riding without a protective helmet', hi: 'सुरक्षा हेलमेट के बिना वाहन चलाना' },
     location: { en: 'Model Avenue, Pilot City', hi: 'मॉडल एवेन्यू, पायलट सिटी' },
+    incidentAt: '2026-08-20T11:08:00+05:30',
     timestamp: '20 Aug 2026 · 11:08 IST',
     amount: '₹1,000',
     authority: { en: 'Synthetic Pilot Traffic Authority', hi: 'सिंथेटिक पायलट यातायात प्राधिकरण' },

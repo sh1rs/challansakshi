@@ -41,7 +41,7 @@ function matchBasisLabel(basis: OrderEvidenceRow['matchBasis'], language: Langua
 
 function completenessLabel(value: OrderCompleteness, language: Language): string {
   const labels: Record<OrderCompleteness, { en: string; hi: string }> = {
-    yes: { en: 'Complete order supplied', hi: 'पूरा आदेश दिया गया' },
+    yes: { en: 'Citizen indicated the supplied order appears complete', hi: 'नागरिक के अनुसार दिया आदेश पूरा दिखता है' },
     no: { en: 'Pages or annexures missing', hi: 'पन्ने या परिशिष्ट नहीं मिले' },
     'not-sure': { en: 'Completeness not certain', hi: 'पूर्णता पक्की नहीं' },
   };
@@ -292,7 +292,7 @@ export function OrderMapScreen({
 
       <section className="order-map-layout">
         <aside className="map-order-source" aria-labelledby="map-order-heading">
-          <div className="map-source-heading"><span>{language === 'hi' ? 'O1–O6 · बदला नहीं जा सकता' : 'O1–O6 · LOCKED SOURCE'}</span><h2 id="map-order-heading">{language === 'hi' ? 'काल्पनिक आदेश का पाठ' : 'Fictional order text'}</h2></div>
+          <div className="map-source-heading"><span>{language === 'hi' ? `O1–O${order.paragraphs.length} · बदला नहीं जा सकता` : `O1–O${order.paragraphs.length} · LOCKED SOURCE`}</span><h2 id="map-order-heading">{language === 'hi' ? 'काल्पनिक आदेश का पाठ' : 'Fictional order text'}</h2></div>
           {language === 'hi' && <p className="map-translation-note">पहली पंक्ति मूल अंग्रेज़ी है; नीचे का हिंदी पाठ केवल सुविधा के लिए है।</p>}
           {order.paragraphs.map((paragraph) => <p id={`map-order-paragraph-${paragraph.id}`} tabIndex={-1} key={paragraph.id}><b>{paragraph.id}</b><span className="order-original" lang="en">{paragraph.text.en}</span>{language === 'hi' && <span className="order-translation" lang="hi"><small>हिंदी रूपांतरण</small>{paragraph.text.hi}</span>}</p>)}
           {sourceOrigin && <button className="source-return" type="button" onClick={returnToMapping}>{language === 'hi' ? `${sourceOrigin} मिलान पर वापस जाएँ` : `Return to mapping ${sourceOrigin}`} <span aria-hidden="true">↓</span></button>}

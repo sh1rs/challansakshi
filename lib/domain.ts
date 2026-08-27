@@ -6,7 +6,7 @@ export type Confidence = 'high' | 'medium' | 'low';
 export type FindingKind = 'mismatch' | 'inconclusive' | 'consistent';
 export type DemoCaseState = 'intake' | 'review' | 'finding' | 'readiness' | 'pack' | 'submitted' | 'under-review' | 'resolved';
 export type OutcomeState = 'none' | 'quashed' | 'rejected' | 'no-resolution';
-export type DemoStep = 'landing' | 'desk' | 'route' | 'intake' | 'review' | 'finding' | 'readiness' | 'pack' | 'tracking' | 'order-review' | 'order-map';
+export type DemoStep = 'landing' | 'desk' | 'route' | 'intake' | 'review' | 'finding' | 'passport' | 'readiness' | 'pack' | 'tracking' | 'order-review' | 'order-map';
 
 export type LocalizedText = { en: string; hi: string };
 
@@ -82,12 +82,15 @@ export function guardEvidenceNavigation(
   simulatedSubmitted: boolean,
   outcome: OutcomeState = 'none',
   orderFactsConfirmed = false,
+  canPreparePack = finding !== 'consistent',
+  passportReady = false,
 ): DemoStep {
-  const protectedSteps: DemoStep[] = ['finding', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
+  const protectedSteps: DemoStep[] = ['finding', 'passport', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
   const postSubmissionSteps: DemoStep[] = ['tracking', 'order-review', 'order-map'];
   if (protectedSteps.includes(requested) && !confirmed) return 'review';
-  if (finding === 'consistent' && requested !== 'finding' && protectedSteps.includes(requested)) return 'finding';
-  if (postSubmissionSteps.includes(requested) && !simulatedSubmitted) return 'pack';
+  if (!canPreparePack && !['finding', 'passport'].includes(requested) && protectedSteps.includes(requested)) return 'finding';
+  if (['readiness', 'pack'].includes(requested) && !passportReady) return 'passport';
+  if (postSubmissionSteps.includes(requested) && !simulatedSubmitted) return passportReady ? 'pack' : 'passport';
   if (['order-review', 'order-map'].includes(requested) && outcome !== 'rejected') return 'tracking';
   if (requested === 'order-map' && !orderFactsConfirmed) return 'order-review';
   return requested;

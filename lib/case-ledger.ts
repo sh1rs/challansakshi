@@ -7,7 +7,9 @@ import type {
   Visibility,
 } from './domain';
 
-export type EvidenceItemId = 'A1' | 'A2' | 'A3' | 'A4' | 'A5';
+export type CoreEvidenceItemId = 'A1' | 'A2' | 'A3' | 'A4' | 'A5';
+export type CustodyEvidenceItemId = 'C1' | 'C2' | 'C3' | 'C4';
+export type EvidenceItemId = CoreEvidenceItemId | CustodyEvidenceItemId;
 export type LedgerActor = 'supplied-record' | 'analysis' | 'citizen' | 'rules' | 'simulated-authority';
 export type CaseLedgerEventType =
   | 'records-loaded'
@@ -15,6 +17,7 @@ export type CaseLedgerEventType =
   | 'corrections-recorded'
   | 'facts-confirmed'
   | 'finding-recorded'
+  | 'evidence-passport-confirmed'
   | 'pack-prepared'
   | 'submission-acknowledged'
   | 'authority-review-recorded'
@@ -25,7 +28,7 @@ export type CaseLedgerEventType =
 
 export interface EvidenceIndexItem {
   id: EvidenceItemId;
-  sourceId: 'challan' | 'vehicle-record' | 'enforcement' | 'citizen-photo' | 'citizen-comparison';
+  sourceId: 'challan' | 'vehicle-record' | 'enforcement' | 'citizen-photo' | 'citizen-comparison' | 'custody-record';
   label: LocalizedText;
   summary: string;
 }
@@ -71,6 +74,10 @@ export interface BuildCaseLedgerInput {
   outcome: OutcomeState;
   orderFactsConfirmed: boolean;
   orderMapConfirmed: boolean;
+  passportConfirmed?: boolean;
+  passportRevisionId?: string | null;
+  custodyEvidenceId?: CustodyEvidenceItemId | null;
+  canPreparePack?: boolean;
 }
 
 export interface CaseLedgerSnapshot {
@@ -105,14 +112,17 @@ export function buildEvidenceIndex(input: {
   registeredPlate: string;
   observedPlate: string;
   submittedRevisionId: string | null;
+  custody?: { id: CustodyEvidenceItemId; label: LocalizedText; summary: string } | null;
 }): EvidenceIndexItem[] {
-  return [
+  const items: EvidenceIndexItem[] = [
     { id: 'A1', sourceId: 'challan', label: { en: 'Synthetic e-Challan', hi: 'सिंथेटिक ई-चालान' }, summary: input.challanNumber },
     { id: 'A2', sourceId: 'vehicle-record', label: { en: 'Synthetic vehicle record', hi: 'सिंथेटिक वाहन रिकॉर्ड' }, summary: input.registeredPlate || 'Unavailable' },
     { id: 'A3', sourceId: 'enforcement', label: { en: 'Enforcement image and observations', hi: 'प्रवर्तन फ़ोटो और अवलोकन' }, summary: input.observedPlate || 'Unavailable / unclear' },
     { id: 'A4', sourceId: 'citizen-photo', label: { en: 'Citizen demo photograph', hi: 'नागरिक की डेमो फ़ोटो' }, summary: 'Synthetic' },
     { id: 'A5', sourceId: 'citizen-comparison', label: { en: 'Citizen-confirmed comparison and request', hi: 'नागरिक द्वारा पक्की तुलना और अनुरोध' }, summary: input.submittedRevisionId ?? 'Not submitted' },
   ];
+  if (input.custody) items.push({ id: input.custody.id, sourceId: 'custody-record', label: input.custody.label, summary: input.custody.summary });
+  return items;
 }
 
 function normalizedFact(fact: ExtractedFact): string {
@@ -169,6 +179,8 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   const events: Omit<CaseLedgerEvent, 'sequence'>[] = [];
   const add = (event: Omit<CaseLedgerEvent, 'sequence'>) => events.push(event);
   const revisionId = input.submittedRevisionId;
+  const canPreparePack = input.canPreparePack ?? input.finding !== 'consistent';
+  const custodyEvidenceIds: EvidenceItemId[] = input.custodyEvidenceId ? [input.custodyEvidenceId] : [];
 
   add({
     id: `${input.fixtureId}-records-loaded`, type: 'records-loaded', recordedOn: input.issueDate,
@@ -209,47 +221,58 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
         ? { en: 'The confirmed records contain a possible vehicle mismatch.', hi: 'पक्के रिकॉर्ड में वाहन का संभावित बेमेल है।' }
         : input.finding === 'inconclusive'
           ? { en: 'The supplied evidence remains inconclusive.', hi: 'दिया गया सबूत अभी भी अनिर्णायक है।' }
-          : { en: 'The supplied vehicle facts appear consistent; no contest was generated.', hi: 'दिए वाहन तथ्य मिलते दिखते हैं; कोई आपत्ति नहीं बनाई गई।' },
+          : canPreparePack
+            ? { en: 'The supplied vehicle facts appear consistent; a separately reviewed custody timeline supports a limited review request.', hi: 'दिए वाहन तथ्य मिलते दिखते हैं; अलग से जाँची वाहन उपयोग समय-रेखा सीमित समीक्षा अनुरोध का आधार देती है।' }
+            : { en: 'The supplied vehicle facts appear consistent; no contest was generated.', hi: 'दिए वाहन तथ्य मिलते दिखते हैं; कोई आपत्ति नहीं बनाई गई।' },
     });
   }
 
-  if (input.packPrepared && input.finding !== 'consistent' && revisionId) {
+  if (input.passportConfirmed && input.passportRevisionId) {
+    add({
+      id: `${input.fixtureId}-evidence-passport-confirmed`, type: 'evidence-passport-confirmed', recordedOn: demoDates.review,
+      actor: 'citizen', evidenceIds: ['A1', 'A2', 'A3', ...custodyEvidenceIds], revisionId: input.passportRevisionId,
+      label: { en: 'Local Evidence Passport confirmed', hi: 'स्थानीय सबूत पासपोर्ट पक्का किया गया' },
+      detail: { en: 'The citizen reviewed identity, supplied-packet scope, and any selected custody interval. This is not official verification.', hi: 'नागरिक ने पहचान, दिए पैकेट का दायरा और चुनी वाहन उपयोग अवधि जाँची। यह आधिकारिक सत्यापन नहीं है।' },
+    });
+  }
+
+  if (input.packPrepared && canPreparePack && revisionId) {
     add({
       id: `${input.fixtureId}-pack-prepared`, type: 'pack-prepared', recordedOn: demoDates.review,
-      actor: 'rules', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5'], revisionId,
+      actor: 'rules', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Evidence pack prepared', hi: 'सबूत पैक तैयार हुआ' },
       detail: { en: `The active pack is tied to revision ${revisionId}.`, hi: `मौजूदा पैक रिविज़न ${revisionId} से जुड़ा है।` },
     });
   }
 
-  if (input.submitted && input.finding !== 'consistent' && revisionId) {
+  if (input.submitted && canPreparePack && revisionId) {
     add({
       id: `${input.fixtureId}-submission-acknowledged`, type: 'submission-acknowledged', recordedOn: demoDates.review,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5'], revisionId,
+      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Simulated submission acknowledged', hi: 'काल्पनिक जमा की पावती मिली' },
       detail: { en: 'No government system was contacted.', hi: 'किसी सरकारी सिस्टम से संपर्क नहीं हुआ।' },
     });
   }
 
-  if (input.submitted && input.finding !== 'consistent' && input.trackingStage >= 3 && revisionId) {
+  if (input.submitted && canPreparePack && input.trackingStage >= 3 && revisionId) {
     add({
       id: `${input.fixtureId}-authority-review`, type: 'authority-review-recorded', recordedOn: demoDates.authorityReview,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5'], revisionId,
+      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Fictional review status recorded', hi: 'काल्पनिक समीक्षा स्थिति दर्ज हुई' },
       detail: { en: 'This is a simulated status branch, not an official event.', hi: 'यह काल्पनिक स्थिति शाखा है, आधिकारिक घटना नहीं।' },
     });
   }
 
-  if (input.submitted && input.finding !== 'consistent' && input.trackingStage >= 4 && revisionId && (input.outcome === 'quashed' || input.outcome === 'rejected')) {
+  if (input.submitted && canPreparePack && input.trackingStage >= 4 && revisionId && (input.outcome === 'quashed' || input.outcome === 'rejected')) {
     add({
       id: `${input.fixtureId}-authority-order-${input.outcome}`, type: 'authority-order-recorded', recordedOn: demoDates.outcome,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5'], revisionId,
+      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
       label: input.outcome === 'rejected'
         ? { en: 'Fictional rejection order recorded', hi: 'काल्पनिक अस्वीकृति आदेश दर्ज हुआ' }
         : { en: 'Fictional quashing order recorded', hi: 'काल्पनिक निरस्तीकरण आदेश दर्ज हुआ' },
       detail: { en: 'Only the currently selected fictional outcome scenario is active.', hi: 'केवल अभी चुना गया काल्पनिक नतीजा सक्रिय है।' },
     });
-  } else if (input.submitted && input.finding !== 'consistent' && input.trackingStage >= 4 && revisionId && input.outcome === 'no-resolution') {
+  } else if (input.submitted && canPreparePack && input.trackingStage >= 4 && revisionId && input.outcome === 'no-resolution') {
     add({
       id: `${input.fixtureId}-no-decision-status`, type: 'no-decision-status-recorded', recordedOn: demoDates.outcome,
       actor: 'simulated-authority', evidenceIds: ['A5'], revisionId,
@@ -258,7 +281,7 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
     });
   }
 
-  if (input.finding !== 'consistent' && input.outcome === 'rejected' && input.orderFactsConfirmed && revisionId) {
+  if (canPreparePack && input.outcome === 'rejected' && input.orderFactsConfirmed && revisionId) {
     add({
       id: `${input.fixtureId}-order-extraction-confirmed`, type: 'order-extraction-confirmed', recordedOn: demoDates.orderReview,
       actor: 'citizen', evidenceIds: ['A5'], revisionId,
@@ -266,10 +289,10 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
       detail: { en: 'The citizen confirmed the extraction from the supplied fictional pages.', hi: 'नागरिक ने दी गई काल्पनिक पन्नों से निकली जानकारी पक्की की।' },
     });
   }
-  if (input.finding !== 'consistent' && input.outcome === 'rejected' && input.orderMapConfirmed && revisionId) {
+  if (canPreparePack && input.outcome === 'rejected' && input.orderMapConfirmed && revisionId) {
     add({
       id: `${input.fixtureId}-order-map-confirmed`, type: 'order-map-confirmed', recordedOn: demoDates.orderReview,
-      actor: 'citizen', evidenceIds: ['A2', 'A3', 'A5'], revisionId,
+      actor: 'citizen', evidenceIds: ['A2', 'A3', 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Order-to-evidence map reviewed', hi: 'आदेश-से-सबूत मानचित्र जाँचा गया' },
       detail: { en: 'Every mapping row was reviewed before the neutral note became available.', hi: 'तटस्थ नोट उपलब्ध होने से पहले हर मैपिंग पंक्ति जाँची गई।' },
     });

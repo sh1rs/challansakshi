@@ -106,6 +106,63 @@ describe('order-to-evidence engine', () => {
     ]);
   });
 
+  it('adds a custody row and explicit order paragraph without changing the hero map', () => {
+    const fixture = fixtures.consistent;
+    const confirmedFacts = deriveConfirmedVehicleFacts(fixture.confirmedFacts, fixture.extractedFacts);
+    const classification = classifyEvidenceComparison(confirmedFacts);
+    const custodyContext = {
+      evidenceId: 'C2' as const,
+      label: { en: 'Vehicle relationship timeline', hi: 'वाहन संबंध समय-रेखा' },
+      submittedPoint: { en: 'The event falls outside the supplied interval.', hi: 'घटना दी अवधि के बाहर है।' },
+    };
+    const evidenceIndex = buildEvidenceIndex({
+      challanNumber: fixture.challanNumber,
+      registeredPlate: confirmedFacts.registeredPlate,
+      observedPlate: confirmedFacts.observedPlate,
+      submittedRevisionId: 'SUB-CONSISTENT-CUSTODY',
+      custody: { id: 'C2', label: custodyContext.label, summary: 'Synthetic transfer acknowledgement' },
+    });
+    const order = buildSyntheticRejectedOrder({
+      finding: classification.finding,
+      grievanceNumber: 'DEMO-GRV-C-0827-11',
+      challanNumber: fixture.challanNumber,
+      registeredPlate: confirmedFacts.registeredPlate,
+      custodyContext,
+    });
+    const rows = buildOrderEvidenceMap({ classification, confirmedFacts, evidenceIndex, custodyContext });
+    expect(order.paragraphs.map((paragraph) => paragraph.id)).toContain('O7');
+    expect(rows.find((row) => row.evidenceIds.includes('C2'))).toMatchObject({ suggestedReasonRefs: ['O2', 'O7'], matchBasis: 'direct-phrase' });
+    expect(heroContext().rows).toHaveLength(6);
+  });
+
+  it('does not cite the mismatch paragraph as if it discussed a separate custody point', () => {
+    const { fixture, confirmedFacts, classification, revisionId } = heroContext();
+    const custodyContext = {
+      evidenceId: 'C2' as const,
+      label: { en: 'Vehicle relationship timeline', hi: 'वाहन संबंध समय-रेखा' },
+      submittedPoint: { en: 'The event falls outside the supplied interval.', hi: 'घटना दी अवधि के बाहर है।' },
+    };
+    const evidenceIndex = buildEvidenceIndex({
+      challanNumber: fixture.challanNumber,
+      registeredPlate: confirmedFacts.registeredPlate,
+      observedPlate: confirmedFacts.observedPlate,
+      submittedRevisionId: revisionId,
+      custody: { id: 'C2', label: custodyContext.label, summary: 'Synthetic transfer acknowledgement' },
+    });
+    const order = buildSyntheticRejectedOrder({
+      finding: classification.finding,
+      grievanceNumber: 'DEMO-GRV-A-0827-17',
+      challanNumber: fixture.challanNumber,
+      registeredPlate: confirmedFacts.registeredPlate,
+      custodyContext,
+    });
+    const rows = buildOrderEvidenceMap({ classification, confirmedFacts, evidenceIndex, custodyContext });
+    const custodyRow = rows.find((row) => row.evidenceIds.includes('C2'));
+    expect(order.paragraphs.find((paragraph) => paragraph.id === 'O2')?.text.en).toContain('enforcement image differs');
+    expect(custodyRow).toMatchObject({ suggestedReasonRefs: ['O7'], matchBasis: 'direct-phrase' });
+    expect(custodyRow?.explanation.en).toContain('O2 addresses only the separate vehicle-mismatch statement');
+  });
+
   it('never creates discrepancy rows for the unclear fixture', () => {
     const fixture = fixtures.inconclusive;
     const confirmedFacts = deriveConfirmedVehicleFacts(fixture.confirmedFacts, fixture.extractedFacts);
@@ -294,6 +351,33 @@ describe('derived case ledger', () => {
     });
     expect(events.some((event) => event.type === 'submission-acknowledged')).toBe(false);
     expect(events.some((event) => event.type === 'authority-order-recorded')).toBe(false);
+  });
+
+  it('allows a consistent visual case to progress only when a separate supported custody ground is present', () => {
+    const fixture = fixtures.consistent;
+    const revisionId = createSubmittedRevisionId(fixture.id, fixture.extractedFacts);
+    const events = buildCaseLedger({
+      fixtureId: fixture.id,
+      issueDate: fixture.issueDate,
+      analysisMode: 'precomputed',
+      confirmed: true,
+      corrections: [],
+      finding: 'consistent',
+      passportConfirmed: true,
+      passportRevisionId: 'PASS-CONSISTENT-CUSTODY',
+      custodyEvidenceId: 'C2',
+      canPreparePack: true,
+      packPrepared: true,
+      submitted: true,
+      submittedRevisionId: revisionId,
+      trackingStage: 3,
+      outcome: 'none',
+      orderFactsConfirmed: false,
+      orderMapConfirmed: false,
+    });
+    expect(events.map((event) => event.type)).toEqual(expect.arrayContaining(['evidence-passport-confirmed', 'pack-prepared', 'submission-acknowledged']));
+    expect(events.find((event) => event.type === 'finding-recorded')?.detail.en).toContain('separately reviewed custody timeline');
+    expect(events.find((event) => event.type === 'evidence-passport-confirmed')?.evidenceIds).toContain('C2');
   });
 
   it('records a contest-ready pack before submission', () => {
