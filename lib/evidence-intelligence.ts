@@ -54,6 +54,10 @@ export type CitizenEvidenceView = {
 
 export type CitizenEvidenceViewInput = {
   answers: CitizenChallanAnswers;
+  /** Task 4 supplies this only after its citizen confirmation gate. */
+  assessment: CitizenReviewAssessment;
+  /** The evidence builders accept only facts confirmed by the citizen after that gate. */
+  confirmation: 'confirmed';
   recordName?: string;
   photographName?: string;
   recordMeta?: LocalRecordFileMeta;
@@ -74,21 +78,49 @@ export type CitizenEvidenceSummaryInput = CitizenEvidenceViewInput & {
   allegedOffence: string;
   eventDate: string;
   officialDeadline: string;
-  assessment?: CitizenReviewAssessment;
   materialSignals?: string[];
   missingEvidence?: string[];
   timeline: CitizenTimelineEvent[];
 };
 
 const CITIZEN_DECLARED_ORIGIN = 'citizen-declared-origin' as const;
+const MAX_ARTIFACT_FIELD_LENGTH = 160;
+const UNSAFE_LOCAL_REFERENCE = /(?:blob|data):[^\s]*/gi;
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/g;
+
+const CITIZEN_TIMELINE_LABELS: Record<string, string> = {
+  'timeline-started': 'You started a private review',
+  'timeline-record-selected': 'You selected a downloaded record',
+  'timeline-image-selected': 'You added a supplied photograph',
+  'timeline-source-confirmed': 'You confirmed the record source',
+  'timeline-observations-confirmed': 'You recorded evidence observations',
+  'timeline-summary-generated': 'You generated a local case summary',
+};
+
+function sanitiseArtifactText(value: unknown, fallback = '[not entered]', maximumLength = MAX_ARTIFACT_FIELD_LENGTH): string {
+  if (typeof value !== 'string') return fallback;
+  const sanitised = value
+    .replace(CONTROL_CHARACTERS, ' ')
+    .replace(UNSAFE_LOCAL_REFERENCE, '[omitted local reference]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maximumLength)
+    .trim();
+  return sanitised || fallback;
+}
 
 function displayValue(value: string): string {
-  return value.replaceAll('-', ' ');
+  return sanitiseArtifactText(value.replaceAll('-', ' '));
 }
 
 function safeFileName(name: string | undefined, fallback: string): string {
-  if (!name || /^(blob|data):/i.test(name)) return fallback;
-  return name;
+  return sanitiseArtifactText(name, sanitiseArtifactText(fallback));
+}
+
+function maskedVehicleSuffix(value: string): string {
+  if (typeof value !== 'string' || /(?:blob|data):/i.test(value)) return '[not entered]';
+  const suffix = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-4);
+  return suffix.length === 4 ? `…${suffix}` : '[not entered]';
 }
 
 function sourceStatusLabel(sourceStatus: OfficialSourceStatus): string {
@@ -103,6 +135,7 @@ function imageObservation(
   field: string,
   value: string,
   imageInspected: boolean,
+  confirmation: 'confirmed',
   limitation?: string,
 ): EvidenceObservation {
   const isUnavailable = value === 'unclear' || value === 'not-visible' || value === 'not-assessable-from-still' || value === 'not-found';
@@ -115,7 +148,7 @@ function imageObservation(
     confidence: isUnavailable || isDifferentWithoutInspection || !imageInspected
       ? 'inconclusive'
       : value === 'different' ? 'high' : 'medium',
-    confirmation: 'confirmed',
+    confirmation,
     limitation: isUnavailable
       ? limitation
       : isDifferentWithoutInspection || !imageInspected
@@ -181,26 +214,26 @@ export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): Citiz
   ];
 
   const observations: EvidenceObservation[] = [
-    imageObservation('observation-registration-plate', 'Registration plate', input.answers.plateObservation, input.answers.imageInspected, limitationFor('plate', input.answers.plateObservation)),
-    imageObservation('observation-vehicle-category', 'Vehicle category', input.answers.categoryObservation, input.answers.imageInspected, limitationFor('category', input.answers.categoryObservation)),
-    imageObservation('observation-vehicle-colour', 'Vehicle colour', input.answers.colourObservation, input.answers.imageInspected, limitationFor('colour', input.answers.colourObservation)),
-    imageObservation('observation-alleged-offence', 'Alleged offence', input.answers.offenceObservation, input.answers.imageInspected, limitationFor('offence', input.answers.offenceObservation)),
-    imageObservation('observation-evidence-timestamp', 'Evidence timestamp', input.answers.timestampStatus, input.answers.imageInspected, limitationFor('timestamp', input.answers.timestampStatus)),
-    imageObservation('observation-evidence-location', 'Evidence location', input.answers.locationStatus, input.answers.imageInspected, limitationFor('location', input.answers.locationStatus)),
+    imageObservation('observation-registration-plate', 'Registration plate', input.answers.plateObservation, input.answers.imageInspected, input.confirmation, limitationFor('plate', input.answers.plateObservation)),
+    imageObservation('observation-vehicle-category', 'Vehicle category', input.answers.categoryObservation, input.answers.imageInspected, input.confirmation, limitationFor('category', input.answers.categoryObservation)),
+    imageObservation('observation-vehicle-colour', 'Vehicle colour', input.answers.colourObservation, input.answers.imageInspected, input.confirmation, limitationFor('colour', input.answers.colourObservation)),
+    imageObservation('observation-alleged-offence', 'Alleged offence', input.answers.offenceObservation, input.answers.imageInspected, input.confirmation, limitationFor('offence', input.answers.offenceObservation)),
+    imageObservation('observation-evidence-timestamp', 'Evidence timestamp', input.answers.timestampStatus, input.answers.imageInspected, input.confirmation, limitationFor('timestamp', input.answers.timestampStatus)),
+    imageObservation('observation-evidence-location', 'Evidence location', input.answers.locationStatus, input.answers.imageInspected, input.confirmation, limitationFor('location', input.answers.locationStatus)),
     {
       id: 'observation-citizen-vehicle-record',
       field: 'Citizen vehicle record',
       value: displayValue(input.answers.ownRecordAvailable),
       sourceId: 'source-citizen-record',
       confidence: input.answers.ownRecordAvailable === 'present' ? 'medium' : 'inconclusive',
-      confirmation: 'confirmed',
+      confirmation: input.confirmation,
       limitation: input.answers.ownRecordAvailable === 'present'
         ? undefined
         : 'The citizen did not record a readable vehicle record for this comparison.',
     },
   ];
 
-  const vehicleDifferenceMateriality = input.answers.imageInspected && input.answers.ownRecordAvailable === 'present'
+  const vehicleDifferenceMateriality = input.assessment.finding === 'citizen-recorded-inconsistency' && input.assessment.canPrepareWorksheet
     ? 'material' as const
     : 'needs-clarification' as const;
   const conflicts: EvidenceConflict[] = [];
@@ -236,23 +269,35 @@ export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): Citiz
 }
 
 export function buildCitizenTimeline(input: CitizenTimelineInput): CitizenTimelineEvent[] {
-  const timeline: CitizenTimelineEvent[] = [{ id: 'timeline-started', label: 'You started a private review', actor: 'citizen' }];
-  if (input.recordSelected) timeline.push({ id: 'timeline-record-selected', label: 'You selected a downloaded record', actor: 'citizen' });
-  if (input.imageSelected) timeline.push({ id: 'timeline-image-selected', label: 'You added a supplied photograph', actor: 'citizen' });
-  if (input.sourceConfirmed) timeline.push({ id: 'timeline-source-confirmed', label: 'You confirmed the record source', actor: 'citizen' });
-  if (input.observationsConfirmed) timeline.push({ id: 'timeline-observations-confirmed', label: 'You recorded evidence observations', actor: 'citizen' });
-  if (input.summaryGenerated) timeline.push({ id: 'timeline-summary-generated', label: 'You generated a local case summary', actor: 'citizen' });
+  const event = (id: string): CitizenTimelineEvent => ({ id, label: CITIZEN_TIMELINE_LABELS[id], actor: 'citizen' });
+  const timeline: CitizenTimelineEvent[] = [event('timeline-started')];
+  if (input.recordSelected) timeline.push(event('timeline-record-selected'));
+  if (input.imageSelected) timeline.push(event('timeline-image-selected'));
+  if (input.sourceConfirmed) timeline.push(event('timeline-source-confirmed'));
+  if (input.observationsConfirmed) timeline.push(event('timeline-observations-confirmed'));
+  if (input.summaryGenerated) timeline.push(event('timeline-summary-generated'));
   return timeline;
 }
 
 function summaryList(items: string[], emptyMessage: string): string[] {
-  return items.length ? items.map((item) => `- ${item}`) : [`- ${emptyMessage}`];
+  const sanitisedItems = items.map((item) => sanitiseArtifactText(item, '[not entered]'));
+  return sanitisedItems.length ? sanitisedItems.map((item) => `- ${item}`) : [`- ${emptyMessage}`];
+}
+
+function canonicalTimelineLines(timeline: CitizenTimelineEvent[]): string[] {
+  const renderedIds = new Set<string>();
+  return timeline.flatMap((event) => {
+    const label = CITIZEN_TIMELINE_LABELS[event.id];
+    if (!label || renderedIds.has(event.id)) return [];
+    renderedIds.add(event.id);
+    return [`- ${label}`];
+  });
 }
 
 export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput): string {
   const view = buildCitizenEvidenceView(input);
-  const materialSignals = input.materialSignals ?? input.assessment?.materialSignals ?? [];
-  const missingEvidence = input.missingEvidence ?? input.assessment?.missingEvidence ?? [];
+  const materialSignals = input.materialSignals ?? input.assessment.materialSignals;
+  const missingEvidence = input.missingEvidence ?? input.assessment.missingEvidence;
   const observationLines = view.observations.map((observation) => {
     const limitation = observation.limitation ? ` Limitation: ${observation.limitation}` : '';
     return `- ${observation.field}: ${observation.value} (confidence: ${observation.confidence}; confirmed by citizen).${limitation}`;
@@ -263,11 +308,11 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
     'Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.',
     '',
     'MINIMISED CASE DETAILS',
-    `Jurisdiction or service: ${input.jurisdiction || '[not entered]'}`,
-    `Vehicle registration suffix: ${input.vehicleSuffix ? `…${input.vehicleSuffix}` : '[not entered]'}`,
-    `Alleged offence category: ${input.allegedOffence || '[not entered]'}`,
-    `Event date shown: ${input.eventDate || '[not entered]'}`,
-    `Officially displayed deadline copied by citizen: ${input.officialDeadline || '[not entered]'}`,
+    `Jurisdiction or service: ${sanitiseArtifactText(input.jurisdiction)}`,
+    `Vehicle registration suffix: ${maskedVehicleSuffix(input.vehicleSuffix)}`,
+    `Alleged offence category: ${sanitiseArtifactText(input.allegedOffence)}`,
+    `Event date shown: ${sanitiseArtifactText(input.eventDate)}`,
+    `Officially displayed deadline copied by citizen: ${sanitiseArtifactText(input.officialDeadline)}`,
     '',
     'CITIZEN-PROVIDED SOURCE REGISTER',
     ...view.sources.map((source) => `- ${source.label} (${source.kind}; ${source.acquisition}; ${source.authenticity})`),
@@ -282,7 +327,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
     ...summaryList(missingEvidence, 'No missing record was recorded in this limited checklist.'),
     '',
     'CITIZEN-RECORDED TIMELINE',
-    ...input.timeline.map((event) => `- ${event.label}`),
+    ...canonicalTimelineLines(input.timeline),
     '',
     'NEUTRAL CLARIFICATION REQUEST',
     'I request review of the evidence supplied with the notice. Based on my own recorded observations, the listed fields may require clarification. Please verify the vehicle identifier, vehicle category, alleged-offence evidence, event timestamp, location, and basis of the notice. I will enter full official identifiers only inside the verified official service.',
