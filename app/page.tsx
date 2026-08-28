@@ -1,5 +1,5 @@
-import ChallanSakshiApp from '../components/ChallanSakshiApp';
+import CitizenHome from '../components/public-beta/CitizenHome';
 
 export default function Home() {
-  return <ChallanSakshiApp />;
+  return <CitizenHome />;
 }

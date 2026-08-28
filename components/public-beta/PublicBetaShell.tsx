@@ -57,7 +57,7 @@ export function PublicBetaShell({
         <div className={styles.footerLinks}>
           <a href="/privacy">{t(language, 'Privacy & data controls', 'गोपनीयता और डेटा नियंत्रण')}</a>
           <a href="/safety">{t(language, 'Safety & official routes', 'सुरक्षा और आधिकारिक रास्ते')}</a>
-          <a href="/">{t(language, 'Synthetic evidence demo', 'सिंथेटिक सबूत डेमो')}</a>
+          <a href="/demo">{t(language, 'Synthetic evidence demo', 'सिंथेटिक सबूत डेमो')}</a>
         </div>
         <p>{t(language, 'Independent early access. It does not file, pay, authenticate, give legal advice, or guarantee an outcome.', 'स्वतंत्र अर्ली एक्सेस। यह फाइल, भुगतान, प्रमाणीकरण, कानूनी सलाह या नतीजे की गारंटी नहीं देता।')}</p>
       </footer>

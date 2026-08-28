@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @next/next/no-html-link-for-pages -- a full same-origin navigation intentionally clears memory-only real-case state. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GuidedStepHeader } from '../guided/GuidedStepHeader';
@@ -345,7 +344,7 @@ export default function CitizenReviewApp() {
             </div>
             <p className={styles.restricted}><strong>{t(language, 'Never enter or paste:', 'कभी दर्ज या पेस्ट न करें:')}</strong> {t(language, 'names, phone/address, Aadhaar, full registration or challan number, RC/DL images, chassis/engine number, bank/card details, OTP, password, UPI PIN, or an entire notice/order.', 'नाम, फ़ोन/पता, आधार, पूरा वाहन या चालान नंबर, RC/DL तस्वीर, चेसिस/इंजन नंबर, बैंक/कार्ड जानकारी, OTP, पासवर्ड, UPI PIN या पूरा नोटिस/आदेश।')}</p>
             {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><a className={styles.buttonQuiet} href="/">{t(language, 'Use the synthetic demo instead', 'इसके बजाय सिंथेटिक डेमो इस्तेमाल करें')}</a><button type="button" className={styles.button} onClick={continueSafety}>{t(language, 'Continue safely', 'सुरक्षित रूप से आगे बढ़ें')} →</button></div>
+            <div className={styles.actions}><a className={styles.buttonQuiet} href="/demo">{t(language, 'Use the synthetic demo instead', 'इसके बजाय सिंथेटिक डेमो इस्तेमाल करें')}</a><button type="button" className={styles.button} onClick={continueSafety}>{t(language, 'Continue safely', 'सुरक्षित रूप से आगे बढ़ें')} →</button></div>
           </section>
         )}
 

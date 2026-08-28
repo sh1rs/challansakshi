@@ -5,18 +5,18 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: 'ChallanSakshi — Evidence before action',
-  description: 'Safely self-review an e-Challan or FASTag transaction with masked, structured observations—or explore a complete synthetic evidence journey.',
+  title: 'ChallanSakshi — Understand your challan safely',
+  description: 'A citizen-first guide to understand an e-Challan, compare the records and evidence you can see, and continue through the correct official service.',
   openGraph: {
     type: 'website',
-    title: 'ChallanSakshi — Evidence before action',
-    description: 'An independent evidence-first citizen tool for manual e-Challan review, FASTag transaction reconciliation, and a complete synthetic evidence journey.',
-    images: [{ url: '/og.png', width: 1200, height: 675, alt: 'ChallanSakshi compares a blue scooter with a white motorcycle.' }],
+    title: 'ChallanSakshi — Understand your challan safely',
+    description: 'An independent citizen tool for reviewing the official record and evidence you choose to inspect before using an official service.',
+    images: [{ url: '/og.png', width: 1200, height: 675, alt: 'ChallanSakshi citizen record and evidence guidance.' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ChallanSakshi — Evidence before action',
-    description: 'Review supplied evidence, event time, packet gaps, and the next official route before you act.',
+    title: 'ChallanSakshi — Understand your challan safely',
+    description: 'Review the record and evidence you can see before you use the appropriate official service.',
     images: ['/og.png'],
   },
 };
