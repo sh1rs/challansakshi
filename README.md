@@ -2,9 +2,14 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first e-Challan resolver for one continuous citizen problem: **does the challan’s own evidence, timestamp, vehicle-relationship record, and case state agree with the citizen it is accusing—and, if contested, does the supplied order address the evidence actually submitted?** It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. A compact notice-safety preflight and a secondary Resolution Desk broaden prevention and routing without pretending to authenticate a notice or complete an official action.
+ChallanSakshi is an independent, evidence-first citizen project built around one discipline: **inspect the official record, separate observation from conclusion, refuse unsupported claims, and hand the citizen a conservative next-step checklist.** The flagship synthetic journey asks whether a challan’s own evidence, timestamp, vehicle-relationship record, and case state agree. Two isolated real-mode tools now turn that discipline into immediate public utility without collecting documents:
 
-> Independent Build What Moves India hackathon prototype. Not affiliated with MoRTH, Parivahan, traffic police, or any court. Synthetic demo data only. Not legal advice.
+- `/review` — a no-upload, no-AI, memory-only e-Challan self-review using masked structured observations;
+- `/fastag` — TollSakshi, a no-upload FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport.
+
+The original synthetic engine remains sealed from both real-mode workflows. It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note.
+
+> Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. The homepage evidence journey is synthetic; the two real-mode routes accept only masked structured answers and never receive documents.
 
 ## The exact citizen problem
 
@@ -28,6 +33,13 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 ## What is working
 
+- A hard-separated **real e-Challan manual review** that starts with source verification, refuses a message-only notice, asks only structured masked observations, blocks conclusions when the official image was not inspected, treats colour alone as non-action-ready, uses only a deadline copied from an official service, and generates a neutral local worksheet.
+- **TollSakshi**, a recorded-FASTag-transaction self-review for unrecognised crossings, citizen-reported two-debit patterns, alternate payment, fare/class, pass/discount, and aligned-record checks. It distinguishes reader-read, debit-post, and SMS times; separates bank-issued from bank-neutral NHAI FASTag routes; applies no definitive duplicate-time threshold; and withholds an action note unless the final same-transaction attestation still matches every compared field. Tag-not-working and plaza/road incidents without a recorded debit are deliberately routed to the separate Safety page rather than forced through this transaction workflow.
+- A 14-element **Toll Evidence Passport** and **Transaction-to-Journey Map** covering vehicle identity, event time, plaza/direction, crossings, amount/class, alternate payment/pass, and credit adjustment.
+- Real-mode state is held only in React memory. It never enters localStorage, sessionStorage, cookies, URLs, forms, `/api/analyze`, analytics, or a case database. Shared-device mode disables the app’s copy/download controls, provides Quick exit & clear, and attempts to leave after about 10 minutes without pointer, keyboard, input, or touch activity; the UI does not claim a background browser timer is infallible.
+- Every action-bearing real-mode artifact has two gates: a pure domain rule and a UI gate. Aligned, already-credited, unverified, incomplete, court, and unknown-jurisdiction outcomes cannot render or download a dispute request.
+- Real-case workflows are explicitly English-only until their decision explanations and artifacts complete Hindi safety review. The synthetic core remains bilingual; Privacy and Safety reading pages remain bilingual.
+- Public Privacy/Data Controls and Safety/Official Routes pages, exact-host official links, reviewed-source dates, no third-party analytics, and response security headers including CSP, frame denial, referrer policy, permissions policy, and content-type protection.
 - A complete mobile-first six-stage evidence journey, plus landing and Resolution Desk routes, with sensible browser back/forward behaviour.
 - A full-screen bilingual **Local Evidence Passport** that joins three questions—vehicle identity, event-time relationship, and supplied-packet completeness—without adding noise to the six-stage progress rail.
 - Four typed vehicle relationship/custody scenarios: owner-aligned, sold before the event, unclear rental handoff, and aligned fleet assignment. Exact timestamps use deterministic interval rules; unclear or unverified records remain abstentions.
@@ -57,7 +69,7 @@ The official e-Challan and Virtual Courts services already support status, payme
 - An indexed, print-friendly contest or clarification pack generated from confirmed facts only.
 - A clearly fictional grievance reference, full tracking timeline, and three switchable reasoned outcomes.
 - Optional Responses API vision extraction with strict Structured Outputs and a reliable precomputed fallback.
-- No real-document upload surface: every route and record remains visibly synthetic.
+- No real-document upload or paste surface. The flagship engine remains visibly synthetic; real modes say “your observation” and never masquerade as model extraction.
 - Accessible labels, visible focus states, reduced-motion support, 360 px layout support, and large touch targets.
 
 ## Architecture
@@ -83,9 +95,21 @@ tests/case-ledger.test.ts                   provenance, ledger, order map, artif
 tests/evidence-passport.test.ts             timeline, Passport, combined-gate, preflight rules
 public/evidence-contact-sheet.png           synthetic evidence photography
 public/og.png                               social preview
+
+app/review/page.tsx                        real e-Challan manual self-review
+app/fastag/page.tsx                        TollSakshi FASTag transaction review
+app/privacy/page.tsx                       implementation-matched data controls
+app/safety/page.tsx                        verified official-route registry
+components/public-beta/                    isolated real-mode shell and workflows
+lib/public-challan.ts                      conservative citizen-observation rules and artifact
+lib/toll-domain.ts                         FASTag assessment, Passport, routes, and artifact
+lib/toll-fixtures.ts                       three wholly fictional TollSakshi examples
+tests/public-challan.test.ts               real-mode refusal and deadline rules
+tests/toll-domain.test.ts                  toll reconciliation and refusal rules
+tests/public-mode-privacy.test.ts          static network/storage/upload/form isolation gate
 ```
 
-The application uses the Sites Next-compatible scaffold (React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, Cloudflare Worker-compatible ESM output). There is no account system, database, payment, real filing, or live government integration.
+The application uses the Sites Next-compatible scaffold (React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, Cloudflare Worker-compatible ESM output). There is no account system, case database, payment, real filing, or live government/bank integration. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers are never passed into that contract.
 
 ### AI versus deterministic rules
 
@@ -121,24 +145,29 @@ The product treats the issue date as Day 0 and displays D+45 as an **indicative,
 
 ## Optional live OpenAI analysis
 
-The complete journey works without an API key. To enable the optional “Re-run AI analysis” control:
+The complete journey works without an API key. Public production builds deliberately disable live model reruns to prevent an unauthenticated demo endpoint from spending an operator key; the bundled precomputed analysis remains available. To exercise the optional “Re-run AI analysis” control in local development:
 
 1. Copy `.env.example` to `.env.local`.
 2. Set `OPENAI_API_KEY` locally.
 3. Set `OPENAI_MODEL` to a vision-capable Responses API model available to your OpenAI project. The app deliberately does not hard-code an unverified model.
 4. Restart the development server.
 
-The route uses the OpenAI Responses API with image input, `store: false`, and a strict JSON Schema. The client sends only a known fixture ID; the server loads the bundled synthetic contact sheet and never accepts caller-supplied document data. It validates both the request and returned object before any observation reaches the UI. It does not log image data or raw document contents. If configuration, network, model access, or validation fails, the UI keeps the typed fixture and shows **Precomputed fallback active**.
+In local development, the route uses the OpenAI Responses API with image input, `store: false`, and a strict JSON Schema. The client sends only a known fixture ID; the server loads the bundled synthetic contact sheet and never accepts caller-supplied document data. It validates request size/type and the returned object before any observation reaches the UI. It does not log image data or raw document contents. In production—or if local configuration, network, model access, or validation fails—the UI keeps the typed fixture and shows **Precomputed fallback active**.
 
-## Synthetic-data and privacy policy
+## Real-mode and synthetic-data privacy policy
 
-- Every name, registration, challan, authority, grievance, date context, image, and outcome is fictional.
+- Real-mode answers exist only in the current page’s in-memory React state. Reload, close, or Quick exit clears them from the app.
+- Real-mode components contain no `fetch`, XHR, beacon, client-storage, cookie, HTML-form, document-upload, raw-textarea, analytics, or `/api/analyze` surface. A test locks this boundary.
+- Real-mode inputs collect at most four-character suffixes and constrained observations. They never request a name, contact information, full vehicle/challan/tag/reference number, Aadhaar, RC/DL image, bank/card information, OTP, password, CVV, PIN, or UPI PIN.
+- The app’s copy/download controls are disabled in shared-device mode, which also attempts to leave the review after about 10 minutes of inactivity and re-checks the expiry on focus, visibility, and page-show events. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print queues, browser history, and backups sit outside the app’s clear action.
+- Hosting infrastructure necessarily handles technical request data such as IP address, path, browser/device information, timestamps, and security logs to deliver and protect the site. Exact host log retention is not controlled or promised by this project.
+- In the synthetic demo, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional.
 - Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
 - The generic vehicle data card is intentionally not a replica of an official RC.
-- The prototype warns against uploading real identity or vehicle records.
-- The prototype does not accept real uploads. All source records are preloaded, typed, fictional fixtures.
+- The synthetic prototype warns against entering real identity or vehicle records.
+- No route accepts real uploads. Source records for the demo remain preloaded fictional fixtures; real-mode citizens inspect their official records separately and record only structured observations.
 - No demo submission reaches a government system.
-- No real registration, OTP, Aadhaar, transaction reference, engine number, or chassis number is requested.
+- No full registration or transaction reference is requested; real mode accepts only last-four suffixes. OTP, Aadhaar, engine numbers, and chassis numbers are never requested.
 - Reset clears local case state and restores the fictional fixtures while keeping the citizen’s Simpler view and text-first preferences.
 - Suspicious synthetic text is displayed as inert text; the prototype never fetches or makes its supplied destination clickable.
 - Text-first mode prevents the evidence contact sheet from being requested until explicit reveal. Choosing “I could not inspect this image” creates an inconclusive evidence state instead of silently confirming visual facts.
@@ -172,6 +201,11 @@ For another common host, install dependencies, configure the optional environmen
 
 ## Known limitations
 
+- The real-mode tools are public-interest early access, not a government-ready production service. No secure incident/feedback inbox or external privacy/legal review has been completed; the UI says so rather than hiding the gap.
+- Real mode does not inspect, authenticate, upload, save, or submit the record. Every result is based only on the citizen’s answers and may be wrong if those answers are incomplete or mistaken.
+- TollSakshi does not access a bank or NETC system, raise a chargeback, prove fraud/cloning, promise a refund, or treat a current tag status as historical event-time status.
+- The October 2025 NETC evidence circular is source-labelled; a newer 2026 duplicate-validation circular appears in the current index, so the product deliberately avoids asserting a definitive duplicate time threshold.
+- 1033 is shown only for NHAI FASTag support or a recorded National Highway/NHAI plaza route, never as the universal bank-issued chargeback channel.
 - The product does not file, pay, cancel, or legally determine an e-Challan.
 - The notice preflight identifies observable warning signs in supplied synthetic text; it does not certify a link as safe, authenticate a notice, detect malware, or prove fraud.
 - The Local Evidence Passport is local and synthetic. It is not government-issued identity, official verification, a legal chain of custody, document forensics, or a legal-admissibility assessment.
@@ -181,8 +215,8 @@ For another common host, install dependencies, configure the optional environmen
 - The Virtual Courts route does not retrieve, list, transfer, or file any real case.
 - The government route, designated authority, required declaration, and implementation can vary by state.
 - The date boundary convention is an explicit product estimate, not a legal opinion.
-- Live analysis covers the synthetic demonstration image; real personal documents are intentionally outside this prototype’s scope.
-- The interface and guidance are bilingual across the core journey, while synthetic identifiers and a few source values remain in English for recognisability.
+- Live analysis covers only the bundled synthetic demonstration image. Real personal documents are outside every AI and API path.
+- The synthetic core journey is bilingual. Real-case decision flows are English-only until the full rule, consent, and artifact language receives a safety review; Privacy and Safety reading pages remain bilingual.
 - Simulated authority outcomes do not represent a prediction or guarantee.
 - The Order-to-Evidence map describes textual coverage only. “Not found” never means a point was ignored, an order is invalid, or an appeal is warranted; content may exist in another page, annexure, or official record.
 
@@ -196,6 +230,12 @@ For another common host, install dependencies, configure the optional environmen
 - [Official Virtual Courts service](https://vcourts.gov.in/virtualcourt/index.php)
 - [Official Virtual Courts FAQ](https://vcourts.gov.in/virtualcourt/faq.php/web_info.php)
 - [OpenAI Responses API reference](https://developers.openai.com/api/reference/resources/responses/methods/create)
+- [NPCI current NETC circular index](https://www.npci.org.in/circulars/netc)
+- [NPCI NETC evidence circular, 28 October 2025](https://www.npci.org.in/uploads/NETC_OC_005_FY_25_26_New_chargeback_reason_codes_in_NRCS_and_guidelines_for_handling_chargebacks_f5b100df97.pdf)
+- [NPCI FASTag issuer helpline directory](https://www.npci.org.in/product/netc/netc-fastag-helpline)
+- [IHMCL National Highways helpline 1033 scope](https://ihmcl.co.in/24x7-national-highways-helpline-1033/)
+- [IHMCL FASTag user guidance](https://ihmcl.co.in/fastag-user/)
+- [National Cyber Crime Reporting Portal](https://cybercrime.gov.in/)
 
 The parliamentary answer describes the 45-day action window, supporting-document requirement, 30-day resolution period for a properly contested challan, reasoned rejection, and state-specific submission mechanism. The amended rule describes the post-rejection choice and deposit condition, while leaving the manner state-specific. The official portals document pending-transaction checks, the warning against paying on both e-Challan and Virtual Courts, court-request handoff, alternative verification, and receipt reprint. Every screen keeps the official-service verification step visible.
 

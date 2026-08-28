@@ -87,6 +87,10 @@ function extractOutputText(response: unknown): string | null {
 }
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return Response.json({ error: 'Live model reruns are disabled in the public release. The bundled synthetic analysis remains available.', fallback: true }, { status: 503 });
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
   if (!apiKey || !model) {
@@ -98,12 +102,17 @@ export async function POST(request: Request) {
     return Response.json({ error: 'This demo endpoint accepts same-origin requests only.', fallback: true }, { status: 403 });
   }
 
-  const contentLength = Number(request.headers.get('content-length') || 0);
-  if (contentLength > 2_000) return Response.json({ error: 'Invalid demo request.', fallback: true }, { status: 413 });
-
   let body: { fixtureId?: unknown };
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 2_000) {
+      return Response.json({ error: 'Invalid demo request.', fallback: true }, { status: 413 });
+    }
+    const parsed = JSON.parse(rawBody) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return Response.json({ error: 'Invalid request.', fallback: true }, { status: 400 });
+    }
+    body = parsed as { fixtureId?: unknown };
   } catch {
     return Response.json({ error: 'Invalid request.', fallback: true }, { status: 400 });
   }

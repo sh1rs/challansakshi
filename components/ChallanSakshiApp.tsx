@@ -113,8 +113,21 @@ const evidenceSteps: StepId[] = ['intake', 'review', 'finding', 'passport', 'rea
 function isStoredFactList(value: unknown): value is ExtractedFact[] {
   return Array.isArray(value) && value.every((fact) => fact && typeof fact === 'object'
     && typeof (fact as ExtractedFact).id === 'string'
+    && (fact as ExtractedFact).label && typeof (fact as ExtractedFact).label.en === 'string' && typeof (fact as ExtractedFact).label.hi === 'string'
     && typeof (fact as ExtractedFact).value === 'string'
-    && typeof (fact as ExtractedFact).evidenceRef === 'string');
+    && ['challan', 'enforcement', 'vehicle-record', 'citizen-photo'].includes((fact as ExtractedFact).source)
+    && ['high', 'medium', 'low'].includes((fact as ExtractedFact).confidence)
+    && ['clear', 'partial', 'unclear', 'not-visible'].includes((fact as ExtractedFact).visibility)
+    && (!(fact as ExtractedFact).uncertainty || (typeof (fact as ExtractedFact).uncertainty?.en === 'string' && typeof (fact as ExtractedFact).uncertainty?.hi === 'string'))
+    && typeof (fact as ExtractedFact).evidenceRef === 'string'
+    && typeof (fact as ExtractedFact).userConfirmationRequired === 'boolean');
+}
+
+function isStoredFactListForFixture(value: unknown, fixtureId: FixtureId): value is ExtractedFact[] {
+  if (!isStoredFactList(value)) return false;
+  const expectedIds = fixtures[fixtureId].extractedFacts.map((fact) => fact.id).sort();
+  const receivedIds = value.map((fact) => fact.id).sort();
+  return expectedIds.length === receivedIds.length && expectedIds.every((id, index) => id === receivedIds[index]);
 }
 
 function isStoredOrderReviews(value: unknown): value is Record<string, OrderMapReview> {
@@ -178,14 +191,14 @@ function hashForStep(step: StepId, issueId: ResolutionIssueId): string {
 }
 
 const copy = {
-  prototype: { en: 'Independent hackathon prototype · Synthetic demo data', hi: 'स्वतंत्र हैकाथॉन प्रोटोटाइप · सिंथेटिक डेमो डेटा' },
+  prototype: { en: 'Independent public-interest project · This journey uses synthetic demo data', hi: 'स्वतंत्र जनहित परियोजना · यह यात्रा सिंथेटिक डेमो डेटा उपयोग करती है' },
   evidenceBefore: { en: 'Evidence before action.', hi: 'कार्रवाई से पहले सबूत समझें।' },
   navHow: { en: 'How it works', hi: 'यह कैसे काम करता है' },
   reset: { en: 'Start over', hi: 'फिर से शुरू करें' },
   landingQuestion: { en: 'Does the challan photo show your vehicle?', hi: 'क्या चालान की फ़ोटो में आपका ही वाहन है?' },
   landingLead: { en: 'Before you pay or contest an e-Challan, understand what its supplied evidence actually shows.', hi: 'ई-चालान भरने या आपत्ति दर्ज करने से पहले समझें कि उसमें दिया सबूत वास्तव में क्या दिखाता है।' },
   tryDemo: { en: 'Try the demo challan', hi: 'डेमो चालान देखें' },
-  noSignup: { en: 'No sign-up · No real documents · About 90 seconds', hi: 'साइन-अप नहीं · असली दस्तावेज़ नहीं · लगभग 90 सेकंड' },
+  noSignup: { en: 'Real review: no uploads or login · Demo: fictional data only', hi: 'असली समीक्षा: अपलोड या लॉगिन नहीं · डेमो: केवल काल्पनिक डेटा' },
   evidenceLinked: { en: 'Evidence-linked', hi: 'सबूत से जुड़ा' },
   evidenceLinkedSub: { en: 'Every finding shows its source', hi: 'हर नतीजा अपना स्रोत दिखाता है' },
   deadlineAware: { en: 'Deadline-aware', hi: 'समय-सीमा स्पष्ट' },
@@ -410,7 +423,7 @@ function AppHeader({ language, setLanguage, step, onReset, onHome, onDesk, easyR
           <span><strong>ChallanSakshi</strong><small>चालान साक्षी</small></span>
         </button>
         <nav aria-label={language === 'hi' ? 'मुख्य नेविगेशन' : 'Primary navigation'}>
-          {step === 'landing' && <><button type="button" className="reset-link resolution-nav-link" onClick={onDesk}>{language === 'hi' ? 'रिज़ॉल्यूशन डेस्क' : 'Resolution desk'}</button><a href="#how-it-works">{local(copy.navHow, language)}</a></>}
+          {step === 'landing' && <><a href="/review">{language === 'hi' ? 'असली चालान समीक्षा' : 'Review my challan'}</a><a href="/fastag">{language === 'hi' ? 'FASTag जाँच' : 'FASTag check'}</a><button type="button" className="reset-link resolution-nav-link" onClick={onDesk}>{language === 'hi' ? 'डेमो डेस्क' : 'Demo desk'}</button><a href="#how-it-works">{local(copy.navHow, language)}</a></>}
           {step !== 'landing' && <button type="button" className="reset-link" onClick={onReset}>{local(copy.reset, language)}</button>}
           <ReadingDataOptions language={language} easyRead={easyRead} textFirst={textFirst} onEasyReadChange={onEasyReadChange} onTextFirstChange={onTextFirstChange} onClearCase={onReset} />
           <div className="language-switch" role="group" aria-label={language === 'hi' ? 'भाषा' : 'Language'}>
@@ -588,8 +601,9 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
           <h1>{language === 'hi' ? <>क्या चालान की फ़ोटो में <em>आपका</em> ही वाहन है?</> : <>Does the challan photo show <em>your</em> vehicle?</>}</h1>
           <p className="hero-lede">{local(copy.landingLead, language)}</p>
           <div className="hero-actions">
-            <Button type="button" onClick={onStart}>{local(copy.tryDemo, language)} <span aria-hidden="true">→</span></Button>
-            <Button variant="secondary" type="button" onClick={onOpenDesk}>{language === 'hi' ? 'अपनी अगली राह खोजें' : 'Find my next step'}</Button>
+            <a className="button button-primary" href="/review">{language === 'hi' ? 'अपने असली चालान की सुरक्षित समीक्षा करें' : 'Review my real challan safely'} <span aria-hidden="true">→</span></a>
+            <Button variant="secondary" type="button" onClick={onStart}>{local(copy.tryDemo, language)}</Button>
+            <Button variant="quiet" type="button" onClick={onOpenDesk}>{language === 'hi' ? 'काल्पनिक समस्या डेस्क' : 'Explore fictional issue routes'}</Button>
           </div>
           <p className="microcopy"><span aria-hidden="true">◉</span>{local(copy.noSignup, language)}</p>
         </div>
@@ -612,6 +626,19 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
           <p><strong>{local(copy.deadlineAware, language)}</strong><span>{local(copy.deadlineAwareSub, language)}</span></p>
           <p><strong>{local(copy.honest, language)}</strong><span>{local(copy.honestSub, language)}</span></p>
         </div>
+      </section>
+
+      <section className="public-service-bridge shell" aria-labelledby="public-services-title">
+        <div className="public-service-heading">
+          <p className="eyebrow"><span />{language === 'hi' ? 'डेमो से सुरक्षित नागरिक उपयोग तक' : 'From demo to safe citizen use'}</p>
+          <h2 id="public-services-title">{language === 'hi' ? 'एक सबूत प्रणाली, दो असली सड़क-संबंधी समस्याएँ।' : 'One evidence system, two real mobility problems.'}</h2>
+          <p>{language === 'hi' ? 'असली-मामला टूल दस्तावेज़ अपलोड या AI के बिना केवल आपके संरचित, मास्क किए गए अवलोकन उपयोग करते हैं।' : 'The real-case tools use only your structured, masked observations—without document uploads or AI analysis.'}</p>
+        </div>
+        <div className="public-service-grid">
+          <a href="/review"><span className="service-code">01 · e-CHALLAN</span><strong>{language === 'hi' ? 'मैन्युअल चालान स्वयं-समीक्षा' : 'Manual challan self-review'}</strong><p>{language === 'hi' ? 'आधिकारिक तस्वीर खुद देखें, अंतर या अस्पष्टता दर्ज करें और निष्पक्ष वर्कशीट बनाएँ।' : 'Inspect the official image yourself, record conflicts or uncertainty, and prepare a neutral worksheet.'}</p><b>{language === 'hi' ? 'सुरक्षित समीक्षा शुरू करें' : 'Start safe review'} →</b></a>
+          <a href="/fastag"><span className="service-code">02 · FASTag</span><strong>TollSakshi</strong><p>{language === 'hi' ? 'डेबिट को वाहन, प्लाज़ा, समय, दूसरी कटौती और क्रेडिट रिकॉर्ड से मिलाएँ।' : 'Reconcile a debit with vehicle, plaza, timestamp, second-debit, and credit-adjustment records.'}</p><b>{language === 'hi' ? 'FASTag जाँच खोलें' : 'Open FASTag check'} →</b></a>
+        </div>
+        <p className="public-service-boundary"><span aria-hidden="true">i</span>{language === 'hi' ? 'रियल मोड स्वतंत्र अर्ली एक्सेस है: कोई फाइलिंग, भुगतान, सरकारी/बैंक डेटा कनेक्शन या नतीजे की गारंटी नहीं।' : 'Real mode is independent early access: no filing, payment, government/bank data connection, or outcome guarantee.'} <a href="/privacy">{language === 'hi' ? 'गोपनीयता और सीमाएँ पढ़ें' : 'Read privacy and limits'} →</a></p>
       </section>
 
       <NoticePreflight language={language} onContinue={onStart} />
@@ -644,7 +671,7 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
 function Footer({ language }: { language: Language }) {
   return (
     <footer className="site-footer">
-      <div className="shell"><div className="footer-brand"><ShieldMark /><span><strong>ChallanSakshi</strong><small>{local(copy.evidenceBefore, language)}</small></span></div><p>{local(copy.disclaimer, language)} {local(copy.currentStateRoute, language)}</p></div>
+      <div className="shell"><div className="footer-brand"><ShieldMark /><span><strong>ChallanSakshi</strong><small>{local(copy.evidenceBefore, language)}</small></span></div><p>{local(copy.disclaimer, language)} {local(copy.currentStateRoute, language)} <a href="/review">{language === 'hi' ? 'असली चालान समीक्षा' : 'Manual real-case review'}</a> · <a href="/fastag">FASTag</a> · <a href="/privacy">{language === 'hi' ? 'गोपनीयता' : 'Privacy'}</a> · <a href="/safety">{language === 'hi' ? 'सुरक्षा' : 'Safety'}</a></p></div>
     </footer>
   );
 }
@@ -1010,18 +1037,18 @@ export default function ChallanSakshiApp() {
           const restoredFixtureId: FixtureId = saved.fixtureId && fixtures[saved.fixtureId] ? saved.fixtureId : 'mismatch';
           setFixtureId(restoredFixtureId);
           {
-            const restoredFacts = isStoredFactList(saved.facts) ? saved.facts : fixtures[restoredFixtureId].extractedFacts;
+            const restoredFacts = isStoredFactListForFixture(saved.facts, restoredFixtureId) ? saved.facts : fixtures[restoredFixtureId].extractedFacts;
             setFacts(restoredFacts);
-            setAnalysisFacts(isStoredFactList(saved.analysisFacts) ? saved.analysisFacts : fixtures[restoredFixtureId].extractedFacts);
+            setAnalysisFacts(isStoredFactListForFixture(saved.analysisFacts, restoredFixtureId) ? saved.analysisFacts : fixtures[restoredFixtureId].extractedFacts);
           }
           if (saved.step && steps.includes(saved.step)) setStep(saved.step);
           setConfirmed(Boolean(saved.confirmed));
-          if (saved.analysisMode) setAnalysisMode(saved.analysisMode);
-          if (typeof saved.trackingStage === 'number') setTrackingStage(saved.trackingStage);
-          if (saved.outcome) setOutcome(saved.outcome);
+          if (saved.analysisMode && ['precomputed', 'live', 'fallback'].includes(saved.analysisMode)) setAnalysisMode(saved.analysisMode);
+          if (typeof saved.trackingStage === 'number' && [2, 3, 4].includes(saved.trackingStage)) setTrackingStage(saved.trackingStage);
+          if (saved.outcome && ['none', 'quashed', 'rejected', 'no-resolution'].includes(saved.outcome)) setOutcome(saved.outcome);
           if (saved.resolutionIssue && resolutionIssues.some((item) => item.id === saved.resolutionIssue)) setResolutionIssue(saved.resolutionIssue);
           const storedSubmissionIsValid = Boolean(saved.fixtureId && fixtures[saved.fixtureId]
-            && isStoredFactList(saved.submittedFacts)
+            && isStoredFactListForFixture(saved.submittedFacts, saved.fixtureId)
             && typeof saved.submittedRevisionId === 'string'
             && createSubmittedRevisionId(saved.fixtureId, saved.submittedFacts) === saved.submittedRevisionId);
           const storedCustodyScenarioId: CustodyScenarioId = saved.version === 5 && saved.custodyScenarioId && custodyScenarios[saved.custodyScenarioId]

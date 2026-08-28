@@ -14,6 +14,15 @@ After a fictional rejection, the same frozen revision is compared with the suppl
 
 The compact preflight never opens suspicious destinations and stops on synthetic APK, credential, remote-access, or personal-payment requests. Text-first mode leaves the 1.6 MB evidence image unloaded until requested; the independent Simpler view adds a plain-language summary and roomier layout. The app works from typed fixtures, with optional structured OpenAI vision and fallback. No real upload, filing, payment, authentication, or government connection exists, and no result declares innocence, fraud, legal ownership, or invalidity.
 
+## Beyond the hero demo: public-interest early access
+
+The same evidence discipline now powers two isolated, immediately usable manual tools:
+
+- **Real e-Challan self-review (`/review`)** — citizens inspect the official record themselves, record only structured masked observations, and receive a conservative local worksheet. It refuses message-only sources, uninspected images, colour-only mismatch claims, and inferred deadlines.
+- **TollSakshi (`/fastag`)** — citizens reconcile a recorded FASTag debit against the official tag mapping, event time, plaza, two-debit pattern, alternate payment, tariff/pass, and credit observations. Its Transaction-to-Journey Map, TP1–TP14 Passport, bank-versus-NHAI-FASTag routing, current-rule issuer review, and aligned-record refusal turn the architecture into a second deep mobility vertical.
+
+Real-mode answers stay only in page memory. There is no document-upload or raw document-paste surface, AI, storage, form submission, URL data, analytics, case database, or automatic filing. The synthetic V5 demo, local persistence, API fixture allowlist, grievance simulator, and outcome simulator remain technically sealed from real mode.
+
 ## Problem
 
 A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve exactly which core facts were submitted, and check whether the supplied response addresses those points. Camera-generated notices can include the wrong vehicle, a misread plate, or an image that does not visibly establish the allegation; after contesting, the citizen still needs the original evidence trail to understand a reasoned response.
@@ -48,6 +57,11 @@ The journey is:
 
 ## What actually works
 
+- Isolated public manual e-Challan review and TollSakshi routes with Privacy/Data Controls and Safety/Official Routes pages.
+- Memory-only real-mode state, masked identifiers, explicit device choice, shared-device in-app copy/download lock plus an approximately 10-minute inactivity exit attempt, Quick exit, and a test-enforced no-storage/no-network/no-upload/no-form boundary.
+- Domain- and UI-level artifact gates: aligned, already-credited, incomplete, Virtual Court, unknown-jurisdiction, or stale-attestation outcomes cannot expose a dispute request.
+- English-only real-case workflows until their rule explanations and downloadable artifacts complete Hindi safety review; the synthetic journey remains bilingual.
+- A FASTag Transaction-to-Journey Map, 14-element Toll Evidence Passport, three synthetic Toll fixtures, and conservative actual-record workflow.
 - Three materially different typed demo fixtures.
 - Editable comparison facts with source and visibility status; synthetic notice identifiers remain visibly read-only.
 - Mandatory human confirmation before classification.
@@ -71,14 +85,14 @@ The journey is:
 - Three payment examples: record conflict, identifier mismatch, and aligned-record refusal.
 - A Virtual Courts search/verification/contest checklist and access/receipt recovery guidance.
 - JSON case-manifest and route-note downloads.
-- Optional structured OpenAI analysis plus precomputed fallback.
+- Optional structured OpenAI analysis in configured local development; the public production build deliberately uses the bundled precomputed fallback.
 - Mobile, tablet, desktop, keyboard, and reduced-motion support.
 
-## What is simulated
+## What is simulated in the homepage journey
 
-- Every document, person, registration, image, authority, grievance number, and outcome.
-- Government submission and status updates.
-- Authority reasoning shown in the tracker.
+- In the homepage synthetic journey, every document, person, registration, image, authority, grievance number, and outcome.
+- Its government submission and status updates.
+- Its authority reasoning shown in the tracker.
 
 No data is sent to Parivahan, a police department, an authority, or a court.
 No real document upload, OTP, payment, bank verification, or live status lookup is offered.
@@ -132,8 +146,8 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 
 **Project category:** Citizen services / road transport / responsible AI
 
-**One-line innovation:** An evidence verification and resolution layer around existing official services that refuses unsupported claims and keeps every next step tied to confirmed records.
+**One-line innovation:** A reusable evidence reconciliation layer for e-Challan and FASTag records that refuses unsupported claims and keeps every next step tied to citizen-confirmed, source-aware observations.
 
-**Intended impact:** Help citizens avoid unsupported grievances and accidental duplicate payments, while producing clearer evidence packets, visible clocks, and safer official handoffs.
+**Intended impact:** Help citizens spot evidence conflicts, avoid unsupported grievances or accidental duplicate payments, and prepare clearer masked checklists for safer official handoffs.
 
 **Most important design decision:** Human-confirmed AI observations feed deterministic rules; the model never controls legal clocks or conclusions.
