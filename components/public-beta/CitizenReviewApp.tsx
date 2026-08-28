@@ -131,19 +131,18 @@ function Preview({
           alt={t(language, `${title} preview`, `${title} प्रीव्यू`)}
         />
       ) : (
-        <object
-          data={selection.previewUrl}
-          type="application/pdf"
-          aria-label={t(language, `${title} PDF preview`, `${title} PDF प्रीव्यू`)}
-        >
+        <div className={styles.localPdfOpen}>
           <p>
             {t(
               language,
-              'PDF preview unavailable; the file remains in this tab memory.',
-              'PDF प्रीव्यू उपलब्ध नहीं; फ़ाइल इस टैब की मेमोरी में रहती है।',
+              'Open this browser-local PDF in a new tab to review it. No file is uploaded. Close that PDF tab yourself, especially on a shared device.',
+              'इस ब्राउज़र-स्थानीय PDF को देखने के लिए नए टैब में खोलें। फ़ाइल अपलोड नहीं होती। खासकर साझा डिवाइस पर PDF टैब स्वयं बंद करें।',
             )}
           </p>
-        </object>
+          <a href={selection.previewUrl} target="_blank" rel="noopener noreferrer">
+            {t(language, 'Open selected PDF locally', 'चुना गया PDF स्थानीय रूप से खोलें')}
+          </a>
+        </div>
       )}
     </article>
   );
@@ -637,6 +636,10 @@ export default function CitizenReviewApp() {
       ));
       return;
     }
+    if (answers.sourceStatus === 'message-only') {
+      goToStep('result');
+      return;
+    }
     if (!recordSelection && !manualEntryMode) {
       showError(t(
         language,
@@ -645,7 +648,7 @@ export default function CitizenReviewApp() {
       ));
       return;
     }
-    goToStep(answers.sourceStatus === 'message-only' ? 'result' : 'observations');
+    goToStep('observations');
   };
 
   const continueObservations = () => {
@@ -837,7 +840,17 @@ export default function CitizenReviewApp() {
       simpleMode={simpleMode}
       onSimpleModeChange={changeSimpleMode}
     >
-      <main className={styles.main}>
+      <main className={styles.main} data-device-context={device}>
+        {device === 'shared' && (
+          <aside className={styles.sharedPrintWarning} data-shared-print-warning>
+            <h1>{t(language, 'Shared-device print blocked', 'साझा-डिवाइस प्रिंट रोका गया')}</h1>
+            <p>{t(
+              language,
+              'ChallanSakshi does not format case details for printing in shared-device mode. Return to the review and use Quick exit & clear.',
+              'साझा-डिवाइस मोड में ChallanSakshi केस विवरण को प्रिंट के लिए तैयार नहीं करता। समीक्षा पर लौटें और तुरंत बाहर निकलें और साफ़ करें उपयोग करें।',
+            )}</p>
+          </aside>
+        )}
         <GuidedStepHeader
           {...guide}
           steps={buildChallanGuidedProgress(step, answers.sourceStatus, language)}
@@ -1612,8 +1625,8 @@ export default function CitizenReviewApp() {
                       {device === 'shared'
                         ? t(
                           language,
-                          'Download, copy, and print are disabled on this shared device. Screenshots, clipboard history, browser downloads, and backups are outside ChallanSakshi’s control.',
-                          'इस साझा डिवाइस पर डाउनलोड, कॉपी और प्रिंट बंद हैं। स्क्रीनशॉट, क्लिपबोर्ड, डाउनलोड और बैकअप नियंत्रण से बाहर हैं।',
+                          'Download, copy, and formatted printing are disabled for this shared-device review. Screenshots, manual text selection, browser history, and backups are outside ChallanSakshi’s control.',
+                          'इस साझा-डिवाइस समीक्षा में डाउनलोड, कॉपी और तैयार प्रिंट बंद हैं। स्क्रीनशॉट, मैन्युअल टेक्स्ट चयन, ब्राउज़र इतिहास और बैकअप ChallanSakshi के नियंत्रण से बाहर हैं।',
                         )
                         : t(
                           language,

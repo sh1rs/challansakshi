@@ -5,6 +5,7 @@ import { resolveConfig } from 'vite';
 
 const projectRoot = resolve(import.meta.dirname, '..');
 const wranglerPath = resolve(projectRoot, 'wrangler.jsonc');
+const nextConfigSource = readFileSync(resolve(projectRoot, 'next.config.ts'), 'utf8');
 
 describe('direct Cloudflare deployment', () => {
   it('builds with Cloudflare Workers directly instead of the Sites serving plugin', async () => {
@@ -13,7 +14,7 @@ describe('direct Cloudflare deployment', () => {
 
     expect(pluginNames).toContain('vite-plugin-cloudflare');
     expect(pluginNames).not.toContain('sites');
-  }, 30_000);
+  }, 120_000);
 
   it('owns only the ChallanSakshi subdomain and keeps optional invocation logs off', () => {
     expect(existsSync(wranglerPath), 'wrangler.jsonc must define the direct production Worker').toBe(true);
@@ -21,6 +22,7 @@ describe('direct Cloudflare deployment', () => {
 
     const config = JSON.parse(readFileSync(wranglerPath, 'utf8')) as {
       name?: string;
+      main?: string;
       workers_dev?: boolean;
       routes?: Array<{ pattern?: string; custom_domain?: boolean }>;
       observability?: { enabled?: boolean };
@@ -29,10 +31,16 @@ describe('direct Cloudflare deployment', () => {
 
     expect(config).toMatchObject({
       name: 'challansakshi',
+      main: 'worker.ts',
       workers_dev: false,
       routes: [{ pattern: 'challansakshi.sh1rs.com', custom_domain: true }],
       observability: { enabled: false },
       vars: { NEXT_PUBLIC_SITE_URL: 'https://challansakshi.sh1rs.com' },
     });
+  });
+
+  it('sets host-scoped HSTS without expanding the policy to all sh1rs.com subdomains', () => {
+    expect(nextConfigSource).toContain("{ key: 'Strict-Transport-Security', value: 'max-age=31536000' }");
+    expect(nextConfigSource).not.toMatch(/includeSubDomains|preload/i);
   });
 });

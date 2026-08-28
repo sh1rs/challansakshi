@@ -11,7 +11,7 @@ ChallanSakshi is an independent, evidence-first citizen project built around one
 
 The original synthetic engine remains sealed inside `/demo`. It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note.
 
-> Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` can preview citizen-selected files locally in the current tab, but it does not upload them to a ChallanSakshi server or AI model.
+> Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` can preview citizen-selected files browser-locally, but it does not upload them to a ChallanSakshi server or AI model. Opening a selected PDF creates a separate browser-local tab that the citizen must close.
 
 ## The exact citizen problem
 
@@ -94,6 +94,7 @@ app/demo/page.tsx
        └─ lib/order-evidence.ts             order fixture, mapping, validation, artifacts
 
 app/api/analyze/route.ts                    optional Responses API image extraction
+worker.ts                                  production-host HTTP → HTTPS boundary, then Vinext
 tests/domain.test.ts                        core deterministic rule coverage
 tests/resolution.test.ts                    resolution and reconciliation rule coverage
 tests/case-ledger.test.ts                   provenance, ledger, order map, artifact invariants
@@ -166,11 +167,11 @@ In local development, the route uses the OpenAI Responses API with image input, 
 
 - Real-mode answers exist only in the current page’s in-memory React state. Reload, close, or Quick exit clears them from the app.
 - `/review` accepts PDF, JPEG, PNG, and WebP files up to 12 MiB each: at most one official record and one supplied image at a time. Validation uses the browser-provided MIME type rather than trusting the filename extension.
-- A valid selection receives a temporary object URL for local preview. The file stays in the current tab and is not sent through `fetch`, XHR, beacon, a server form, `/api/analyze`, or an AI model. This release performs no OCR. Replacing, removing, resetting, Quick Exit, and unmounting release the relevant preview URL.
+- A valid selection receives a temporary object URL for browser-local preview and is not sent through `fetch`, XHR, beacon, a server form, `/api/analyze`, or an AI model. This release performs no OCR. An image preview stays inside the review page; opening a selected PDF creates a separate browser-local tab that Quick Exit cannot close, so the citizen must close that PDF tab. Replacing, removing, resetting, Quick Exit, and unmounting release the app's relevant object URL.
 - File selection does not authenticate origin. Source and confidence labels remain citizen-provided observations, never government verification.
 - Real-mode components contain no client case storage, cookies, case identifiers in URLs, raw-textarea, analytics, or real-case `/api/analyze` path. Automated privacy tests lock this boundary while permitting the dedicated local file input.
 - Real-mode inputs never request CAPTCHA, OTP, Aadhaar/VID, a government/bank/FASTag password, or card/payment credentials. Any official login, identity check, CAPTCHA, OTP, or payment belongs only on the independently opened official service.
-- The app’s copy/download/print controls are disabled in shared-device mode, which attempts to leave the review after about 10 minutes of inactivity. Browser timer throttling can delay that attempt, so Quick Exit remains the required clear action when finished. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print-to-PDF files, browser history, and backups sit outside the app’s clear action.
+- The app’s copy/download/formatted-print controls are disabled in shared-device mode, which attempts to leave the review after about 10 minutes of inactivity. Browser-native print is reduced to a non-sensitive warning, but screenshots, manual selection, browser history, browser extensions, and device backups remain outside the app's control. Browser timer throttling can delay the exit attempt, so Quick Exit remains the required clear action when finished. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print-to-PDF files, browser history, and backups sit outside the app’s clear action.
 - Hosting infrastructure necessarily handles technical request data such as IP address, path, browser/device information, timestamps, and security logs to deliver and protect the site. Exact host log retention is not controlled or promised by this project.
 - In the synthetic demo, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional.
 - Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
@@ -208,7 +209,7 @@ Use the bundled Node runtime for reproducible repository verification:
 
 ## Deployment
 
-Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration.
+Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration. Its versioned entrypoint returns a hostname-scoped `308` from HTTP to the same HTTPS path and query before invoking Vinext. HTTPS responses set a one-year HSTS policy for this hostname without `includeSubDomains` or preload, so the portfolio apex and future sibling subdomains are not silently enrolled.
 
 Deployment is not part of test, typecheck, lint, or build verification. It is a separate external side effect and must be run only after the current build and configuration are verified, Wrangler is authenticated to the correct Cloudflare account, domain ownership is confirmed, and the deployment is explicitly authorised:
 

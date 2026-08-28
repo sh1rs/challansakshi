@@ -84,7 +84,7 @@ export function SafetyBoundary({ language, children }: { language: Language; chi
       <span aria-hidden="true">i</span>
       <div>
         <strong>{t(language, 'Local record preview · no server upload', 'स्थानीय रिकॉर्ड प्रीव्यू · कोई सर्वर अपलोड नहीं')}</strong>
-        <p>{t(language, 'Selected records and answers remain in the current browser tab. They are not sent to a server, AI model, authority, bank, or toll operator. The hosting provider still receives ordinary page-request metadata.', 'चुने रिकॉर्ड और उत्तर मौजूदा ब्राउज़र टैब में रहते हैं। वे सर्वर, AI मॉडल, प्राधिकरण, बैंक या टोल ऑपरेटर को नहीं भेजे जाते। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
+        <p>{t(language, 'Selected records remain browser-local and answers remain in this app tab. They are not uploaded to a server or sent to an AI model, authority, bank, or toll operator. Opening a PDF creates another browser-local tab that Quick exit cannot close; close it yourself. The hosting provider still receives ordinary page-request metadata.', 'चुने रिकॉर्ड ब्राउज़र में स्थानीय रहते हैं और उत्तर इस ऐप टैब में रहते हैं। वे सर्वर पर अपलोड या AI मॉडल, प्राधिकरण, बैंक अथवा टोल ऑपरेटर को नहीं भेजे जाते। PDF खोलने पर दूसरा ब्राउज़र-स्थानीय टैब बनता है जिसे तुरंत बाहर निकलना बंद नहीं कर सकता; उसे स्वयं बंद करें। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
         {children}
       </div>
     </aside>

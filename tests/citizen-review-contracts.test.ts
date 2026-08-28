@@ -18,6 +18,10 @@ const guidedStyles = readFileSync(
   new URL('../components/guided/GuidedStepHeader.module.css', import.meta.url),
   'utf8',
 );
+const securityConfig = readFileSync(
+  new URL('../next.config.ts', import.meta.url),
+  'utf8',
+);
 
 function mediaBlock(source: string, query: string) {
   const marker = `@media ${query}`;
@@ -88,6 +92,21 @@ describe('citizen review release contracts', () => {
     expect(manualHandler).toMatch(/setManualEntryMode\(true\)/);
   });
 
+  it('lets a message-only source reach the promised safe stop without evidence intake', () => {
+    const sourceHandler = reviewSource.match(
+      /const continueSource\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\};/,
+    )?.[1] ?? '';
+    const safeStopIndex = sourceHandler.indexOf("answers.sourceStatus === 'message-only'");
+    const evidenceGateIndex = sourceHandler.indexOf('!recordSelection && !manualEntryMode');
+
+    expect(safeStopIndex).toBeGreaterThanOrEqual(0);
+    expect(evidenceGateIndex).toBeGreaterThanOrEqual(0);
+    expect(safeStopIndex).toBeLessThan(evidenceGateIndex);
+    expect(sourceHandler).toMatch(
+      /if \(answers\.sourceStatus === 'message-only'\) \{\s*goToStep\('result'\);\s*return;/,
+    );
+  });
+
   it('renders evidence as a native accessible table', () => {
     expect(reviewSource).toMatch(/buildCitizenEvidencePresentationView/);
     expect(reviewSource).toMatch(/<table\b/);
@@ -119,7 +138,7 @@ describe('citizen review release contracts', () => {
     expect(publicStyles).not.toMatch(/\.quickExit::(?:before|after)[^{]*\{[^}]*content\s*:/);
   });
 
-  it('localizes the PDF preview label by record role', () => {
+  it('opens a selected PDF locally without contradicting the object-src security policy', () => {
     const selection = {
       file: {} as File,
       meta: {
@@ -139,10 +158,28 @@ describe('citizen review release contracts', () => {
       language: 'hi',
     }));
 
-    expect(html).toContain('aria-label="आधिकारिक रिकॉर्ड PDF प्रीव्यू"');
-    expect(reviewSource).toMatch(
-      /aria-label=\{t\(language, `\$\{title\} PDF preview`, `\$\{title\} PDF प्रीव्यू`\)\}/,
-    );
+    expect(securityConfig).toContain('"object-src \'none\'"');
+    expect(html).toContain('href="blob:local-preview"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('चुना गया PDF स्थानीय रूप से खोलें');
+    expect(html).toContain('PDF टैब स्वयं बंद करें');
+    expect(html).not.toContain('<object');
+    expect(reviewSource).not.toContain('<object');
+    expect(reviewSource).toContain('Open selected PDF locally');
+  });
+
+  it('describes the selected-file boundary without denying ordinary hosting requests', () => {
+    const shell = renderToStaticMarkup(createElement(LocalRecordIntake, {
+      record: null,
+      photograph: null,
+      onRecordChange: () => undefined,
+      onPhotographChange: () => undefined,
+      language: 'en',
+    }));
+
+    expect(shell).toContain('No selected file or answer has been uploaded to ChallanSakshi or an authority');
+    expect(shell).not.toContain('has left this browser tab');
+    expect(shell).not.toContain('Nothing has left this device');
   });
 
   it('sets every reviewed essential 320px selector to at least 16px explicitly', () => {
@@ -165,6 +202,9 @@ describe('citizen review release contracts', () => {
       '.serviceGrid button',
       '.serviceGrid a',
       '.artifact pre',
+      '.panel small',
+      '.passport em',
+      '.englishOnly',
     ]) {
       expectExplicitSixteenPixelRule(publicMobile, selector);
     }
@@ -190,6 +230,18 @@ describe('citizen review release contracts', () => {
     expect(reviewSource).toMatch(/data-print-timeline/);
     expect(publicStyles).toMatch(/@media print[\s\S]*?\.app\s*>\s*\*\s*\{[^}]*display:\s*none\s*!important/);
     expect(publicStyles).toMatch(/@media print[\s\S]*?\[data-print-artifact\][^{]*\{[^}]*display:\s*block\s*!important/);
+  });
+
+  it('suppresses browser-native formatted printing on a shared device', () => {
+    expect(reviewSource).toContain('data-device-context={device}');
+    expect(reviewSource).toContain('data-shared-print-warning');
+    expect(reviewSource).toContain('formatted printing are disabled for this shared-device review');
+    expect(publicStyles).toMatch(
+      /@media print[\s\S]*?\[data-device-context='shared'\]\s+\[data-print-result\]\s*\{[^}]*display:\s*none\s*!important/,
+    );
+    expect(publicStyles).toMatch(
+      /@media print[\s\S]*?\[data-device-context='shared'\]\s+\[data-shared-print-warning\]\s*\{[^}]*display:\s*block\s*!important/,
+    );
   });
 
   it('routes stage presentation through keyed standard and simple copy', () => {
@@ -220,10 +272,32 @@ describe('citizen review release contracts', () => {
   it('keeps essential privacy and safety reading copy readable and tappable at 320px', () => {
     const publicMobile = mediaBlock(publicStyles, '(max-width: 420px)');
 
+    expect(publicStyles).toMatch(
+      /\.brand\s*\{[^}]*min-height:\s*48px[^}]*display:\s*inline-flex/,
+    );
     expectExplicitSixteenPixelRule(publicMobile, '.infoSection p');
     expectExplicitSixteenPixelRule(publicMobile, '.infoSection li');
+    expectExplicitSixteenPixelRule(publicMobile, '.footerLinks a');
+    expectExplicitSixteenPixelRule(publicMobile, '.footer p');
     expect(publicMobile).toMatch(
       /\.infoSection a\s*\{[^}]*display:\s*inline-flex[^}]*min-height:\s*48px/,
+    );
+    expect(publicMobile).toMatch(
+      /\.footerLinks a\s*\{[^}]*display:\s*flex[^}]*min-height:\s*48px/,
+    );
+    expect(publicMobile).toMatch(
+      /\.infoPage h1\s*\{[^}]*font-size:\s*(?:3[0-9]|[12][0-9])px[^}]*overflow-wrap:\s*anywhere/,
+    );
+  });
+
+  it('stacks FASTag passport status inside each card on narrow screens', () => {
+    const publicMobile = mediaBlock(publicStyles, '(max-width: 700px)');
+
+    expect(publicMobile).toMatch(
+      /\.passport article\s*\{[^}]*grid-template-columns:\s*34px\s+minmax\(0,\s*1fr\)/,
+    );
+    expect(publicMobile).toMatch(
+      /\.passport em\s*\{[^}]*grid-column:\s*2[^}]*justify-self:\s*start/,
     );
   });
 });

@@ -14,7 +14,7 @@
 }
 
 .header { width: min(1320px, calc(100% - 48px)); min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: auto; border-bottom: 1px solid var(--line); }
-.brand { color: var(--ink); font-size: clamp(22px, 2vw, 30px); font-weight: 790; letter-spacing: -.055em; text-decoration: none; }
+.brand { min-height: 48px; display: inline-flex; align-items: center; color: var(--ink); font-size: clamp(22px, 2vw, 30px); font-weight: 790; letter-spacing: -.055em; text-decoration: none; }
 .headerActions, .headerActions a, .languageToggle { display: flex; align-items: center; }
 .headerActions { gap: 24px; }
 .headerActions a, .simpleToggle, .languageToggle button { min-height: 48px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 690; text-decoration: none; cursor: pointer; }
@@ -111,14 +111,14 @@
   .hero > h1 { font-size: clamp(38px, 11vw, 51px); text-align: left; }
   .hero > p { margin: 13px 0 18px; font-size: 17px; text-align: left; }
   .actionList { gap: 0; }
-  .actionRow { min-height: 96px; grid-template-columns: 58px 1fr 30px; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+  .actionRow { min-height: 96px; grid-template-columns: 58px 1fr 48px; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); border-radius: 0; }
   .actionRow:nth-child(2) { border: 0; border-bottom: 1px solid var(--line); background: transparent; }
   .goalIcon { width: 54px; height: 54px; border: 1px solid var(--teal); background: transparent; }
   .actionRow:nth-child(2) .goalIcon { border-color: var(--gold); background: transparent; }
   .actionCopy h2 { color: var(--ink); font-size: 24px; }
   .actionRow:nth-child(2) .actionCopy h2 { color: var(--ink); }
   .actionCopy p { margin-top: 3px; font-size: 14px; }
-  .actionLink { min-height: 72px; padding: 0; border: 0; color: var(--ink); }
+  .actionLink { min-width: 48px; min-height: 72px; padding: 0; border: 0; color: var(--ink); }
   .actionLink span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .actionLink svg { width: 28px; height: 28px; }
   .actionRow:nth-child(2) .actionLink { background: transparent; color: var(--ink); }
@@ -141,6 +141,17 @@
   .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; padding: 14px; }
   .footer a { min-height: 48px; font-size: 12px; }
   .footer p { grid-column: 1 / -1; margin: 8px 0 0; text-align: left; }
+  .headerActions > a,
+  .simpleToggle,
+  .languageToggle button,
+  .actionCopy p,
+  .situationRail a,
+  .journey p,
+  .privacyGroup h3,
+  .privacyGroup li,
+  .fastagDoorway p,
+  .footer a,
+  .footer p { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

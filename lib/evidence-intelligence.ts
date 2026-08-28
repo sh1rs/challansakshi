@@ -155,10 +155,6 @@ function displayValue(value: string): string {
   return sanitiseArtifactText(value.replaceAll('-', ' '));
 }
 
-function safeFileName(name: string | undefined, fallback: string): string {
-  return sanitiseArtifactText(name, sanitiseArtifactText(fallback));
-}
-
 function artifactFallback(language: Language) {
   return language === 'hi' ? '[दर्ज नहीं]' : '[not entered]';
 }
@@ -236,21 +232,27 @@ function sourceFileName(input: CitizenEvidenceViewInput, role: 'record' | 'photo
  */
 export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): CitizenEvidenceView {
   const currentAssessment = assessCitizenChallanReview(input.answers);
-  const recordName = safeFileName(sourceFileName(input, 'record'), sourceStatusLabel(input.answers.sourceStatus));
-  const photographName = safeFileName(sourceFileName(input, 'photograph'), 'Citizen-described supplied photograph');
+  const hasLocalRecord = Boolean(sourceFileName(input, 'record'));
+  const hasLocalPhotograph = Boolean(sourceFileName(input, 'photograph'));
+  const recordName = hasLocalRecord
+    ? 'Citizen-selected local official-record copy'
+    : sourceStatusLabel(input.answers.sourceStatus);
+  const photographName = hasLocalPhotograph
+    ? 'Citizen-selected local supplied photograph'
+    : 'Citizen-described supplied photograph';
   const sources: EvidenceSourceRef[] = [
     {
       id: 'source-official-copy',
       label: recordName,
       kind: 'official-record-copy',
-      acquisition: sourceFileName(input, 'record') ? 'local-file-preview' : 'citizen-recorded',
+      acquisition: hasLocalRecord ? 'local-file-preview' : 'citizen-recorded',
       authenticity: CITIZEN_DECLARED_ORIGIN,
     },
     {
       id: 'source-enforcement-image',
       label: photographName,
       kind: 'enforcement-image',
-      acquisition: sourceFileName(input, 'photograph') ? 'local-file-preview' : 'citizen-recorded',
+      acquisition: hasLocalPhotograph ? 'local-file-preview' : 'citizen-recorded',
       authenticity: CITIZEN_DECLARED_ORIGIN,
     },
     {
@@ -330,10 +332,10 @@ export function buildCitizenEvidencePresentationView(
   const sourceLabels: Record<string, string> = language === 'hi'
     ? {
       'source-official-copy': view.sources[0]?.acquisition === 'local-file-preview'
-        ? `नागरिक द्वारा चुनी रिकॉर्ड कॉपी: ${view.sources[0].label}`
+        ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी'
         : officialFallbackHi[view.sources[0]?.label ?? ''] ?? 'नागरिक द्वारा दर्ज आधिकारिक रिकॉर्ड',
       'source-enforcement-image': view.sources[1]?.acquisition === 'local-file-preview'
-        ? `नागरिक द्वारा चुनी तस्वीर: ${view.sources[1].label}`
+        ? 'नागरिक द्वारा चुनी स्थानीय तस्वीर'
         : 'नागरिक द्वारा वर्णित दी गई तस्वीर',
       'source-citizen-record': `नागरिक द्वारा दर्ज वाहन रिकॉर्ड: ${localizeEvidenceValue(
         view.sources[2]?.label.split(': ').at(-1) ?? '',
@@ -386,6 +388,23 @@ function canonicalTimelineLines(timeline: CitizenTimelineEvent[], language: Lang
   });
 }
 
+function exportSourceLabel(source: EvidenceSourceRef, language: Language): string {
+  if (source.acquisition !== 'local-file-preview') return source.label;
+  if (source.id === 'source-official-copy') {
+    return language === 'hi'
+      ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी (साझा सारांश से फ़ाइल का नाम हटाया गया)'
+      : 'Citizen-selected local official-record copy (file name omitted from shared summary)';
+  }
+  if (source.id === 'source-enforcement-image') {
+    return language === 'hi'
+      ? 'नागरिक द्वारा चुनी स्थानीय तस्वीर (साझा सारांश से फ़ाइल का नाम हटाया गया)'
+      : 'Citizen-selected local supplied photograph (file name omitted from shared summary)';
+  }
+  return language === 'hi'
+    ? 'नागरिक द्वारा चुना स्थानीय रिकॉर्ड (साझा सारांश से फ़ाइल का नाम हटाया गया)'
+    : 'Citizen-selected local record (file name omitted from shared summary)';
+}
+
 export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput): string {
   const language = input.language ?? 'en';
   const canonicalView = buildCitizenEvidenceView(input);
@@ -393,6 +412,10 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
     language,
     simpleMode: input.simpleMode ?? false,
   });
+  const exportSources = view.sources.map((source) => ({
+    ...source,
+    label: exportSourceLabel(source, language),
+  }));
   const materialSignals = input.materialSignals ?? input.assessment.materialSignals;
   const missingEvidence = input.missingEvidence ?? input.assessment.missingEvidence;
   const observationLines = view.observations.map((observation) => {
@@ -424,7 +447,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
         `कॉपी की गई आधिकारिक तारीख: ${sanitiseArtifactText(input.officialDeadline, artifactFallback('hi'))}`,
         '',
         'जानकारी कहाँ से आई',
-        ...view.sources.map((source) => `- ${source.label}`),
+        ...exportSources.map((source) => `- ${source.label}`),
         '',
         'आपने क्या देखा',
         ...simpleObservations,
@@ -462,7 +485,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
       `Official date you copied: ${sanitiseArtifactText(input.officialDeadline)}`,
       '',
       'WHERE THE INFORMATION CAME FROM',
-      ...view.sources.map((source) => `- ${source.label}`),
+      ...exportSources.map((source) => `- ${source.label}`),
       '',
       'WHAT YOU SAW',
       ...simpleObservations,
@@ -503,7 +526,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
       `नागरिक द्वारा कॉपी की गई आधिकारिक तारीख: ${sanitiseArtifactText(input.officialDeadline, artifactFallback('hi'))}`,
       '',
       'नागरिक द्वारा दिए स्रोत',
-      ...view.sources.map((source) => `- ${source.label}`),
+      ...exportSources.map((source) => `- ${source.label}`),
       '',
       'नागरिक द्वारा पुष्ट अवलोकन',
       ...hindiObservationLines,
@@ -539,7 +562,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
     `Officially displayed deadline copied by citizen: ${sanitiseArtifactText(input.officialDeadline)}`,
     '',
     'CITIZEN-PROVIDED SOURCE REGISTER',
-    ...view.sources.map((source) => `- ${source.label} (${source.kind}; ${source.acquisition}; ${source.authenticity})`),
+    ...exportSources.map((source) => `- ${source.label} (${source.kind}; ${source.acquisition}; ${source.authenticity})`),
     '',
     'CITIZEN-CONFIRMED OBSERVATIONS',
     ...observationLines,

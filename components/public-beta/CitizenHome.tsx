@@ -71,7 +71,7 @@ const copy: Record<Language, Copy> = {
     privacyHeading: 'Your privacy is built in',
     privacyGroups: [
       { title: 'We never ask for', items: ['Government passwords', 'CAPTCHA or OTP', 'Aadhaar details', 'Payment credentials'] },
-      { title: 'Your documents stay on your device', items: ['Files are processed locally by default', 'Nothing is uploaded without a separate future product decision', 'You control what you keep or share'] },
+      { title: 'Your documents stay on your device', items: ['Selected files stay browser-local', 'No file is uploaded to ChallanSakshi, AI, or an authority', 'Opening a PDF creates a separate local tab; close it yourself', 'You choose what to save or share'] },
       { title: 'Official services, always', items: ['Payments happen on official services', 'Submissions happen on official services', 'We do not collect or process payments'] },
     ],
     fastagHeading: 'Have a FASTag transaction problem instead?',
@@ -117,7 +117,7 @@ const copy: Record<Language, Copy> = {
     privacyHeading: 'आपकी गोपनीयता इसमें शामिल है',
     privacyGroups: [
       { title: 'हम कभी नहीं माँगते', items: ['सरकारी पासवर्ड', 'CAPTCHA या OTP', 'आधार विवरण', 'भुगतान क्रेडेंशियल'] },
-      { title: 'आपके दस्तावेज़ आपके डिवाइस पर रहते हैं', items: ['फ़ाइलें डिफ़ॉल्ट रूप से स्थानीय रूप से प्रोसेस होती हैं', 'अलग भविष्य के उत्पाद निर्णय के बिना कुछ अपलोड नहीं होता', 'आप तय करते हैं कि क्या रखना या साझा करना है'] },
+      { title: 'आपके दस्तावेज़ आपके डिवाइस पर रहते हैं', items: ['चुनी फ़ाइलें ब्राउज़र में स्थानीय रहती हैं', 'कोई फ़ाइल ChallanSakshi, AI या किसी प्राधिकरण पर अपलोड नहीं होती', 'PDF अलग स्थानीय टैब में खुलती है; उसे स्वयं बंद करें', 'आप चुनते हैं कि क्या सेव या साझा करना है'] },
       { title: 'हमेशा आधिकारिक सेवाएँ', items: ['भुगतान आधिकारिक सेवाओं पर होते हैं', 'सबमिशन आधिकारिक सेवाओं पर होते हैं', 'हम भुगतान नहीं लेते या प्रोसेस नहीं करते'] },
     ],
     fastagHeading: 'क्या आपको FASTag लेन-देन की समस्या है?',

@@ -7,6 +7,24 @@ const intakeComponentSource = readFileSync(
   new URL('../components/public-beta/LocalRecordIntake.tsx', import.meta.url),
   'utf8',
 );
+const intakeStyles = readFileSync(
+  new URL('../components/public-beta/LocalRecordIntake.module.css', import.meta.url),
+  'utf8',
+);
+
+function mediaBlock(source: string, query: string) {
+  const marker = `@media ${query}`;
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex < 0) return '';
+  const openIndex = source.indexOf('{', markerIndex);
+  let depth = 0;
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(openIndex + 1, index);
+  }
+  return '';
+}
 
 describe('local official-record intake', () => {
   it('accepts only the approved PDF and image MIME types', () => {
@@ -33,5 +51,25 @@ describe('local official-record intake', () => {
     expect(intakeComponentSource).toMatch(
       /<input\s+[\s\S]*?className=\{styles\.visuallyHidden\}[\s\S]*?tabIndex=\{-1\}[\s\S]*?type="file"/,
     );
+  });
+
+  it('keeps local-intake guidance and controls at 16px on narrow screens', () => {
+    const mobile = mediaBlock(intakeStyles, '(max-width: 420px)');
+
+    for (const selector of [
+      '.receipt strong',
+      '.receipt li',
+      '.rowCopy p:last-child',
+      '.choose',
+      '.actions button',
+      '.metadata strong',
+      '.metadata span',
+      '.preview p',
+      '.error',
+    ]) {
+      expect(mobile, selector).toMatch(
+        new RegExp(`${selector.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[^{}]*\\{[^}]*font-size:\\s*16px`),
+      );
+    }
   });
 });

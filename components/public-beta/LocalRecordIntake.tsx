@@ -24,12 +24,12 @@ const copy = {
     heading: 'Bring the record back',
     introduction: 'Choose a downloaded challan print, receipt, screenshot, or supplied photograph. The selected file stays in this browser memory.',
     receiptHeading: 'Local-processing receipt',
-    nothingLeft: 'Nothing has left this device',
+    nothingLeft: 'No selected file or answer has been uploaded to ChallanSakshi or an authority',
     login: 'Government login information · never collected',
     recordPending: 'Selected record · not yet chosen',
-    recordReady: 'Selected record · ready for local preview',
+    recordReady: 'Selected record · ready for local review',
     photoPending: 'Selected photograph · not yet chosen',
-    photoReady: 'Selected photograph · ready for local preview',
+    photoReady: 'Selected photograph · ready for local review',
     upload: 'Server upload: off',
     saved: 'Saved case: off',
     recordTitle: 'Official record',
@@ -42,13 +42,13 @@ const copy = {
     remove: 'Remove',
     memory: 'Memory only',
     category: 'MIME category',
-    previewReady: 'Local preview ready',
-    recordPdfPreview: 'Official record PDF preview',
-    photoPdfPreview: 'Supplied photograph PDF preview',
+    previewReady: 'Local image preview ready',
+    pdfReady: 'PDF selected · open locally to review',
+    openPdf: 'Open selected PDF locally',
     inputRecord: 'Choose an official record from this device',
     inputPhoto: 'Choose a supplied photograph from this device',
     imageAlt: 'Citizen-selected evidence preview',
-    pdfFallback: 'This browser cannot show the PDF preview. The selected file remains only in browser memory.',
+    pdfNote: 'Open this browser-local copy in a new tab to review it. No file is uploaded. Close the PDF tab yourself, especially on a shared device.',
     errors: {
       'empty-file': 'This file is empty. Choose a record or photograph that contains the information you want to review.',
       'file-too-large': 'This file is larger than 12 MiB. Choose a smaller PDF or image before previewing it.',
@@ -59,12 +59,12 @@ const copy = {
     heading: 'रिकॉर्ड वापस लाएँ',
     introduction: 'अपने द्वारा डाउनलोड किया हुआ चालान प्रिंट, रसीद, स्क्रीनशॉट या दी गई तस्वीर चुनें। चुनी गई फ़ाइल केवल इस ब्राउज़र की मेमोरी में रहती है।',
     receiptHeading: 'स्थानीय-प्रोसेसिंग रसीद',
-    nothingLeft: 'इस डिवाइस से कुछ भी बाहर नहीं गया है',
+    nothingLeft: 'कोई चुनी हुई फ़ाइल या उत्तर ChallanSakshi या किसी प्राधिकरण पर अपलोड नहीं हुआ है',
     login: 'सरकारी लॉगिन जानकारी · कभी एकत्र नहीं की जाती',
     recordPending: 'चुना गया रिकॉर्ड · अभी नहीं चुना गया',
-    recordReady: 'चुना गया रिकॉर्ड · स्थानीय प्रीव्यू के लिए तैयार',
+    recordReady: 'चुना गया रिकॉर्ड · स्थानीय समीक्षा के लिए तैयार',
     photoPending: 'चुनी गई तस्वीर · अभी नहीं चुनी गई',
-    photoReady: 'चुनी गई तस्वीर · स्थानीय प्रीव्यू के लिए तैयार',
+    photoReady: 'चुनी गई तस्वीर · स्थानीय समीक्षा के लिए तैयार',
     upload: 'सर्वर अपलोड: बंद',
     saved: 'सेव किया गया केस: बंद',
     recordTitle: 'आधिकारिक रिकॉर्ड',
@@ -77,13 +77,13 @@ const copy = {
     remove: 'हटाएँ',
     memory: 'केवल मेमोरी में',
     category: 'MIME श्रेणी',
-    previewReady: 'स्थानीय प्रीव्यू तैयार है',
-    recordPdfPreview: 'आधिकारिक रिकॉर्ड PDF प्रीव्यू',
-    photoPdfPreview: 'दी गई तस्वीर PDF प्रीव्यू',
+    previewReady: 'स्थानीय चित्र प्रीव्यू तैयार है',
+    pdfReady: 'PDF चुना गया · स्थानीय रूप से खोलकर देखें',
+    openPdf: 'चुना गया PDF स्थानीय रूप से खोलें',
     inputRecord: 'इस डिवाइस से आधिकारिक रिकॉर्ड चुनें',
     inputPhoto: 'इस डिवाइस से दी गई तस्वीर चुनें',
     imageAlt: 'नागरिक द्वारा चुनी गई साक्ष्य तस्वीर का प्रीव्यू',
-    pdfFallback: 'यह ब्राउज़र PDF प्रीव्यू नहीं दिखा सकता। चुनी गई फ़ाइल केवल ब्राउज़र मेमोरी में रहती है।',
+    pdfNote: 'इसे देखने के लिए ब्राउज़र की स्थानीय कॉपी नए टैब में खोलें। फ़ाइल अपलोड नहीं होती। खासकर साझा डिवाइस पर PDF टैब स्वयं बंद करें।',
     errors: {
       'empty-file': 'यह फ़ाइल खाली है। ऐसा रिकॉर्ड या तस्वीर चुनें जिसमें वह जानकारी हो जिसे आप देखना चाहते हैं।',
       'file-too-large': 'यह फ़ाइल 12 MiB से बड़ी है। प्रीव्यू से पहले छोटा PDF या चित्र चुनें।',
@@ -166,7 +166,7 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
             <span>{text.category}: {selection.meta.type}</span>
             <span>{text.memory}</span>
             <span>{text.upload}</span>
-            <span>{text.previewReady}</span>
+            <span>{selection.meta.previewKind === 'image' ? text.previewReady : text.pdfReady}</span>
           </div>
 
           <div className={styles.preview}>
@@ -174,13 +174,12 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
               // eslint-disable-next-line @next/next/no-img-element -- The deliberate local object URL must not be routed through an image service.
               <img src={selection.previewUrl} alt={text.imageAlt} />
             ) : (
-              <object
-                data={selection.previewUrl}
-                type="application/pdf"
-                aria-label={isPhotograph ? text.photoPdfPreview : text.recordPdfPreview}
-              >
-                <p>{text.pdfFallback}</p>
-              </object>
+              <div className={styles.pdfOpen}>
+                <p>{text.pdfNote}</p>
+                <a href={selection.previewUrl} target="_blank" rel="noopener noreferrer">
+                  {text.openPdf}
+                </a>
+              </div>
             )}
           </div>
 

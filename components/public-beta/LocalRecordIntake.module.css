@@ -42,9 +42,12 @@
 .metadata span { color: var(--muted); font-size: 12px; line-height: 1.4; }
 .metadata span:nth-of-type(4) { color: var(--teal-deep); font-weight: 750; }
 .preview { overflow: hidden; max-width: 100%; min-height: 124px; margin-top: 13px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
-.preview img, .preview object { display: block; width: 100%; min-height: 240px; max-height: 410px; object-fit: contain; }
-.preview object { border: 0; }
+.preview img { display: block; width: 100%; min-height: 240px; max-height: 410px; object-fit: contain; }
 .preview p { margin: 0; padding: 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.pdfOpen { min-height: 180px; display: grid; align-content: center; justify-items: start; gap: 12px; padding: 18px; }
+.pdfOpen p { padding: 0; }
+.pdfOpen a { min-height: 48px; display: inline-flex; align-items: center; padding: 10px 16px; border: 1.5px solid var(--teal-deep); border-radius: 9px; color: var(--teal-deep); font-size: 15px; font-weight: 750; text-decoration: none; }
+.pdfOpen a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 
 .error { grid-column: 2; margin: -4px 0 0; padding: 11px 13px; border-left: 4px solid var(--error); background: #fff4f2; color: #702e29; font-size: 14px; line-height: 1.45; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
@@ -57,8 +60,21 @@
   .choose { width: 100%; min-width: 0; }
   .actions { display: grid; grid-template-columns: 1fr 1fr; }
   .actions button { width: 100%; min-height: 50px; }
-  .preview img, .preview object { min-height: 210px; max-height: 310px; }
+  .preview img { min-height: 210px; max-height: 310px; }
   .error { grid-column: 1; margin-top: -4px; }
+}
+
+@media (max-width: 420px) {
+  .receipt strong,
+  .receipt li,
+  .rowCopy p:last-child,
+  .choose,
+  .actions button,
+  .metadata strong,
+  .metadata span,
+  .preview p,
+  .pdfOpen a,
+  .error { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

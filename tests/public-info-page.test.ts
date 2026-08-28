@@ -22,8 +22,10 @@ describe('public privacy and safety pages', () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
 
     expect(html).toContain('deliberately select');
-    expect(html).toContain('current browser tab');
-    expect(html).toContain('not sent to the ChallanSakshi server or an AI model');
+    expect(html).toContain('stays browser-local');
+    expect(html).toContain('not uploaded to the ChallanSakshi server or sent to an AI model');
+    expect(html).toContain('Opening a selected PDF creates a separate browser-local tab');
+    expect(html).toContain('Quick exit cannot close or erase that tab');
     expect(html).toContain('does not authenticate its origin');
     expect(html).toContain('Authorised government API access is not implemented');
   });
@@ -79,8 +81,12 @@ describe('public privacy and safety pages', () => {
 
   it('keeps complete Hindi counterparts for the critical privacy and safety boundaries', () => {
     expectBilingualPair(
-      'Each selected record or supplied image stays in the current browser tab and is not sent to the ChallanSakshi server or an AI model. This release does not run OCR on it.',
-      'हर चुना गया रिकॉर्ड या दी गई तस्वीर मौजूदा ब्राउज़र टैब में रहती है और ChallanSakshi सर्वर या AI मॉडल को नहीं भेजी जाती। यह रिलीज़ उस पर OCR नहीं चलाती।',
+      'Each selected record or supplied image stays browser-local and is not uploaded to the ChallanSakshi server or sent to an AI model. This release does not run OCR on it.',
+      'हर चुना गया रिकॉर्ड या दी गई तस्वीर ब्राउज़र में स्थानीय रहती है और ChallanSakshi सर्वर पर अपलोड या AI मॉडल को नहीं भेजी जाती। यह रिलीज़ उस पर OCR नहीं चलाती।',
+    );
+    expectBilingualPair(
+      'Opening a selected PDF creates a separate browser-local tab. Quick exit cannot close or erase that tab; close the PDF tab yourself, especially on a shared device.',
+      'चुना गया PDF खोलने पर एक अलग ब्राउज़र-स्थानीय टैब बनता है। तुरंत बाहर निकलना उस टैब को बंद या मिटा नहीं सकता; खासकर साझा डिवाइस पर PDF टैब स्वयं बंद करें।',
     );
     expectBilingualPair(
       'Selecting a file does not authenticate its origin. Any source label records what the citizen says about the copy; it is not government verification.',

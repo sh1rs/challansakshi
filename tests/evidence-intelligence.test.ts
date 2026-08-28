@@ -56,6 +56,20 @@ describe('citizen evidence intelligence', () => {
     expect(view.sources).not.toContainEqual(expect.objectContaining({ authenticity: 'authorised-connector' }));
   });
 
+  it('keeps citizen filenames out of the evidence view used by result and print', () => {
+    const view = buildCitizenEvidenceView({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      recordName: 'Asha_KA01AB3317_challan.pdf',
+      photographName: 'Asha_KA01AB3317_enforcement-photo.jpg',
+    });
+
+    expect(view.sources[0].label).toBe('Citizen-selected local official-record copy');
+    expect(view.sources[1].label).toBe('Citizen-selected local supplied photograph');
+    expect(JSON.stringify(view)).not.toMatch(/Asha|KA01AB3317|challan\.pdf|enforcement-photo\.jpg/);
+  });
+
   it('keeps unclear observations inconclusive and explains the limitation', () => {
     const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', recordName: 'challan.pdf', photographName: 'photo.jpg' });
     expect(view.observations.find((item) => item.field === 'Alleged offence')).toMatchObject({
@@ -244,6 +258,44 @@ describe('citizen evidence intelligence', () => {
     expect(summary).not.toContain('data:');
     expect(summary).not.toContain('blob:');
     expect(summary).not.toContain('file bytes');
+  });
+
+  it.each([
+    ['en', false],
+    ['en', true],
+    ['hi', false],
+    ['hi', true],
+  ] as const)('omits citizen filenames from the %s summary when simple mode is %s', (language, simpleMode) => {
+    const summary = buildCitizenEvidenceSummary({
+      jurisdiction: 'Central e-Challan service',
+      vehicleSuffix: '3317',
+      allegedOffence: 'Helmet',
+      eventDate: '2026-08-20',
+      officialDeadline: '',
+      recordName: 'Asha_KA01AB3317_challan.pdf',
+      photographName: 'Asha_KA01AB3317_enforcement-photo.jpg',
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      language,
+      simpleMode,
+      timeline: buildCitizenTimeline({
+        recordSelected: true,
+        imageSelected: true,
+        sourceConfirmed: true,
+        observationsConfirmed: true,
+        summaryGenerated: true,
+        language,
+      }),
+    });
+
+    expect(summary).not.toContain('Asha');
+    expect(summary).not.toContain('KA01AB3317');
+    expect(summary).not.toContain('challan.pdf');
+    expect(summary).not.toContain('enforcement-photo.jpg');
+    expect(summary).toContain(language === 'hi'
+      ? 'साझा सारांश से फ़ाइल का नाम हटाया गया'
+      : 'file name omitted from shared summary');
   });
 
   it('generates a reviewed Hindi summary while retaining the exact English disclaimer', () => {

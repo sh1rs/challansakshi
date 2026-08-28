@@ -1411,15 +1411,21 @@ main:focus { outline: none; }
 
 @media (max-width: 480px) {
   .site-header { gap: 7px; }
+  .brand-button { min-height: 48px; }
   .brand { gap: 7px; }
   .brand-mark { width: 32px; height: 35px; font-size: 16px; }
   .brand strong { font-size: 14px; }
   .brand small { font-size: 9px; }
   .site-header nav { gap: 6px; }
-  .reading-options > summary { width: 42px; max-width: 42px; min-height: 38px; padding-inline: 8px; }
+  .reading-options > summary { width: 48px; max-width: 48px; min-height: 48px; padding-inline: 8px; font-size: 16px; }
   .reading-options > summary::after { margin-left: 4px; }
   .language-switch { padding: 2px; }
-  .language-switch button { min-width: 31px; min-height: 32px; padding-inline: 5px; }
+  .language-switch button { min-width: 48px; min-height: 48px; padding-inline: 5px; font-size: 16px; }
+  .evidence-photo-placeholder .button,
+  .text-skip-button,
+  .public-service-boundary a,
+  .breadth-heading > div:last-child > button,
+  .site-footer p a { min-height: 48px; display: inline-flex; align-items: center; font-size: 16px; }
   .progress { grid-template-columns: repeat(6, 1fr); overflow: visible; padding-block: 9px; }
   .progress li { min-width: 0; flex-direction: column; gap: 3px; color: #59615d; }
   .progress li::after { top: 11px; right: -25%; width: 50%; }
