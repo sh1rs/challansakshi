@@ -1,21 +1,126 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const publicModeFiles = [
-  'components/public-beta/CitizenReviewApp.tsx',
-  'components/public-beta/TollSakshiApp.tsx',
-  'components/public-beta/PublicBetaShell.tsx',
-  'lib/public-challan.ts',
-  'lib/toll-domain.ts',
-].map((path) => ({ path, source: readFileSync(join(process.cwd(), path), 'utf8') }));
+// These four route modules are the complete real-mode boundary. Following every
+// relative import/export keeps the audit current when a route gains a new local dependency.
+const publicModeEntryPoints = [
+  'app/review/page.tsx',
+  'app/fastag/page.tsx',
+  'app/manual/challan/page.tsx',
+  'app/toll/page.tsx',
+] as const;
+const localModulePattern = /(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g;
+
+function workspacePath(absolutePath: string) {
+  return relative(process.cwd(), absolutePath).split(sep).join('/');
+}
+
+function resolveLocalModule(importerPath: string, specifier: string) {
+  const base = resolve(process.cwd(), dirname(importerPath), specifier);
+  const candidates = extname(base)
+    ? [base]
+    : [base, `${base}.ts`, `${base}.tsx`, `${base}.css`, join(base, 'index.ts'), join(base, 'index.tsx')];
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+function collectPublicModeFiles() {
+  const pending: string[] = [...publicModeEntryPoints];
+  const sources = new Map<string, string>();
+  while (pending.length) {
+    const path = pending.pop();
+    if (!path || sources.has(path)) continue;
+    const source = readFileSync(join(process.cwd(), path), 'utf8');
+    sources.set(path, source);
+    for (const match of source.matchAll(localModulePattern)) {
+      const resolved = resolveLocalModule(path, match[1]);
+      if (!resolved) throw new Error(`Unresolved local import ${match[1]} from ${path}`);
+      pending.push(workspacePath(resolved));
+    }
+  }
+  return [...sources].map(([path, source]) => ({ path, source }));
+}
+
+const publicModeFiles = collectPublicModeFiles();
 
 describe('real-mode privacy isolation', () => {
-  it('contains no client storage, document upload, raw paste, or network-send surface', () => {
-    for (const { path, source } of publicModeFiles) {
-      expect(source, path).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|localStorage\.|sessionStorage\.|document\.cookie/);
-      expect(source, path).not.toMatch(/type=["']file["']|<textarea|dangerouslySetInnerHTML|\/api\/analyze/);
+  it('covers both real routes, compatibility aliases, components, and transitive local modules', () => {
+    const inventoriedPaths = new Set(publicModeFiles.map(({ path }) => path));
+    for (const requiredPath of [
+      'app/review/page.tsx',
+      'app/fastag/page.tsx',
+      'app/manual/challan/page.tsx',
+      'app/toll/page.tsx',
+      'components/guided/GuidedStepHeader.tsx',
+      'lib/citizen-home.ts',
+      'lib/citizen-review-presentation.ts',
+      'lib/domain.ts',
+      'lib/guided-journey.ts',
+      'lib/shared-device-inactivity.ts',
+      'lib/toll-fixtures.ts',
+    ]) {
+      expect(inventoriedPaths.has(requiredPath), requiredPath).toBe(true);
     }
+  });
+
+  it('contains no network-send, persistence, analyze, raw paste, or unsafe HTML surface', () => {
+    for (const { path, source } of publicModeFiles) {
+      expect(source, path).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket\s*\(|EventSource\s*\(/);
+      expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
+      expect(source, path).not.toMatch(/<textarea|dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
+    }
+  });
+
+  it('keeps case and identifier state out of URL, query, and browser history writes', () => {
+    for (const { path, source } of publicModeFiles) {
+      expect(source, path).not.toMatch(/history\.(?:pushState|replaceState)\s*\(|router\.(?:push|replace)\s*\(/);
+      expect(source, path).not.toMatch(/(?:window\.)?location\.(?:search|hash|href)\s*=|window\.location\s*=/);
+      expect(source, path).not.toMatch(/[?&](?:challan|vehicle|registration|plate|phone|email|case|notice|account|transaction|amount)=/i);
+      for (const match of source.matchAll(/window\.location\.replace\(([^)]+)\)/g)) {
+        expect(match[1].trim(), path).toBe("'/'");
+      }
+    }
+
+    const queryReaders = publicModeFiles.filter(({ source }) => source.includes('URLSearchParams'));
+    expect(queryReaders.map(({ path }) => path)).toEqual(['lib/citizen-home.ts']);
+    expect(queryReaders[0].source).toMatch(/new URLSearchParams\(search\)\.get\('goal'\)/);
+    expect(queryReaders[0].source).not.toMatch(/URLSearchParams[\s\S]*?\.(?:set|append|delete)\s*\(/);
+    const queryKeys = publicModeFiles.flatMap(({ source }) => (
+      [...source.matchAll(/[?&]([a-zA-Z0-9_-]+)=/g)].map((match) => match[1])
+    ));
+    expect(new Set(queryKeys)).toEqual(new Set(['goal']));
+  });
+
+  it('allows the native file input only inside controlled LocalRecordIntake', () => {
+    for (const { path, source } of publicModeFiles) {
+      if (path === 'components/public-beta/LocalRecordIntake.tsx') {
+        expect(source, path).toMatch(/type=["']file["']/);
+      } else {
+        expect(source, path).not.toMatch(/type=["']file["']/);
+      }
+    }
+  });
+
+  it('allows object URLs only for controlled previews and existing local artifact downloads', () => {
+    const allowed = new Set([
+      'components/public-beta/CitizenReviewApp.tsx',
+      'components/public-beta/LocalRecordIntake.tsx',
+      'components/public-beta/TollSakshiApp.tsx',
+    ]);
+    for (const { path, source } of publicModeFiles) {
+      if (!allowed.has(path)) expect(source, path).not.toMatch(/URL\.(?:create|revoke)ObjectURL/);
+    }
+
+    const intake = publicModeFiles.find((file) => file.path === 'components/public-beta/LocalRecordIntake.tsx')?.source ?? '';
+    const citizen = publicModeFiles.find((file) => file.path === 'components/public-beta/CitizenReviewApp.tsx')?.source ?? '';
+    const toll = publicModeFiles.find((file) => file.path === 'components/public-beta/TollSakshiApp.tsx')?.source ?? '';
+
+    // Intake URLs preview a user-selected file. The two app URLs wrap generated
+    // local text artifacts; none transmits or persists the selected file.
+    expect(intake).toMatch(/URL\.createObjectURL\(file\)/);
+    expect(citizen).toMatch(/new Blob\(\[summary\]/);
+    expect(toll).toMatch(/new Blob\(\[worksheet\]/);
+    expect(`${citizen}\n${intake}\n${toll}`).not.toMatch(/fetch\s*\([^)]*blob:|sendBeacon\s*\([^)]*blob:/);
   });
 
   it('uses no HTML form that could fall back to a URL or server submission', () => {

@@ -43,6 +43,8 @@ const copy = {
     memory: 'Memory only',
     category: 'MIME category',
     previewReady: 'Local preview ready',
+    recordPdfPreview: 'Official record PDF preview',
+    photoPdfPreview: 'Supplied photograph PDF preview',
     inputRecord: 'Choose an official record from this device',
     inputPhoto: 'Choose a supplied photograph from this device',
     imageAlt: 'Citizen-selected evidence preview',
@@ -76,6 +78,8 @@ const copy = {
     memory: 'केवल मेमोरी में',
     category: 'MIME श्रेणी',
     previewReady: 'स्थानीय प्रीव्यू तैयार है',
+    recordPdfPreview: 'आधिकारिक रिकॉर्ड PDF प्रीव्यू',
+    photoPdfPreview: 'दी गई तस्वीर PDF प्रीव्यू',
     inputRecord: 'इस डिवाइस से आधिकारिक रिकॉर्ड चुनें',
     inputPhoto: 'इस डिवाइस से दी गई तस्वीर चुनें',
     imageAlt: 'नागरिक द्वारा चुनी गई साक्ष्य तस्वीर का प्रीव्यू',
@@ -170,7 +174,11 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
               // eslint-disable-next-line @next/next/no-img-element -- The deliberate local object URL must not be routed through an image service.
               <img src={selection.previewUrl} alt={text.imageAlt} />
             ) : (
-              <object data={selection.previewUrl} type="application/pdf" aria-label={text.previewReady}>
+              <object
+                data={selection.previewUrl}
+                type="application/pdf"
+                aria-label={isPhotograph ? text.photoPdfPreview : text.recordPdfPreview}
+              >
                 <p>{text.pdfFallback}</p>
               </object>
             )}

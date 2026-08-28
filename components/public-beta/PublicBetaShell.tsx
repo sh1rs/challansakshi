@@ -31,13 +31,21 @@ export function PublicBetaShell({
   onSimpleModeChange?: (value: boolean) => void;
 }) {
   return (
-    <div className={styles.app} data-simple-mode={simpleMode === undefined ? undefined : simpleMode}>
+    <div
+      className={styles.app}
+      lang={language}
+      data-simple-mode={simpleMode === undefined ? undefined : simpleMode}
+    >
       <div className={styles.publicBar}>
         <span aria-hidden="true" />
         {t(language, 'Independent public-interest early access · Not a government, bank, court, or toll service', 'स्वतंत्र जनहित अर्ली एक्सेस · यह सरकारी, बैंक, अदालत या टोल सेवा नहीं है')}
       </div>
       <header className={styles.header}>
-        <a className={styles.brand} href="/" aria-label="ChallanSakshi home">
+        <a
+          className={styles.brand}
+          href="/"
+          aria-label={t(language, 'ChallanSakshi home', 'चालान साक्षी होम')}
+        >
           <span className={styles.brandMark} aria-hidden="true">स</span>
           <span><strong>{service}</strong><small>{serviceHindi}</small></span>
         </a>

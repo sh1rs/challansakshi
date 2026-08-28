@@ -1,11 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   buildCitizenEvidenceSummary,
+  buildCitizenEvidencePresentationView,
   buildCitizenEvidenceView,
   buildCitizenTimeline,
+  type ConfirmationStatus,
   type CitizenEvidenceViewInput,
+  type EvidenceConfidence,
 } from '../lib/evidence-intelligence';
-import { assessCitizenChallanReview } from '../lib/public-challan';
+import {
+  getCitizenReviewPresentation,
+  localizeAssessment,
+  localizeEvidenceLimitation,
+} from '../lib/citizen-review-presentation';
+import { assessCitizenChallanReview, citizenSituationForFinding } from '../lib/public-challan';
 
 const answers = {
   sourceStatus: 'downloaded-official-record' as const,
@@ -26,6 +34,17 @@ const assessment = assessCitizenChallanReview(answers);
 void ({ answers, assessment } satisfies CitizenEvidenceViewInput);
 
 describe('citizen evidence intelligence', () => {
+  it('keeps canonical confidence and confirmation values strongly typed', () => {
+    const view = buildCitizenEvidenceView({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+    });
+
+    expectTypeOf(view.observations[0].confidence).toEqualTypeOf<EvidenceConfidence>();
+    expectTypeOf(view.observations[0].confirmation).toEqualTypeOf<ConfirmationStatus>();
+  });
+
   it('labels a downloaded record as citizen-declared rather than government-authenticated', () => {
     const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', recordName: 'challan.pdf', photographName: 'photo.jpg' });
     expect(view.sources[0]).toMatchObject({
@@ -134,7 +153,7 @@ describe('citizen evidence intelligence', () => {
       'You started a private review',
       'You selected a downloaded record',
       'You added a supplied photograph',
-      'You confirmed the record source',
+      'You recorded the record source',
       'You recorded evidence observations',
       'You generated a local case summary',
     ]);
@@ -143,6 +162,50 @@ describe('citizen evidence intelligence', () => {
       expect.objectContaining({ id: 'timeline-summary-generated', actor: 'citizen' }),
     ]));
     expect(JSON.stringify(timeline)).not.toMatch(/authority|received|accepted|rejected|quashed|timestamp/i);
+  });
+
+  it('localizes the evidence view fields, values, sources, confidence, confirmation, and limitations', () => {
+    const canonicalView = buildCitizenEvidenceView({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      recordName: 'challan.pdf',
+      photographName: 'photo.jpg',
+    });
+    const view = buildCitizenEvidencePresentationView(canonicalView, {
+      language: 'hi',
+      simpleMode: false,
+    });
+
+    expect(view.sources[0].label).toContain('नागरिक');
+    expect(view.observations.find((item) => item.id === 'observation-registration-plate')).toMatchObject({
+      field: 'नंबर प्लेट',
+      value: 'अलग',
+      confidence: 'उच्च',
+      confirmation: 'नागरिक द्वारा पुष्ट',
+    });
+    expect(view.observations.find((item) => item.id === 'observation-alleged-offence')?.limitation)
+      .toContain('नागरिक ने दर्ज किया');
+  });
+
+  it('localizes every citizen timeline event in Hindi', () => {
+    const timeline = buildCitizenTimeline({
+      recordSelected: true,
+      imageSelected: true,
+      sourceConfirmed: true,
+      observationsConfirmed: true,
+      summaryGenerated: true,
+      language: 'hi',
+    });
+
+    expect(timeline.map((event) => event.label)).toEqual([
+      'आपने निजी समीक्षा शुरू की',
+      'आपने डाउनलोड किया रिकॉर्ड चुना',
+      'आपने दी गई तस्वीर जोड़ी',
+      'आपने रिकॉर्ड का स्रोत दर्ज किया',
+      'आपने सबूत के अवलोकन पुष्ट किए',
+      'आपने स्थानीय केस सारांश बनाया',
+    ]);
   });
 
   it('generates a minimised summary with ordered sections, the mandatory disclaimer, and no file bytes', () => {
@@ -181,6 +244,175 @@ describe('citizen evidence intelligence', () => {
     expect(summary).not.toContain('data:');
     expect(summary).not.toContain('blob:');
     expect(summary).not.toContain('file bytes');
+  });
+
+  it('generates a reviewed Hindi summary while retaining the exact English disclaimer', () => {
+    const summary = buildCitizenEvidenceSummary({
+      jurisdiction: 'राष्ट्रीय ई-चालान',
+      vehicleSuffix: '3317',
+      allegedOffence: 'हेलमेट',
+      eventDate: '2026-08-20',
+      officialDeadline: '',
+      recordName: 'challan.pdf',
+      photographName: 'photo.jpg',
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      language: 'hi',
+      simpleMode: true,
+      timeline: buildCitizenTimeline({
+        recordSelected: true,
+        imageSelected: true,
+        sourceConfirmed: true,
+        observationsConfirmed: true,
+        summaryGenerated: true,
+        language: 'hi',
+      }),
+    });
+
+    expect(summary).toContain('CHALLANSAKSHI — आपका स्थानीय सारांश');
+    expect(summary).toContain('Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.');
+    expect(summary).toContain('नागरिक ने ChallanSakshi का उपयोग करके तैयार किया। किसी सरकारी प्राधिकरण को जमा नहीं किया गया, प्रमाणित नहीं किया गया और मंज़ूर नहीं किया गया।');
+    expect(summary).toContain('आपकी जानकारी');
+    expect(summary).toContain('नंबर प्लेट: अलग');
+    expect(summary).toContain('आपने स्थानीय केस सारांश बनाया');
+    expect(summary).not.toContain('You recorded that the readable plate details differ.');
+    expect(summary).not.toContain('A copy of the official notice');
+  });
+
+  it('uses reviewed Hindi fallbacks for manual entry with no files or optional facts', () => {
+    const manualAnswers = {
+      ...answers,
+      sourceStatus: 'official-service' as const,
+      ownRecordAvailable: 'unclear' as const,
+      noticeCopyAvailable: 'unclear' as const,
+    };
+    const manualAssessment = assessCitizenChallanReview(manualAnswers);
+    const canonicalView = buildCitizenEvidenceView({
+      answers: manualAnswers,
+      assessment: manualAssessment,
+      confirmation: 'confirmed',
+    });
+    const view = buildCitizenEvidencePresentationView(canonicalView, {
+      language: 'hi',
+      simpleMode: false,
+    });
+    const summary = buildCitizenEvidenceSummary({
+      jurisdiction: '',
+      vehicleSuffix: '',
+      allegedOffence: '',
+      eventDate: '',
+      officialDeadline: '',
+      answers: manualAnswers,
+      assessment: manualAssessment,
+      confirmation: 'confirmed',
+      language: 'hi',
+      simpleMode: false,
+      timeline: [],
+    });
+
+    expect(view.sources.map((source) => source.label)).toEqual([
+      'नागरिक द्वारा दर्ज आधिकारिक सेवा रिकॉर्ड',
+      'नागरिक द्वारा वर्णित दी गई तस्वीर',
+      'नागरिक द्वारा दर्ज वाहन रिकॉर्ड: अस्पष्ट',
+    ]);
+    expect(summary).toContain('क्षेत्राधिकार या सेवा: [दर्ज नहीं]');
+    expect(summary).toContain('वाहन नंबर के अंतिम अक्षर/अंक: [दर्ज नहीं]');
+    expect(summary).toContain('आरोपित अपराध श्रेणी: [दर्ज नहीं]');
+    expect(summary).not.toMatch(/\[not entered\]|Citizen-declared|Citizen-described|Citizen-reported/);
+  });
+
+  it('simplifies assessment presentation without changing codes, order, or readiness', () => {
+    const reviewAnswers = {
+      ...answers,
+      categoryObservation: 'match' as const,
+      ownRecordAvailable: 'unclear' as const,
+      noticeCopyAvailable: 'missing' as const,
+    };
+    const reviewAssessment = assessCitizenChallanReview(reviewAnswers);
+    const unchangedAssessment = structuredClone(reviewAssessment);
+    const standard = localizeAssessment(reviewAssessment, 'en', false);
+    const simple = localizeAssessment(reviewAssessment, 'en', true);
+    const simpleHindi = localizeAssessment(reviewAssessment, 'hi', true);
+
+    expect(standard.materialSignals[0]).toBe('You recorded that the readable plate details differ.');
+    expect(simple.materialSignals[0]).toBe('The number plate looks different.');
+    expect(simple.cautions[0]).toBe('These are your answers. ChallanSakshi did not check the records.');
+    expect(simple.missingEvidence).toEqual(['A readable vehicle record', 'The official notice copy']);
+    expect(simpleHindi.materialSignals[0]).toBe('नंबर प्लेट अलग दिखती है।');
+    expect(simpleHindi.cautions[0]).toBe('ये आपके उत्तर हैं। ChallanSakshi ने रिकॉर्ड नहीं जाँचे।');
+    expect(simpleHindi.missingEvidence).toEqual(['पढ़ने योग्य वाहन रिकॉर्ड', 'आधिकारिक नोटिस की कॉपी']);
+    expect(simple.materialSignals).toHaveLength(reviewAssessment.materialSignals.length);
+    expect(simple.cautions).toHaveLength(reviewAssessment.cautions.length);
+    expect(reviewAssessment).toEqual(unchangedAssessment);
+    expect(assessCitizenChallanReview(reviewAnswers)).toEqual(unchangedAssessment);
+    expect(citizenSituationForFinding(reviewAssessment.finding)).toBe(
+      citizenSituationForFinding(unchangedAssessment.finding),
+    );
+  });
+
+  it('simplifies evidence limitations in both languages', () => {
+    const limitation = 'The citizen recorded that the supplied still does not show the registration plate clearly.';
+
+    expect(localizeEvidenceLimitation(limitation, 'en', false)).toBe(limitation);
+    expect(localizeEvidenceLimitation(limitation, 'en', true)).toBe(
+      'The number plate is not clear enough to read.',
+    );
+    expect(localizeEvidenceLimitation(limitation, 'hi', false)).toBe(
+      'नागरिक ने दर्ज किया कि दी गई तस्वीर में नंबर प्लेट साफ़ नहीं दिखती।',
+    );
+    expect(localizeEvidenceLimitation(limitation, 'hi', true)).toBe(
+      'नंबर प्लेट साफ़ नहीं पढ़ी जा सकती।',
+    );
+  });
+
+  it.each([
+    ['en', 'YOUR INFORMATION', 'WHAT YOU SAW', 'Please check these facts on the official service.'],
+    ['hi', 'आपकी जानकारी', 'आपने क्या देखा', 'इन तथ्यों को आधिकारिक सेवा पर जाँचें।'],
+  ] as const)('uses a complete simple %s artifact template', (language, detailsHeading, observationsHeading, bodySentence) => {
+    const summary = buildCitizenEvidenceSummary({
+      jurisdiction: language === 'hi' ? 'राष्ट्रीय ई-चालान' : 'National e-Challan',
+      vehicleSuffix: '3317',
+      allegedOffence: language === 'hi' ? 'हेलमेट' : 'Helmet',
+      eventDate: '2026-08-20',
+      officialDeadline: '',
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      language,
+      simpleMode: true,
+      timeline: buildCitizenTimeline({
+        recordSelected: false,
+        imageSelected: false,
+        sourceConfirmed: true,
+        observationsConfirmed: true,
+        summaryGenerated: true,
+        language,
+      }),
+    });
+
+    expect(summary).toContain(detailsHeading);
+    expect(summary).toContain(observationsHeading);
+    expect(summary).toContain(bodySentence);
+    expect(summary).toContain('Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.');
+    expect(summary).not.toMatch(/MINIMISED CASE DETAILS|NEUTRAL CLARIFICATION REQUEST|न्यूनतम केस विवरण|तटस्थ स्पष्टीकरण अनुरोध/);
+  });
+
+  it('provides distinct simple result-section headings in English and Hindi', () => {
+    expect(getCitizenReviewPresentation('en', true).resultSections).toEqual({
+      established: 'What is clear',
+      unclear: 'What is not clear',
+      missing: 'What you still need',
+      evidence: 'Your evidence notes',
+      officialRoute: 'Where to go next',
+    });
+    expect(getCitizenReviewPresentation('hi', true).resultSections).toEqual({
+      established: 'क्या साफ़ है',
+      unclear: 'क्या साफ़ नहीं है',
+      missing: 'आपको अभी क्या चाहिए',
+      evidence: 'आपके सबूत के नोट',
+      officialRoute: 'आगे कहाँ जाएँ',
+    });
   });
 
   it('sanitises hostile summary fields and keeps only canonical citizen timeline events', () => {

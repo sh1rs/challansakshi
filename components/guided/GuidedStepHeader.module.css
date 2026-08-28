@@ -26,7 +26,7 @@
 .status[data-tone='ready'], .status[data-tone='complete'] { border-color: #a9cfbf; background: #f1faf6; }
 .status[data-tone='ready'] strong, .status[data-tone='complete'] strong { color: #17614e; }
 .stepList { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
-.stepList li { display: flex; align-items: center; gap: 8px; min-width: 0; color: #71827c; }
+.stepList li { display: flex; align-items: center; gap: 8px; min-width: 0; color: #4e625c; }
 .stepList li > span { width: 25px; height: 25px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid #c4d2cd; border-radius: 50%; background: #fff; font-size: 9px; font-weight: 900; }
 .stepList small { overflow: hidden; font-size: 10px; font-weight: 760; line-height: 1.3; text-overflow: ellipsis; }
 .stepList li[data-state='current'] { color: #135c55; }
@@ -40,7 +40,17 @@
   .guideTopline span { display: none; }
   .primaryInstruction h2 { font-size: 24px; }
   .guideDetails { grid-template-columns: 1fr; }
+  .guideDetails p, .guideDetails strong { font-size: 16px; }
   .stepList { display: none; }
+}
+
+@media (max-width: 420px) {
+  .guideTopline p,
+  .guideTopline span,
+  .primaryInstruction > span,
+  .guideDetails > div > span,
+  .guideDetails p,
+  .guideDetails strong { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) { .progressTrack span { transition: none; } }
