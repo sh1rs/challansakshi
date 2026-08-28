@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessCitizenChallanReview, buildCitizenChallanWorksheet, calculateEnteredOfficialDeadline, type CitizenChallanAnswers } from '../lib/public-challan';
+import { assessCitizenChallanReview, buildCitizenChallanWorksheet, calculateEnteredOfficialDeadline, citizenSituationForFinding, type CitizenChallanAnswers } from '../lib/public-challan';
 
 const complete: CitizenChallanAnswers = {
   sourceStatus: 'official-service', imageInspected: true, plateObservation: 'match', categoryObservation: 'match', colourObservation: 'match',
@@ -62,6 +62,16 @@ describe('public challan self-review', () => {
     expect(calculateEnteredOfficialDeadline('2026-09-02', '2026-08-28').daysRemaining).toBe(5);
     expect(calculateEnteredOfficialDeadline('2026-08-20', '2026-08-28').status).toBe('passed');
     expect(() => calculateEnteredOfficialDeadline('2026-02-30', '2026-08-28')).toThrow();
+  });
+
+  it.each([
+    ['source-not-verified', 'source-not-verified'],
+    ['insufficient-review', 'insufficient-review'],
+    ['entries-do-not-support-mismatch', 'records-appear-consistent'],
+    ['supplied-image-unclear', 'evidence-unclear'],
+    ['citizen-recorded-inconsistency', 'material-inconsistency-recorded'],
+  ] as const)('maps the stable citizen situation alias for %s', (finding, situation) => {
+    expect(citizenSituationForFinding(finding)).toBe(situation);
   });
 
   it('places the no-inspection boundary at the start of every worksheet', () => {

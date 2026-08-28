@@ -9,6 +9,13 @@ export type CitizenReviewFinding =
   | 'entries-do-not-support-mismatch'
   | 'insufficient-review';
 
+export type CitizenSituation =
+  | 'source-not-verified'
+  | 'insufficient-review'
+  | 'records-appear-consistent'
+  | 'evidence-unclear'
+  | 'material-inconsistency-recorded';
+
 export interface CitizenChallanAnswers {
   sourceStatus: OfficialSourceStatus;
   imageInspected: boolean;
@@ -29,6 +36,13 @@ export interface CitizenReviewAssessment {
   materialSignals: string[];
   cautions: string[];
   missingEvidence: string[];
+}
+
+export function citizenSituationForFinding(finding: CitizenReviewFinding): CitizenSituation {
+  if (finding === 'citizen-recorded-inconsistency') return 'material-inconsistency-recorded';
+  if (finding === 'supplied-image-unclear') return 'evidence-unclear';
+  if (finding === 'entries-do-not-support-mismatch') return 'records-appear-consistent';
+  return finding;
 }
 
 export interface OfficialDeadlineStatus {
