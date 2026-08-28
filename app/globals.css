@@ -217,6 +217,7 @@ h1 em { color: var(--teal); font-weight: inherit; }
 .progress li.done { color: #516b64; }
 .progress li.done > span { border-color: #8fb9ae; background: #dff2eb; color: var(--teal-dark); }
 .screen-shell { min-height: 70vh; padding-block: 36px 90px; }
+.synthetic-guide-before-screen + .screen-shell { padding-top: 0; }
 .back-button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0; border: 0; background: transparent; color: #53665f; font-size: 13px; font-weight: 760; cursor: pointer; }
 .back-button span { font-size: 18px; }
 .screen-heading { max-width: 760px; margin-top: 38px; }

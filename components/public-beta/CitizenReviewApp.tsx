@@ -1,8 +1,10 @@
 'use client';
 /* eslint-disable @next/next/no-html-link-for-pages -- a full same-origin navigation intentionally clears memory-only real-case state. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { GuidedStepHeader } from '../guided/GuidedStepHeader';
 import type { Language } from '../../lib/domain';
+import { buildChallanGuidedProgress, getChallanGuideContent } from '../../lib/guided-journey';
 import {
   assessCitizenChallanReview,
   buildCitizenChallanWorksheet,
@@ -32,8 +34,6 @@ const defaultAnswers: CitizenChallanAnswers = {
   noticeCopyAvailable: 'unclear',
   custodyRecordAvailable: 'not-applicable',
 };
-
-const steps: Step[] = ['safety', 'source', 'observations', 'result'];
 
 function t(language: Language, en: string, hi: string) {
   return language === 'hi' ? hi : en;
@@ -90,6 +90,8 @@ export default function CitizenReviewApp() {
   const [offence, setOffence] = useState('');
   const [error, setError] = useState('');
   const [artifactStatus, setArtifactStatus] = useState('');
+  const guideHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStepRef = useRef<Step>(step);
 
   const currentReviewSignature = useMemo(() => JSON.stringify({ answers, jurisdiction, vehicleSuffix, eventDate, officialDeadline, offence }), [answers, jurisdiction, vehicleSuffix, eventDate, officialDeadline, offence]);
   const helperFinalConfirmed = helperConfirmationSignature !== '' && helperConfirmationSignature === currentReviewSignature;
@@ -109,6 +111,20 @@ export default function CitizenReviewApp() {
     assessment,
     answers,
   }), [jurisdiction, vehicleSuffix, offence, eventDate, officialDeadline, assessment, answers]);
+  const safetyReady = Boolean(role && device && consent.manual && consent.minimum && (role !== 'helper' || consent.citizenConfirmed));
+  const observationsReady = (role !== 'helper' || helperFinalConfirmed)
+    && (vehicleSuffix.length === 0 || vehicleSuffix.length === 4)
+    && (!officialDeadline || Boolean(deadline));
+  const guide = getChallanGuideContent({
+    step,
+    safetyReady,
+    sourceStatus: answers.sourceStatus,
+    jurisdictionSelected: Boolean(jurisdiction && jurisdiction !== 'Not sure' && jurisdiction !== 'Virtual Court / court notice'),
+    observationsReady,
+    worksheetAvailable: assessment.canPrepareWorksheet,
+    exportAllowed: device !== 'shared',
+  });
+  const guideProgress = buildChallanGuidedProgress(step, answers.sourceStatus);
 
   const reset = () => {
     setStep('safety');
@@ -168,6 +184,12 @@ export default function CitizenReviewApp() {
       document.removeEventListener('visibilitychange', refreshReferenceDate);
     };
   }, []);
+
+  useEffect(() => {
+    if (previousStepRef.current === step) return;
+    previousStepRef.current = step;
+    guideHeadingRef.current?.focus();
+  }, [step]);
 
   const quickExit = () => {
     reset();
@@ -247,7 +269,6 @@ export default function CitizenReviewApp() {
     setArtifactStatus(t(language, 'Downloaded locally. ChallanSakshi cannot erase the Downloads copy.', 'स्थानीय रूप से डाउनलोड हुआ। ChallanSakshi डाउनलोड की कॉपी मिटा नहीं सकता।'));
   };
 
-  const progressIndex = steps.indexOf(step);
   const observationOptions: Array<[Observation, string]> = [
     ['match', t(language, 'Appears to match', 'मेल खाता दिखता है')],
     ['different', t(language, 'Appears materially different', 'महत्वपूर्ण रूप से अलग दिखता है')],
@@ -264,7 +285,22 @@ export default function CitizenReviewApp() {
   return (
     <PublicBetaShell language={language} setLanguage={setLanguage} service="ChallanSakshi" serviceHindi="चालान साक्षी" onQuickExit={quickExit} englishOnly>
       <main className={styles.main}>
-        <section className={styles.hero}>
+        <GuidedStepHeader
+          {...guide}
+          steps={guideProgress}
+          progressLabel={t(language, 'e-Challan review progress', 'ई-चालान समीक्षा प्रगति')}
+          headingRef={guideHeadingRef}
+          headingId="challan-guided-step-title"
+          labels={{
+            doNow: t(language, 'Do this now', 'अभी यह करें'),
+            why: t(language, 'Why this matters', 'यह क्यों ज़रूरी है'),
+            status: t(language, 'Status', 'स्थिति'),
+            next: t(language, 'Next', 'आगे'),
+            allSteps: t(language, 'See all steps', 'सभी चरण देखें'),
+          }}
+        />
+
+        <section className={`${styles.hero} ${styles.heroCompact}`}>
           <div>
             <p className={styles.eyebrow}>{t(language, 'Local manual workspace', 'स्थानीय मैन्युअल कार्यक्षेत्र')}</p>
             <h1>{t(language, 'Inspect the official record. Record only ', 'आधिकारिक रिकॉर्ड देखें। केवल वही दर्ज करें जो ')}<em>{t(language, 'what you can see.', 'आप देख सकते हैं।')}</em></h1>
@@ -283,18 +319,24 @@ export default function CitizenReviewApp() {
 
         <SafetyBoundary language={language} />
 
-        <ol className={styles.progress} aria-label={t(language, 'Review progress', 'समीक्षा प्रगति')}>
-          {steps.map((item, index) => <li key={item} className={index < progressIndex ? styles.stepDone : index === progressIndex ? styles.stepActive : ''}><span>{index < progressIndex ? '✓' : index + 1}</span>{[t(language, 'Safety', 'सुरक्षा'), t(language, 'Source', 'स्रोत'), t(language, 'Observe', 'अवलोकन'), t(language, 'Next step', 'अगला कदम')][index]}</li>)}
-        </ol>
-
         {step === 'safety' && (
           <section className={styles.panel} aria-labelledby="safety-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Before any case detail', 'किसी भी मामले की जानकारी से पहले')}</p><h2 id="safety-title">{t(language, 'Set the privacy boundary', 'गोपनीयता सीमा तय करें')}</h2><p>{t(language, 'Case answers are not persisted by this app. Reloading, closing, or quick-exiting clears them from page memory. The host still receives technical request logs; downloads, clipboard copies, screenshots, and browser history are outside that clear action.', 'मामले के उत्तर इस ऐप द्वारा स्थायी रूप से सेव नहीं होते। रीलोड, बंद करने या तुरंत बाहर निकलने पर वे पेज मेमोरी से साफ़ होते हैं। होस्ट को तकनीकी अनुरोध लॉग मिलते हैं; डाउनलोड, क्लिपबोर्ड, स्क्रीनशॉट और ब्राउज़र इतिहास इस सफ़ाई से बाहर हैं।')}</p></div><span className={styles.stepTag}>01 / 04</span></div>
+            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Before any case detail', 'किसी भी मामले की जानकारी से पहले')}</p><h2 id="safety-title">{t(language, 'Set the privacy boundary', 'गोपनीयता सीमा तय करें')}</h2><p>{t(language, 'Case answers are not persisted by this app. Reloading, closing, or quick-exiting clears them from page memory. The host still receives technical request logs; downloads, clipboard copies, screenshots, and browser history are outside that clear action.', 'मामले के उत्तर इस ऐप द्वारा स्थायी रूप से सेव नहीं होते। रीलोड, बंद करने या तुरंत बाहर निकलने पर वे पेज मेमोरी से साफ़ होते हैं। होस्ट को तकनीकी अनुरोध लॉग मिलते हैं; डाउनलोड, क्लिपबोर्ड, स्क्रीनशॉट और ब्राउज़र इतिहास इस सफ़ाई से बाहर हैं।')}</p></div></div>
             <div className={styles.choiceGrid}>
-              <button type="button" className={`${styles.choice} ${role === 'self' ? styles.choiceActive : ''}`} onClick={() => { setRole('self'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'This is my case', 'यह मेरा मामला है')}</strong><small>{t(language, 'I will record only my own observations.', 'मैं केवल अपने अवलोकन दर्ज करूँगा/करूँगी।')}</small></button>
-              <button type="button" className={`${styles.choice} ${role === 'helper' ? styles.choiceActive : ''}`} onClick={() => { setRole('helper'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'I am helping someone present', 'मैं सामने मौजूद किसी व्यक्ति की मदद कर रहा/रही हूँ')}</strong><small>{t(language, 'They have agreed; I will not infer answers or collect their identity.', 'उन्होंने सहमति दी है; मैं उत्तर का अनुमान या उनकी पहचान दर्ज नहीं करूँगा/करूँगी।')}</small></button>
-              <button type="button" className={`${styles.choice} ${device === 'private' ? styles.choiceActive : ''}`} onClick={() => setDevice('private')}><strong>{t(language, 'Private device', 'निजी डिवाइस')}</strong><small>{t(language, 'Copy and download can be enabled at the end.', 'अंत में कॉपी और डाउनलोड उपलब्ध होंगे।')}</small></button>
-              <button type="button" className={`${styles.choice} ${device === 'shared' ? styles.choiceActive : ''}`} onClick={() => setDevice('shared')}><strong>{t(language, 'Shared or public device', 'साझा या सार्वजनिक डिवाइस')}</strong><small>{t(language, 'In-app copy/download controls stay disabled; the page attempts to leave after about 10 minutes of inactivity. Use Quick exit when done.', 'ऐप के कॉपी/डाउनलोड नियंत्रण बंद रहते हैं; लगभग 10 मिनट निष्क्रिय रहने पर पेज बाहर निकलने का प्रयास करता है। अंत में तुरंत बाहर निकलें।')}</small></button>
+              <fieldset className={styles.choiceFieldset}>
+                <legend className={styles.choiceLegend}>{t(language, 'A. Who is reviewing this case?', 'A. इस मामले की समीक्षा कौन कर रहा है?')}</legend>
+                <div className={styles.choiceGroup}>
+                  <button type="button" aria-pressed={role === 'self'} className={`${styles.choice} ${role === 'self' ? styles.choiceActive : ''}`} onClick={() => { setRole('self'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'This is my case', 'यह मेरा मामला है')}</strong><small>{t(language, 'I will record only my own observations.', 'मैं केवल अपने अवलोकन दर्ज करूँगा/करूँगी।')}</small></button>
+                  <button type="button" aria-pressed={role === 'helper'} className={`${styles.choice} ${role === 'helper' ? styles.choiceActive : ''}`} onClick={() => { setRole('helper'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'I am helping someone who is present', 'मैं सामने मौजूद किसी व्यक्ति की मदद कर रहा/रही हूँ')}</strong><small>{t(language, 'They have agreed; I will not infer answers or collect their identity.', 'उन्होंने सहमति दी है; मैं उत्तर का अनुमान या उनकी पहचान दर्ज नहीं करूँगा/करूँगी।')}</small></button>
+                </div>
+              </fieldset>
+              <fieldset className={styles.choiceFieldset}>
+                <legend className={styles.choiceLegend}>{t(language, 'B. What kind of device is this?', 'B. यह किस तरह का डिवाइस है?')}</legend>
+                <div className={styles.choiceGroup}>
+                  <button type="button" aria-pressed={device === 'private'} className={`${styles.choice} ${device === 'private' ? styles.choiceActive : ''}`} onClick={() => setDevice('private')}><strong>{t(language, 'Private device', 'निजी डिवाइस')}</strong><small>{t(language, 'Copy and download can be enabled at the end.', 'अंत में कॉपी और डाउनलोड उपलब्ध होंगे।')}</small></button>
+                  <button type="button" aria-pressed={device === 'shared'} className={`${styles.choice} ${device === 'shared' ? styles.choiceActive : ''}`} onClick={() => setDevice('shared')}><strong>{t(language, 'Shared or public device', 'साझा या सार्वजनिक डिवाइस')}</strong><small>{t(language, 'In-app copy/download controls stay disabled; the page attempts to leave after about 10 minutes of inactivity. Use Quick exit when done.', 'ऐप के कॉपी/डाउनलोड नियंत्रण बंद रहते हैं; लगभग 10 मिनट निष्क्रिय रहने पर पेज बाहर निकलने का प्रयास करता है। अंत में तुरंत बाहर निकलें।')}</small></button>
+                </div>
+              </fieldset>
             </div>
             <div className={styles.acknowledgements}>
               <label className={styles.check}><input type="checkbox" checked={consent.manual} onChange={(event) => setConsent({ ...consent, manual: event.target.checked })} />{t(language, 'I understand this is manual self-review, not document analysis, filing, payment, or legal advice.', 'मैं समझता/समझती हूँ कि यह मैन्युअल स्वयं-समीक्षा है, दस्तावेज़ विश्लेषण, फाइलिंग, भुगतान या कानूनी सलाह नहीं।')}</label>
@@ -309,7 +351,7 @@ export default function CitizenReviewApp() {
 
         {step === 'source' && (
           <section className={styles.panel} aria-labelledby="source-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Source before facts', 'तथ्यों से पहले स्रोत')}</p><h2 id="source-title">{t(language, 'How did you independently obtain the record?', 'आपने रिकॉर्ड स्वतंत्र रूप से कैसे प्राप्त किया?')}</h2><p>{t(language, 'Do not trust a link, number, or payment route merely because it appears in a message.', 'किसी संदेश में लिंक, नंबर या भुगतान रास्ता होने मात्र से उस पर भरोसा न करें।')}</p></div><span className={styles.stepTag}>02 / 04</span></div>
+            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Source before facts', 'तथ्यों से पहले स्रोत')}</p><h2 id="source-title">{t(language, 'How did you independently obtain the record?', 'आपने रिकॉर्ड स्वतंत्र रूप से कैसे प्राप्त किया?')}</h2><p>{t(language, 'Do not trust a link, number, or payment route merely because it appears in a message.', 'किसी संदेश में लिंक, नंबर या भुगतान रास्ता होने मात्र से उस पर भरोसा न करें।')}</p></div></div>
             <div className={styles.choiceGrid}>
               {([
                 ['official-service', t(language, 'I opened the official service myself', 'मैंने आधिकारिक सेवा खुद खोली'), t(language, 'The record/status is visible there.', 'रिकॉर्ड/स्थिति वहाँ दिखाई दे रही है।')],
@@ -326,13 +368,13 @@ export default function CitizenReviewApp() {
               ]} />
             </div>
             {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('safety')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueSource}>{t(language, 'Continue', 'आगे बढ़ें')} →</button></div>
+            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('safety')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueSource}>{answers.sourceStatus === 'message-only' ? t(language, 'See the safe next step', 'सुरक्षित अगला कदम देखें') : t(language, 'Continue to evidence comparison', 'सबूत की तुलना पर आगे बढ़ें')} →</button></div>
           </section>
         )}
 
         {step === 'observations' && (
           <section className={styles.panel} aria-labelledby="observe-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Your observation—not extraction', 'आपका अवलोकन—न कि निष्कर्षण')}</p><h2 id="observe-title">{t(language, 'Record only what the official evidence shows', 'केवल वही दर्ज करें जो आधिकारिक सबूत दिखाता है')}</h2><p>{t(language, 'Use the official record in a separate tab or device. Do not paste it here.', 'आधिकारिक रिकॉर्ड अलग टैब या डिवाइस में देखें। उसे यहाँ पेस्ट न करें।')}</p></div><span className={styles.stepTag}>03 / 04</span></div>
+            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Your observation—not extraction', 'आपका अवलोकन—न कि निष्कर्षण')}</p><h2 id="observe-title">{t(language, 'Record only what the official evidence shows', 'केवल वही दर्ज करें जो आधिकारिक सबूत दिखाता है')}</h2><p>{t(language, 'Use the official record in a separate tab or device. Do not paste it here.', 'आधिकारिक रिकॉर्ड अलग टैब या डिवाइस में देखें। उसे यहाँ पेस्ट न करें।')}</p></div></div>
             <div className={styles.formGrid}>
               <div className={styles.field}><label htmlFor="vehicle-suffix">{t(language, 'Your vehicle registration — last 4 only (optional)', 'आपका वाहन नंबर — केवल अंतिम 4 (वैकल्पिक)')}</label><input id="vehicle-suffix" value={vehicleSuffix} inputMode="text" maxLength={4} autoComplete="off" placeholder="3317" onChange={(event) => setVehicleSuffix(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))} /><small>{t(language, 'Never enter the full registration.', 'पूरा वाहन नंबर कभी दर्ज न करें।')}</small></div>
               <div className={styles.field}><label htmlFor="event-date">{t(language, 'Event date shown (optional)', 'दिखाई गई घटना तारीख (वैकल्पिक)')}</label><input id="event-date" type="date" value={eventDate} max={indiaDateNow()} onInput={(event) => setEventDate(event.currentTarget.value)} onChange={(event) => setEventDate(event.target.value)} /><small>{t(language, 'Do not substitute the message-received date.', 'संदेश मिलने की तारीख को घटना तारीख न मानें।')}</small></div>
@@ -358,13 +400,13 @@ export default function CitizenReviewApp() {
             </div>
             {role === 'helper' && <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={helperFinalConfirmed} onChange={(event) => setHelperConfirmationSignature(event.target.checked ? currentReviewSignature : '')} />{t(language, 'The citizen is still present. I read back these final observations and they confirmed each answer. Any later edit requires confirmation again.', 'नागरिक अभी मौजूद है। मैंने अंतिम अवलोकन पढ़कर सुनाए और उन्होंने हर उत्तर की पुष्टि की। बाद का कोई भी बदलाव फिर पुष्टि माँगेगा।')}</label></div>}
             {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('source')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueObservations}>{t(language, 'Build my local review', 'मेरी स्थानीय समीक्षा बनाएँ')} →</button></div>
+            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('source')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueObservations}>{t(language, 'Show what my entries support', 'दिखाएँ कि मेरी प्रविष्टियाँ क्या समर्थन करती हैं')} →</button></div>
           </section>
         )}
 
         {step === 'result' && (
           <section className={styles.panel} aria-labelledby="result-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Conservative result', 'सावधान नतीजा')}</p><h2 id="result-title">{t(language, 'What your answers support—and do not support', 'आपके उत्तर क्या समर्थन करते हैं—और क्या नहीं')}</h2></div><span className={styles.stepTag}>04 / 04</span></div>
+            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Conservative result', 'सावधान नतीजा')}</p><h2 id="result-title">{t(language, 'What your answers support—and do not support', 'आपके उत्तर क्या समर्थन करते हैं—और क्या नहीं')}</h2></div></div>
             <div className={styles.resultHero} data-tone={resultCopy.tone}><span className={styles.resultIcon} aria-hidden="true">{resultCopy.tone === 'good' ? '✓' : resultCopy.tone === 'stop' ? 'i' : '!'}</span><div><h2>{resultCopy.title}</h2><p>{resultCopy.body}</p><p><strong>{t(language, 'Based only on your answers.', 'केवल आपके उत्तरों पर आधारित।')}</strong> {t(language, 'ChallanSakshi did not inspect the photograph, challan, RC, authority record, or official status.', 'ChallanSakshi ने तस्वीर, चालान, RC, प्राधिकरण रिकॉर्ड या आधिकारिक स्थिति नहीं देखी।')}</p></div></div>
 
             {answers.sourceStatus === 'message-only' ? (

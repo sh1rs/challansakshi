@@ -109,7 +109,7 @@ tests/toll-domain.test.ts                  toll reconciliation and refusal rules
 tests/public-mode-privacy.test.ts          static network/storage/upload/form isolation gate
 ```
 
-The application uses the Sites Next-compatible scaffold (React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, Cloudflare Worker-compatible ESM output). There is no account system, case database, payment, real filing, or live government/bank integration. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers are never passed into that contract.
+The application uses React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, and direct Cloudflare Worker-compatible ESM output. There is no account system, case database, payment, real filing, or live government/bank integration. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers are never passed into that contract.
 
 ### AI versus deterministic rules
 
@@ -195,7 +195,7 @@ pnpm run build
 
 ## Deployment
 
-The repository includes `.openai/hosting.json` and is deployment-ready for OpenAI Sites. Set `NEXT_PUBLIC_SITE_URL` to the trusted production origin before the final production build so Open Graph image URLs are absolute.
+Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration. Deploy with `pnpm run deploy:cloudflare` after authenticating Wrangler with the Cloudflare account that owns the `sh1rs.com` zone.
 
 For another common host, install dependencies, configure the optional environment variables, and run `pnpm run build`. No persistent service or paid infrastructure is required.
 

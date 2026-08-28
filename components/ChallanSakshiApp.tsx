@@ -71,6 +71,8 @@ import {
   NoticePreflight,
   ReadingDataOptions,
 } from './EvidencePassport';
+import { GuidedStepHeader } from './guided/GuidedStepHeader';
+import { getSyntheticGuide, type SyntheticGuideState, type SyntheticGuidedScreen } from '../lib/guided-journey';
 
 type AnalysisMode = 'precomputed' | 'live' | 'fallback';
 type Pair = { en: string; hi: string };
@@ -108,7 +110,6 @@ const PREFERENCES_KEY = 'challansakshi-ui-v1';
 const OLD_STORAGE_KEYS = ['challansakshi-demo-v4', 'challansakshi-demo-v3', 'challansakshi-demo-v2', 'challansakshi-demo-v1'];
 const ORDER_FACT_IDS: OrderFactId[] = ['order-id', 'grievance-id', 'challan-id', 'order-date', 'outcome', 'reason', 'next-route'];
 const steps: StepId[] = ['landing', 'desk', 'route', 'intake', 'review', 'finding', 'passport', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
-const evidenceSteps: StepId[] = ['intake', 'review', 'finding', 'passport', 'readiness', 'pack', 'tracking', 'order-review', 'order-map'];
 
 function isStoredFactList(value: unknown): value is ExtractedFact[] {
   return Array.isArray(value) && value.every((fact) => fact && typeof fact === 'object'
@@ -436,29 +437,17 @@ function AppHeader({ language, setLanguage, step, onReset, onHome, onDesk, easyR
   );
 }
 
-function Progress({ step, language }: { step: StepId; language: Language }) {
-  if (!evidenceSteps.includes(step)) return null;
-  const items: Array<{ id: StepId; label: Pair }> = [
-    { id: 'intake', label: { en: 'Evidence', hi: 'सबूत' } },
-    { id: 'review', label: { en: 'Verify', hi: 'जाँच' } },
-    { id: 'finding', label: { en: 'Finding', hi: 'नतीजा' } },
-    { id: 'readiness', label: { en: 'Readiness', hi: 'तैयारी' } },
-    { id: 'pack', label: { en: 'Pack', hi: 'पैक' } },
-    { id: 'tracking', label: { en: 'Track', hi: 'स्थिति' } },
-  ];
-  const progressStep: StepId = step === 'order-review' || step === 'order-map' ? 'tracking' : step === 'passport' ? 'finding' : step;
-  const activeIndex = items.findIndex((item) => item.id === progressStep);
-  return (
-    <div className="progress-wrap">
-      <ol className="progress shell" aria-label={language === 'hi' ? 'डेमो के चरण' : 'Demo progress'}>
-        {items.map((item, index) => (
-          <li key={item.id} className={index < activeIndex ? 'done' : index === activeIndex ? 'active' : ''} aria-current={index === activeIndex ? 'step' : undefined}>
-            <span>{index < activeIndex ? '✓' : index + 1}</span><small>{local(item.label, language)}</small>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
+export function SyntheticGuidedHeader({
+  step,
+  language,
+  state,
+}: {
+  step: SyntheticGuidedScreen;
+  language: Language;
+  state?: SyntheticGuideState;
+}) {
+  const guide = getSyntheticGuide({ step, language, state });
+  return <GuidedStepHeader {...guide} headingId={`synthetic-guide-${step}`} />;
 }
 
 function Button({ children, variant = 'primary', className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'quiet' | 'danger' }) {
@@ -1690,7 +1679,6 @@ export default function ChallanSakshiApp() {
         onEasyReadChange={setEasyRead}
         onTextFirstChange={(value) => { setTextFirst(value); if (value) setRevealedImages([]); }}
       />
-      <Progress step={renderStep} language={language} />
       {easyRead && <EasyReadSummary step={renderStep} language={language} assessment={activeCaseAssessment} />}
 
       {renderStep === 'landing' && <Landing language={language} onStart={() => startResolutionEvidence('wrong-evidence')} onOpenDesk={() => go('desk')} onOpenRoute={openResolutionRoute} textFirst={textFirst} imageRevealed={revealedImages.includes('mismatch-enforcement')} onRevealImage={() => revealImage('mismatch-enforcement')} />}
@@ -1703,6 +1691,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen>
             <BackButton onClick={() => go('landing')} language={language} />
+            <SyntheticGuidedHeader step="intake" language={language} />
             <div className="screen-heading"><p className="eyebrow"><span />{local(copy.chooseCase, language)}</p><h1>{local(copy.evidenceIntake, language)}</h1><p>{local(copy.evidenceIntro, language)} {local(copy.changeAnytime, language)}</p></div>
             <FixturePicker fixtureId={fixtureId} language={language} onSelect={chooseFixture} />
             <div className="privacy-warning" role="note"><span aria-hidden="true">!</span><div><strong>{language === 'hi' ? 'असली दस्तावेज़ अपलोड न करें' : 'Keep real documents out of this prototype'}</strong><p>{local(copy.uploadWarning, language)}</p></div></div>
@@ -1720,6 +1709,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen>
             <BackButton onClick={() => go('intake')} language={language} />
+            <SyntheticGuidedHeader step="review" language={language} state={{ reviewComplete: confirmed && reviewValidation.complete }} />
             <div className="review-heading-row"><div className="screen-heading"><p className="eyebrow"><span />{local(copy.reviewFacts, language)}</p><h1>{local(copy.reviewFacts, language)}</h1><p>{local(copy.reviewLead, language)}</p></div><div className="analysis-controls"><StatusPill mode={analysisMode} language={language} /><Button variant="secondary" type="button" onClick={rerunLiveAnalysis} disabled={analysisBusy || textFirst}>{analysisBusy ? local(copy.rerunning, language) : local(copy.rerun, language)}</Button>{textFirst && <small>{language === 'hi' ? 'टेक्स्ट-पहले मोड में लाइव इमेज अनुरोध बंद है।' : 'Live image requests are off in text-first mode.'}</small>}</div></div>
             {analysisMessage && <p className={`analysis-message ${analysisMode === 'fallback' ? 'warning' : ''}`} role="status">{analysisMessage}</p>}
             <div className="review-layout">
@@ -1754,6 +1744,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen className="finding-screen">
             <BackButton onClick={() => go('review')} language={language} />
+            <SyntheticGuidedHeader step="finding" language={language} />
             <FindingPanel finding={classification.finding} fixture={fixture} facts={facts} language={language} textFirst={textFirst} imageRevealed={revealedImages.includes(enforcementImageKey)} onRevealImage={() => revealImage(enforcementImageKey)} />
             <EvidencePassportStrip language={language} snapshot={draftPassport} assessment={caseAssessment} onOpen={() => go('passport')} />
             <div className="finding-bottom-grid"><ContestClock fixture={fixture} language={language} /><div className="authority-note"><span aria-hidden="true">§</span><div><h3>{language === 'hi' ? 'राज्य का तरीका अलग हो सकता है' : 'The state route may vary'}</h3><p>{language === 'hi' ? 'राज्य सरकार आपत्ति जमा करने का तरीका और संबंधित प्राधिकरण तय करती है। मौजूदा तरीका आधिकारिक पोर्टल पर जाँचें।' : 'The State Government specifies how a contest is submitted and which authority handles it. Verify the current route before acting.'}</p><a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer">{local(copy.officialPortal, language)} <span aria-hidden="true">↗</span></a></div></div></div>
@@ -1765,6 +1756,7 @@ export default function ChallanSakshiApp() {
 
       {renderStep === 'passport' && (
         <>
+          <div className="shell synthetic-guide-before-screen"><SyntheticGuidedHeader step="passport" language={language} state={{ passportReviewsComplete: simulatedSubmitted || (custodyReviewed && passportScopeReviewed), passportFrozen: simulatedSubmitted, submissionComplete: simulatedSubmitted }} /></div>
           <EvidencePassportScreen
             language={language}
             fixture={fixture}
@@ -1792,6 +1784,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen>
             <BackButton onClick={() => go('passport')} language={language} />
+            <SyntheticGuidedHeader step="readiness" language={language} />
             <EvidencePassportStrip language={language} snapshot={activePassport} assessment={activeCaseAssessment} onOpen={() => go('passport')} />
             <div className="screen-heading readiness-title"><p className="eyebrow"><span />{local(copy.evidenceReadiness, language)}</p><h1>{readiness.complete ? (language === 'hi' ? 'इस डेमो समीक्षा की मूल दी गई चीज़ें मौजूद हैं' : 'Core supplied items are present for this demo review') : (language === 'hi' ? 'दी गई कुछ चीज़ें अभी साफ़ नहीं हैं' : 'Some supplied items are still unclear')}</h1><p>{local(copy.readinessLead, language)}</p></div>
             <div className="readiness-meter"><div><strong>{readiness.requiredPresent} / {readiness.requiredTotal}</strong><span>{language === 'hi' ? 'ज़रूरी डेमो चीज़ें मौजूद' : 'required demo items present'}</span></div><div className="readiness-bar"><span style={{ width: `${(readiness.requiredPresent / readiness.requiredTotal) * 100}%` }} /></div><b className={readiness.complete ? 'complete' : 'incomplete'}>{readiness.complete ? (language === 'hi' ? 'दिए पैकेट की सूची पूरी' : 'Supplied-packet checklist complete') : (language === 'hi' ? 'स्पष्टीकरण ज़रूरी' : 'Clarification needed')}</b></div>
@@ -1814,6 +1807,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen className="pack-screen">
             <BackButton onClick={() => go('readiness')} language={language} />
+            <SyntheticGuidedHeader step="pack" language={language} state={{ submissionComplete: simulatedSubmitted }} />
             <EvidencePassportStrip language={language} snapshot={activePassport} assessment={activeCaseAssessment} onOpen={() => go('passport')} />
             <div className="screen-heading"><p className="eyebrow"><span />{local(copy.contestPack, language)}</p><h1>{local(copy.contestPack, language)}</h1><p>{local(copy.packLead, language)}</p></div>
             <div className="simulation-banner"><span aria-hidden="true">!</span><strong>{local(copy.simulatedOnly, language)}</strong></div>
@@ -1839,6 +1833,7 @@ export default function ChallanSakshiApp() {
         <>
           <Screen className="tracking-screen">
             <BackButton onClick={() => go('pack')} language={language} />
+            <SyntheticGuidedHeader step="tracking" language={language} state={{ submissionComplete: simulatedSubmitted, outcomeSelected: outcome !== 'none' }} />
             <EvidencePassportStrip language={language} snapshot={activePassport} assessment={activeCaseAssessment} onOpen={() => go('passport')} />
             <div className="tracking-heading"><div><p className="eyebrow"><span />{local(copy.tracking, language)}</p><h1>{local(copy.tracking, language)}</h1><p>{local(copy.trackingLead, language)}</p></div><div className="fictional-reference"><small>{local(copy.fictionalRef, language)}</small><strong>{grievanceNumber}</strong><span>{local(copy.synthetic, language)}</span></div></div>
             <div className="simulation-banner strong"><span aria-hidden="true">!</span><div><strong>{language === 'hi' ? 'डेमो आपत्ति दर्ज की गई' : 'Simulated submission received'}</strong><p>{local(copy.trackingLead, language)} {language === 'hi' ? 'यह संदर्भ नंबर पूरी तरह काल्पनिक है।' : 'This reference number is entirely fictional.'}</p></div></div>
@@ -1866,6 +1861,7 @@ export default function ChallanSakshiApp() {
 
       {renderStep === 'order-review' && outcome === 'rejected' && simulatedSubmitted && (
         <>
+          <div className="shell synthetic-guide-before-screen"><SyntheticGuidedHeader step="order-review" language={language} state={{ orderFactsComplete: orderFactValidation.complete }} /></div>
           <OrderReviewScreen
             language={language}
             order={rejectedOrder}
@@ -1891,6 +1887,7 @@ export default function ChallanSakshiApp() {
 
       {renderStep === 'order-map' && outcome === 'rejected' && simulatedSubmitted && orderCompleteness && submittedRevisionId && (
         <>
+          <div className="shell synthetic-guide-before-screen"><SyntheticGuidedHeader step="order-map" language={language} state={{ orderMapComplete: orderMapValidation.complete, orderLimitationConfirmed, orderNoteCreated: effectiveOrderNoteCreated }} /></div>
           <OrderMapScreen
             language={language}
             order={rejectedOrder}

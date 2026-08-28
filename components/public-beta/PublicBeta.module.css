@@ -45,6 +45,11 @@
 
 .main { width: min(1100px, calc(100% - 40px)); margin-inline: auto; padding: 54px 0 92px; }
 .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); align-items: center; gap: clamp(42px, 7vw, 90px); padding-block: 24px 48px; }
+.heroCompact { grid-template-columns: 1fr; gap: 0; padding-block: 18px 28px; }
+.heroCompact .heroCard { display: none; }
+.heroCompact h1 { max-width: 900px; font-size: clamp(28px, 3vw, 38px); }
+.heroCompact .lede { max-width: 840px; margin-top: 12px; font-size: 14px; line-height: 1.55; }
+.heroCompact .eyebrow { margin-bottom: 10px; }
 .eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; color: var(--pb-teal-dark); font-size: 11px; font-weight: 880; letter-spacing: .13em; text-transform: uppercase; }
 .eyebrow::before { content: ''; width: 24px; height: 2px; background: #d69a35; }
 .hero h1, .sectionTitle h1 { margin: 0; font: 650 clamp(43px, 5vw, 69px)/1.02 Georgia, serif; letter-spacing: -.045em; }
@@ -77,6 +82,10 @@
 .sectionTitle p { max-width: 720px; margin: 10px 0 0; color: var(--pb-muted); font-size: 14px; line-height: 1.65; }
 .stepTag { display: inline-flex; padding: 7px 10px; border-radius: 999px; background: #e6f3ef; color: var(--pb-teal-dark); font-size: 10px; font-weight: 880; letter-spacing: .06em; white-space: nowrap; }
 .choiceGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.choiceFields { display: grid; gap: 24px; }
+.choiceFieldset { min-width: 0; grid-column: 1 / -1; margin: 0; padding: 0; border: 0; }
+.choiceLegend { width: 100%; margin-bottom: 11px; color: var(--pb-ink); font: 700 17px/1.35 Georgia, serif; }
+.choiceGroup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .choice, .fixtureChoice { min-height: 110px; padding: 19px; border: 1px solid #ced6d1; border-radius: 12px; background: #fbfaf6; color: var(--pb-ink); text-align: left; cursor: pointer; }
 .choice:hover, .fixtureChoice:hover { border-color: #8caea3; }
 .choiceActive { border-color: var(--pb-teal); background: #eef8f4; box-shadow: 0 0 0 2px rgb(8 122 116 / 10%); }
@@ -101,6 +110,14 @@
 .observationCard label { display: block; margin-bottom: 11px; font: 700 14px/1.3 Georgia, serif; }
 .observationCard label span { display: block; margin-bottom: 4px; color: var(--pb-teal-dark); font: 850 9px/1.2 ui-sans-serif, sans-serif; letter-spacing: .09em; }
 .observationCard select { width: 100%; min-height: 44px; padding: 0 9px; border: 1px solid #c8d1cc; border-radius: 8px; background: white; color: var(--pb-ink); font-size: 12px; }
+.recordSections { display: grid; gap: 16px; }
+.recordSection { padding: 22px; border: 1px solid #d8ddd8; border-radius: 13px; background: #fbfcf8; }
+.recordSectionHeading { display: grid; grid-template-columns: auto 1fr; gap: 13px; align-items: start; margin-bottom: 20px; }
+.recordSectionHeading > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--pb-navy); color: white; font-size: 11px; font-weight: 900; }
+.recordSectionHeading h3 { margin: 2px 0 0; font: 700 19px/1.25 Georgia, serif; }
+.recordSectionHeading p { margin: 5px 0 0; color: var(--pb-muted); font-size: 11px; line-height: 1.5; }
+.recordSection .acknowledgements { margin-top: 0; }
+.recordSectionNote { margin: 0; padding: 14px 16px; border-left: 3px solid #91aaa1; background: #f0f4f1; color: #53665e; font-size: 12px; line-height: 1.55; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 22px; border-top: 1px solid #e0e3de; }
 .button, .buttonSecondary, .buttonQuiet { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 0 21px; border-radius: 9px; font-size: 13px; font-weight: 820; text-decoration: none; cursor: pointer; }
 .button { border: 1px solid var(--pb-teal); background: var(--pb-teal); color: white; box-shadow: 0 8px 18px rgb(8 122 116 / 16%); }
@@ -195,13 +212,17 @@
   .quickExit::after { content: 'Exit'; font-size: 10px; }
   .hero { padding-top: 6px; }
   .hero h1 { font-size: 44px; }
+  .heroCompact { padding-block: 10px 18px; }
+  .heroCompact h1 { font-size: 28px; line-height: 1.08; }
+  .heroCompact .lede { margin-top: 9px; font-size: 12px; }
   .progress { overflow: visible; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
   .progress li:nth-child(2n)::after { display: none; }
   .panel { padding: 21px; }
   .sectionTitle { grid-template-columns: 1fr; gap: 10px; }
-  .choiceGrid, .formGrid, .observationGrid, .resultMeta, .fixtureBar, .passport, .sourceGrid { grid-template-columns: 1fr; }
+  .choiceGrid, .choiceGroup, .formGrid, .observationGrid, .resultMeta, .fixtureBar, .passport, .sourceGrid { grid-template-columns: 1fr; }
   .fieldWide { grid-column: auto; }
-  .actions { align-items: stretch; flex-direction: column-reverse; }
+  .recordSection { padding: 18px; }
+  .actions { align-items: stretch; flex-direction: column; }
   .actions .button, .actions .buttonSecondary, .actions .buttonQuiet, .actions a { width: 100%; }
   .journeyMap { overflow-x: auto; }
   .journeyMap header, .journeyRow { min-width: 650px; }
@@ -217,6 +238,7 @@
   .nav { gap: 8px; }
   .languages button { min-width: 32px; padding: 0 5px; }
   .hero h1 { font-size: 40px; }
+  .heroCompact h1 { font-size: 28px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
