@@ -1,8 +1,9 @@
 import type { LocalRecordFileMeta } from './local-record-intake';
-import type {
-  CitizenChallanAnswers,
-  CitizenReviewAssessment,
-  OfficialSourceStatus,
+import {
+  assessCitizenChallanReview,
+  type CitizenChallanAnswers,
+  type CitizenReviewAssessment,
+  type OfficialSourceStatus,
 } from './public-challan';
 
 export type EvidenceAcquisition =
@@ -85,7 +86,7 @@ export type CitizenEvidenceSummaryInput = CitizenEvidenceViewInput & {
 
 const CITIZEN_DECLARED_ORIGIN = 'citizen-declared-origin' as const;
 const MAX_ARTIFACT_FIELD_LENGTH = 160;
-const UNSAFE_LOCAL_REFERENCE = /(?:blob|data):[^\s]*/gi;
+const UNSAFE_LOCAL_REFERENCE = /(?:blob|data|file|filesystem):[^\s]*/gi;
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/g;
 
 const CITIZEN_TIMELINE_LABELS: Record<string, string> = {
@@ -118,7 +119,7 @@ function safeFileName(name: string | undefined, fallback: string): string {
 }
 
 function maskedVehicleSuffix(value: string): string {
-  if (typeof value !== 'string' || /(?:blob|data):/i.test(value)) return '[not entered]';
+  if (typeof value !== 'string' || /(?:blob|data|file|filesystem):/i.test(value)) return '[not entered]';
   const suffix = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-4);
   return suffix.length === 4 ? `…${suffix}` : '[not entered]';
 }
@@ -184,9 +185,10 @@ function sourceFileName(input: CitizenEvidenceViewInput, role: 'record' | 'photo
 
 /**
  * Builds a presentation-only view from facts the citizen has already confirmed.
- * This function does not inspect source bytes, authenticate a record, or classify a case.
+ * This function does not inspect source bytes or authenticate a record. It reuses the deterministic conservative classifier for materiality and makes no independent or legal classification.
  */
 export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): CitizenEvidenceView {
+  const currentAssessment = assessCitizenChallanReview(input.answers);
   const recordName = safeFileName(sourceFileName(input, 'record'), sourceStatusLabel(input.answers.sourceStatus));
   const photographName = safeFileName(sourceFileName(input, 'photograph'), 'Citizen-described supplied photograph');
   const sources: EvidenceSourceRef[] = [
@@ -233,7 +235,7 @@ export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): Citiz
     },
   ];
 
-  const vehicleDifferenceMateriality = input.assessment.finding === 'citizen-recorded-inconsistency' && input.assessment.canPrepareWorksheet
+  const vehicleDifferenceMateriality = currentAssessment.finding === 'citizen-recorded-inconsistency' && currentAssessment.canPrepareWorksheet
     ? 'material' as const
     : 'needs-clarification' as const;
   const conflicts: EvidenceConflict[] = [];

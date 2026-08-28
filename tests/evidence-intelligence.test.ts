@@ -106,6 +106,23 @@ describe('citizen evidence intelligence', () => {
     expect(view.conflicts).toContainEqual(expect.objectContaining({ reason: 'registration', materiality: 'needs-clarification' }));
   });
 
+  it('does not let a stale action-ready assessment make a message-only difference material', () => {
+    const currentAnswers = { ...answers, sourceStatus: 'message-only' as const, plateObservation: 'different' as const };
+    const staleActionReadyAssessment = assessCitizenChallanReview(answers);
+    const view = buildCitizenEvidenceView({
+      answers: currentAnswers,
+      assessment: staleActionReadyAssessment,
+      confirmation: 'confirmed',
+      recordName: 'challan.pdf',
+      photographName: 'photo.jpg',
+    });
+
+    expect(staleActionReadyAssessment).toMatchObject({ finding: 'citizen-recorded-inconsistency', canPrepareWorksheet: true });
+    expect(assessCitizenChallanReview(currentAnswers)).toMatchObject({ finding: 'source-not-verified', canPrepareWorksheet: false });
+    expect(view.conflicts).toContainEqual(expect.objectContaining({ reason: 'registration', materiality: 'needs-clarification' }));
+    expect(view.conflicts).not.toContainEqual(expect.objectContaining({ reason: 'registration', materiality: 'material' }));
+  });
+
   it('derives confirmed observations only from the explicit post-gate confirmation input', () => {
     const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed' });
     expect(view.observations.every((observation) => observation.confirmation === 'confirmed')).toBe(true);
@@ -173,7 +190,7 @@ describe('citizen evidence intelligence', () => {
       allegedOffence: 'data:text/plain,not-a-record',
       eventDate: '2026-08-20\nCITIZEN-CONFIRMED OBSERVATIONS',
       officialDeadline: 'blob:local-only',
-      recordName: 'blob:private-record',
+      recordName: 'file:///Users/alice/secret.pdf',
       photographName: 'image.jpg\r\nNEUTRAL CLARIFICATION REQUEST',
       answers,
       assessment,
@@ -192,6 +209,8 @@ describe('citizen evidence intelligence', () => {
     expect(summary).not.toMatch(/[\r\u0000-\u0009\u000B\u000C\u000E-\u001F\u007F-\u009F]/);
     expect(summary).not.toContain('data:');
     expect(summary).not.toContain('blob:');
+    expect(summary).not.toContain('file:');
+    expect(summary).not.toContain('/Users/alice/secret.pdf');
     expect(summary).not.toContain('Authority accepted');
     expect(summary).not.toContain('Authority updated');
     expect(summary).not.toContain('Authority received');
