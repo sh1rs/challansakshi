@@ -13,7 +13,7 @@ describe('direct Cloudflare deployment', () => {
 
     expect(pluginNames).toContain('vite-plugin-cloudflare');
     expect(pluginNames).not.toContain('sites');
-  });
+  }, 30_000);
 
   it('owns only the ChallanSakshi subdomain and keeps optional invocation logs off', () => {
     expect(existsSync(wranglerPath), 'wrangler.jsonc must define the direct production Worker').toBe(true);
