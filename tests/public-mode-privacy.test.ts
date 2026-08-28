@@ -33,9 +33,10 @@ describe('real-mode privacy isolation', () => {
     expect(inputs).not.toMatch(/name=["'](?:name|phone|email|address|aadhaar|password)/i);
   });
 
-  it('marks both real-case tools as English-only until decision copy is fully translated', () => {
-    for (const path of ['components/public-beta/CitizenReviewApp.tsx', 'components/public-beta/TollSakshiApp.tsx']) {
-      expect(publicModeFiles.find((file) => file.path === path)?.source, path).toMatch(/<PublicBetaShell[^>]*englishOnly/);
-    }
+  it('keeps the translated e-Challan flow bilingual while FASTag remains English-only', () => {
+    const citizenApp = publicModeFiles.find((file) => file.path === 'components/public-beta/CitizenReviewApp.tsx')?.source;
+    const tollApp = publicModeFiles.find((file) => file.path === 'components/public-beta/TollSakshiApp.tsx')?.source;
+    expect(citizenApp, 'components/public-beta/CitizenReviewApp.tsx').not.toMatch(/<PublicBetaShell[^>]*englishOnly/);
+    expect(tollApp, 'components/public-beta/TollSakshiApp.tsx').toMatch(/<PublicBetaShell[^>]*englishOnly/);
   });
 });

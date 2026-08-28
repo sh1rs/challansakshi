@@ -27,11 +27,28 @@ describe('guided journey progress', () => {
 
   it('shows evidence observation as skipped when a message-only source safely stops the review', () => {
     expect(buildChallanGuidedProgress('result', 'message-only')).toEqual([
-      { id: 'safety', label: 'Protect your information', state: 'complete' },
-      { id: 'source', label: 'Verify the source', state: 'safe-stop' },
-      { id: 'observations', label: 'Compare the evidence', state: 'skipped' },
-      { id: 'result', label: 'Official next step', state: 'current' },
+      { id: 'safety', label: 'Start safely', state: 'complete' },
+      { id: 'source', label: 'Get official record', state: 'safe-stop' },
+      { id: 'observations', label: 'Check the evidence', state: 'skipped' },
+      { id: 'result', label: 'Decide and resolve', state: 'current' },
     ]);
+  });
+
+  it('guides the citizen to obtain the official record before confirming facts', () => {
+    expect(getChallanGuideContent({
+      step: 'source',
+      safetyReady: true,
+      sourceStatus: 'not-selected',
+      jurisdictionSelected: false,
+      observationsReady: false,
+      worksheetAvailable: false,
+      exportAllowed: true,
+    })).toMatchObject({
+      currentLabel: 'Step 2 of 4 · Get the official record',
+      instruction: 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
+      status: 'Official source and record still needed',
+      next: 'Confirm every extracted fact before comparing evidence.',
+    });
   });
 
   it('turns a message-only source into a plain-language safe stop instead of an evidence task', () => {
@@ -44,7 +61,7 @@ describe('guided journey progress', () => {
       worksheetAvailable: false,
       exportAllowed: true,
     })).toMatchObject({
-      currentLabel: 'Step 2 of 4 · Verify the source',
+      currentLabel: 'Step 2 of 4 · Get the official record',
       status: 'Safe stop: verify the record before comparing evidence',
       statusTone: 'safe-stop',
       next: 'Use the verified official route to obtain the record; evidence comparison will stay skipped.',

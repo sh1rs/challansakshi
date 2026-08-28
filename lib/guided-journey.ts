@@ -43,10 +43,10 @@ export function buildGuidedProgress<Id extends string>(
 export type ChallanGuidedStep = 'safety' | 'source' | 'observations' | 'result';
 
 const challanSteps: readonly GuidedStepDefinition<ChallanGuidedStep>[] = [
-  { id: 'safety', label: 'Protect your information' },
-  { id: 'source', label: 'Verify the source' },
-  { id: 'observations', label: 'Compare the evidence' },
-  { id: 'result', label: 'Official next step' },
+  { id: 'safety', label: 'Start safely' },
+  { id: 'source', label: 'Get official record' },
+  { id: 'observations', label: 'Check the evidence' },
+  { id: 'result', label: 'Decide and resolve' },
 ];
 
 export function buildChallanGuidedProgress(
@@ -78,7 +78,7 @@ export function getChallanGuideContent({
   exportAllowed: boolean;
 }): GuidedStepContent {
   if (step === 'safety') return {
-    currentLabel: 'Step 1 of 4 · Protect your information',
+    currentLabel: 'Step 1 of 4 · Start safely',
     instruction: 'Choose who is reviewing and whether this device is private or shared.',
     why: 'These choices control consent, downloads, and the shared-device exit.',
     status: safetyReady ? 'Privacy and device choices confirmed' : 'Choose the reviewer, device, and every required confirmation',
@@ -88,8 +88,8 @@ export function getChallanGuideContent({
 
   if (step === 'source') {
     if (sourceStatus === 'message-only') return {
-      currentLabel: 'Step 2 of 4 · Verify the source',
-      instruction: 'Open the official record yourself. Then choose where you found it and which authority or service is shown.',
+      currentLabel: 'Step 2 of 4 · Get the official record',
+      instruction: 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
       why: 'A message or forwarded link alone does not verify the record.',
       status: 'Safe stop: verify the record before comparing evidence',
       statusTone: 'safe-stop',
@@ -97,17 +97,17 @@ export function getChallanGuideContent({
     };
     const sourceReady = sourceStatus !== 'not-selected' && jurisdictionSelected;
     return {
-      currentLabel: 'Step 2 of 4 · Verify the source',
-      instruction: 'Open the official record yourself. Then choose where you found it and which authority or service is shown.',
-      why: 'A message or forwarded link alone does not verify the record.',
-      status: sourceReady ? 'Source and jurisdiction recorded' : 'Source and jurisdiction still needed',
+      currentLabel: 'Step 2 of 4 · Get the official record',
+      instruction: 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
+      why: 'A message or forwarded link alone does not verify the record. ChallanSakshi never needs your government password, CAPTCHA, OTP, Aadhaar details, or payment credentials.',
+      status: sourceReady ? 'Official source and record confirmed' : 'Official source and record still needed',
       statusTone: sourceReady ? 'ready' : 'needs-action',
-      next: sourceReady ? 'Compare the official evidence with your vehicle record.' : 'Complete both source fields before continuing.',
+      next: 'Confirm every extracted fact before comparing evidence.',
     };
   }
 
   if (step === 'observations') return {
-    currentLabel: 'Step 3 of 4 · Compare the evidence',
+    currentLabel: 'Step 3 of 4 · Check the evidence',
     instruction: 'Compare one official image with one vehicle record, then record only visible facts.',
     why: 'The review can use only facts you personally confirmed.',
     status: observationsReady ? 'Ready for a conservative review' : 'Record what is visible, unclear, or not supplied',
@@ -117,7 +117,7 @@ export function getChallanGuideContent({
 
   const safeStop = sourceStatus === 'message-only';
   return {
-    currentLabel: 'Step 4 of 4 · Official next step',
+    currentLabel: 'Step 4 of 4 · Decide and resolve',
     instruction: safeStop
       ? 'Verify the record through an official service before comparing or contesting anything.'
       : 'Read the finding, check what remains missing, then use only the official route shown.',

@@ -1,26 +1,39 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+
 import { GuidedStepHeader } from '../guided/GuidedStepHeader';
+import { parseCitizenGoal, type CitizenGoal } from '../../lib/citizen-home';
 import type { Language } from '../../lib/domain';
+import {
+  buildCitizenEvidenceSummary,
+  buildCitizenEvidenceView,
+  buildCitizenTimeline,
+  type CitizenEvidenceView,
+} from '../../lib/evidence-intelligence';
 import { buildChallanGuidedProgress, getChallanGuideContent } from '../../lib/guided-journey';
 import {
   assessCitizenChallanReview,
-  buildCitizenChallanWorksheet,
   calculateEnteredOfficialDeadline,
+  citizenSituationForFinding,
   type CitizenChallanAnswers,
-  type CitizenReviewFinding,
+  type CitizenSituation,
   type Observation,
   type OffenceObservation,
   type RecordAvailability,
 } from '../../lib/public-challan';
+import { LocalRecordIntake, type LocalRecordSelection } from './LocalRecordIntake';
 import { PublicBetaShell, SafetyBoundary, publicBetaStyles as styles } from './PublicBetaShell';
 
 type Step = 'safety' | 'source' | 'observations' | 'result';
 type Role = 'self' | 'helper';
 type Device = 'private' | 'shared';
 
-const defaultAnswers: CitizenChallanAnswers = {
+const NATIONAL_URL = 'https://echallan.parivahan.gov.in/';
+const COURT_URL = 'https://vcourts.gov.in/virtualcourt/index.php';
+const DISCLAIMER = 'Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.';
+
+const defaults: CitizenChallanAnswers = {
   sourceStatus: 'not-selected',
   imageInspected: false,
   plateObservation: 'unclear',
@@ -38,166 +51,461 @@ function t(language: Language, en: string, hi: string) {
   return language === 'hi' ? hi : en;
 }
 
-function indiaDateNow(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+function indiaDateNow() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
-function SelectField({ id, label, value, onChange, options, help }: {
+function downloadSummary(summary: string) {
+  const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'challansakshi-citizen-evidence-summary.txt';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<[string, string]>;
-  help?: string;
 }) {
   return (
     <div className={styles.field}>
       <label htmlFor={id}>{label}</label>
       <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map(([optionValue, optionLabel]) => <option value={optionValue} key={optionValue}>{optionLabel}</option>)}
+        {options.map(([v, text]) => (
+          <option value={v} key={v}>
+            {text}
+          </option>
+        ))}
       </select>
-      {help && <small>{help}</small>}
     </div>
   );
 }
 
-function findingCopy(finding: CitizenReviewFinding, language: Language): { title: string; body: string; tone: 'warn' | 'good' | 'stop' } {
-  const values: Record<CitizenReviewFinding, { en: string; hi: string; bodyEn: string; bodyHi: string; tone: 'warn' | 'good' | 'stop' }> = {
-    'source-not-verified': { en: 'Verify the notice source first', hi: 'पहले नोटिस के स्रोत की पुष्टि करें', bodyEn: 'A message or forwarded link is not enough to begin an evidence comparison.', bodyHi: 'सिर्फ संदेश या भेजा हुआ लिंक सबूत की तुलना शुरू करने के लिए पर्याप्त नहीं है।', tone: 'stop' },
-    'citizen-recorded-inconsistency': { en: 'Citizen-recorded material inconsistency', hi: 'नागरिक द्वारा दर्ज महत्वपूर्ण असंगति', bodyEn: 'Your structured observations contain a readable plate or vehicle-category conflict. Official verification is still required.', bodyHi: 'आपके दर्ज अवलोकनों में पढ़ने योग्य नंबर प्लेट या वाहन श्रेणी का अंतर है। आधिकारिक जाँच अभी भी आवश्यक है।', tone: 'warn' },
-    'supplied-image-unclear': { en: 'Supplied image remains unclear', hi: 'दी गई तस्वीर अभी भी अस्पष्ट है', bodyEn: 'Your answers contain an unreadable, missing, or not-assessable evidence field. Ask for clearer evidence instead of guessing.', bodyHi: 'आपके उत्तरों में अपठनीय, गायब या एक तस्वीर से न जाँची जा सकने वाली जानकारी है। अनुमान लगाने के बजाय साफ़ सबूत माँगें।', tone: 'warn' },
-    'entries-do-not-support-mismatch': { en: 'Your entries do not support a vehicle mismatch', hi: 'आपकी प्रविष्टियाँ वाहन बेमेल का समर्थन नहीं करतीं', bodyEn: 'The plate and category observations align. ChallanSakshi will not manufacture a vehicle-mismatch request.', bodyHi: 'नंबर प्लेट और श्रेणी के अवलोकन मेल खाते हैं। ChallanSakshi वाहन बेमेल की शिकायत नहीं गढ़ेगा।', tone: 'good' },
-    'insufficient-review': { en: 'Not enough information to review', hi: 'समीक्षा के लिए पर्याप्त जानकारी नहीं', bodyEn: 'Inspect the official evidence first, then record only what you can actually see.', bodyHi: 'पहले आधिकारिक सबूत देखें, फिर केवल वही दर्ज करें जो आप वास्तव में देख सकते हैं।', tone: 'stop' },
+function Preview({
+  selection,
+  title,
+  language,
+}: {
+  selection: LocalRecordSelection;
+  title: string;
+  language: Language;
+}) {
+  return (
+    <article className={styles.localPreview}>
+      <header>
+        <strong>{title}</strong>
+        <small>
+          {selection.meta.name} · {t(language, 'memory only', 'केवल मेमोरी में')}
+        </small>
+      </header>
+      {selection.meta.previewKind === 'image' ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Deliberate local object URL; never routed through a service.
+        <img
+          src={selection.previewUrl}
+          alt={t(language, `${title} preview`, `${title} प्रीव्यू`)}
+        />
+      ) : (
+        <object
+          data={selection.previewUrl}
+          type="application/pdf"
+          aria-label={`${title} PDF preview`}
+        >
+          <p>
+            {t(
+              language,
+              'PDF preview unavailable; the file remains in this tab memory.',
+              'PDF प्रीव्यू उपलब्ध नहीं; फ़ाइल इस टैब की मेमोरी में रहती है।',
+            )}
+          </p>
+        </object>
+      )}
+    </article>
+  );
+}
+const resultText: Record<
+  CitizenSituation,
+  {
+    title: [string, string];
+    body: [string, string];
+    simple: [string, string];
+    tone: 'warn' | 'good' | 'stop';
+  }
+> = {
+  'source-not-verified': {
+    title: ['Verify the notice source first', 'पहले नोटिस के स्रोत की पुष्टि करें'],
+    body: [
+      'A message or forwarded link is not enough to begin an evidence comparison.',
+      'सिर्फ संदेश या भेजा हुआ लिंक सबूत तुलना के लिए पर्याप्त नहीं है।',
+    ],
+    simple: [
+      'Do not rely on the message. Find the record on an official service first.',
+      'संदेश पर भरोसा न करें। पहले आधिकारिक सेवा पर रिकॉर्ड खोजें।',
+    ],
+    tone: 'stop',
+  },
+  'insufficient-review': {
+    title: ['Not enough information to review', 'समीक्षा के लिए पर्याप्त जानकारी नहीं'],
+    body: [
+      'Inspect the supplied evidence and a readable comparison record before treating a difference as action-ready.',
+      'अंतर पर कार्रवाई से पहले दी गई तस्वीर और पढ़ने योग्य तुलना रिकॉर्ड देखें।',
+    ],
+    simple: [
+      'More clear records are needed before deciding what to do.',
+      'निर्णय से पहले अधिक साफ़ रिकॉर्ड चाहिए।',
+    ],
+    tone: 'stop',
+  },
+  'records-appear-consistent': {
+    title: [
+      'Your entries do not support a vehicle mismatch',
+      'आपकी प्रविष्टियाँ वाहन बेमेल का समर्थन नहीं करतीं',
+    ],
+    body: [
+      'The plate and category observations align. ChallanSakshi will not manufacture a dispute.',
+      'नंबर प्लेट और श्रेणी मेल खाते हैं। ChallanSakshi विवाद नहीं गढ़ेगा।',
+    ],
+    simple: [
+      'The plate and vehicle type appear to match.',
+      'नंबर प्लेट और वाहन का प्रकार मेल खाते दिखते हैं।',
+    ],
+    tone: 'good',
+  },
+  'evidence-unclear': {
+    title: ['Supplied image remains unclear', 'दी गई तस्वीर अभी भी अस्पष्ट है'],
+    body: [
+      'One or more evidence fields are unreadable, missing, or not assessable from the supplied still.',
+      'एक या अधिक सबूत फ़ील्ड अपठनीय, गायब या तस्वीर से जाँचने योग्य नहीं हैं।',
+    ],
+    simple: [
+      'The photo is not clear enough to decide. Ask for clearer evidence.',
+      'तस्वीर पर्याप्त साफ़ नहीं है। साफ़ सबूत माँगें।',
+    ],
+    tone: 'warn',
+  },
+  'material-inconsistency-recorded': {
+    title: [
+      'Citizen-recorded material inconsistency',
+      'नागरिक द्वारा दर्ज महत्वपूर्ण असंगति',
+    ],
+    body: [
+      'Your observations contain a readable plate or vehicle-category conflict. Official verification is still required.',
+      'आपके अवलोकनों में नंबर प्लेट या वाहन श्रेणी का अंतर है। आधिकारिक जाँच अभी भी ज़रूरी है।',
+    ],
+    simple: [
+      'The photo and your vehicle record do not appear to match.',
+      'तस्वीर और आपके वाहन रिकॉर्ड में अंतर दिखता है।',
+    ],
+    tone: 'warn',
+  },
+};
+
+function sourceLabel(view: CitizenEvidenceView, id: string) {
+  return view.sources.find((source) => source.id === id)?.label ?? 'Citizen-recorded source';
+}
+
+function EvidenceRows({
+  evidence,
+  language,
+}: {
+  evidence: CitizenEvidenceView;
+  language: Language;
+}) {
+  const labels = {
+    field: t(language, 'Field', 'फ़ील्ड'),
+    observation: t(language, 'Observation', 'अवलोकन'),
+    source: t(language, 'Source', 'स्रोत'),
+    confidence: t(language, 'Confidence', 'विश्वास'),
+    confirmation: t(language, 'Confirmation', 'पुष्टि'),
+    limitation: t(language, 'Limitation', 'सीमा'),
   };
-  const item = values[finding];
-  return { title: language === 'hi' ? item.hi : item.en, body: language === 'hi' ? item.bodyHi : item.bodyEn, tone: item.tone };
+
+  return (
+    <div className={styles.evidenceTable} role="table">
+      <div className={styles.evidenceHeader} role="row">
+        <span>{labels.field}</span>
+        <span>{labels.observation}</span>
+        <span>{labels.source}</span>
+        <span>{labels.confidence}</span>
+        <span>{labels.confirmation}</span>
+        <span>{labels.limitation}</span>
+      </div>
+      {evidence.observations.map((item) => (
+        <div className={styles.evidenceRow} role="row" key={item.id}>
+          <span data-label={labels.field}>{item.field}</span>
+          <span data-label={labels.observation}>{item.value}</span>
+          <span data-label={labels.source}>{sourceLabel(evidence, item.sourceId)}</span>
+          <span data-label={labels.confidence}>{item.confidence}</span>
+          <span data-label={labels.confirmation}>{item.confirmation}</span>
+          <span data-label={labels.limitation}>
+            {item.limitation ?? t(language, 'None recorded', 'कोई दर्ज नहीं')}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function CitizenReviewApp() {
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<Step>('safety');
+  const [goal, setGoal] = useState<CitizenGoal | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [device, setDevice] = useState<Device | null>(null);
-  const [consent, setConsent] = useState({ manual: false, minimum: false, citizenConfirmed: false });
-  const [helperConfirmationSignature, setHelperConfirmationSignature] = useState('');
-  const [answers, setAnswers] = useState<CitizenChallanAnswers>(defaultAnswers);
+  const [consent, setConsent] = useState({
+    manual: false,
+    minimum: false,
+    citizenConfirmed: false,
+  });
+  const [recordSelection, setRecordSelection] = useState<LocalRecordSelection | null>(null);
+  const [photographSelection, setPhotographSelection] = useState<LocalRecordSelection | null>(null);
+  const [factsConfirmed, setFactsConfirmed] = useState(false);
+  const [summaryGenerated, setSummaryGenerated] = useState(false);
+  const [simpleMode, setSimpleMode] = useState(false);
+  const [manualEntryMode, setManualEntryMode] = useState(false);
+  const [helperSignature, setHelperSignature] = useState('');
+  const [answers, setAnswers] = useState<CitizenChallanAnswers>(defaults);
   const [jurisdiction, setJurisdiction] = useState('');
   const [vehicleSuffix, setVehicleSuffix] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [officialDeadline, setOfficialDeadline] = useState('');
-  const [referenceDate, setReferenceDate] = useState(indiaDateNow);
   const [offence, setOffence] = useState('');
+  const [referenceDate, setReferenceDate] = useState(indiaDateNow);
   const [error, setError] = useState('');
   const [artifactStatus, setArtifactStatus] = useState('');
-  const guideHeadingRef = useRef<HTMLHeadingElement>(null);
-  const previousStepRef = useRef<Step>(step);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(step);
 
-  const currentReviewSignature = useMemo(() => JSON.stringify({ answers, jurisdiction, vehicleSuffix, eventDate, officialDeadline, offence }), [answers, jurisdiction, vehicleSuffix, eventDate, officialDeadline, offence]);
-  const helperFinalConfirmed = helperConfirmationSignature !== '' && helperConfirmationSignature === currentReviewSignature;
-
+  const signature = useMemo(
+    () => JSON.stringify({
+      answers,
+      jurisdiction,
+      vehicleSuffix,
+      eventDate,
+      officialDeadline,
+      offence,
+      manualEntryMode,
+      recordName: recordSelection?.meta.name ?? '',
+      photographName: photographSelection?.meta.name ?? '',
+    }),
+    [
+      answers,
+      jurisdiction,
+      vehicleSuffix,
+      eventDate,
+      officialDeadline,
+      offence,
+      manualEntryMode,
+      recordSelection?.meta.name,
+      photographSelection?.meta.name,
+    ],
+  );
+  const helperConfirmed = factsConfirmed && helperSignature === signature && helperSignature !== '';
   const assessment = useMemo(() => assessCitizenChallanReview(answers), [answers]);
+
   const deadline = useMemo(() => {
-    try { return calculateEnteredOfficialDeadline(officialDeadline, referenceDate); }
-    catch { return null; }
+    try {
+      return calculateEnteredOfficialDeadline(officialDeadline, referenceDate);
+    } catch {
+      return null;
+    }
   }, [officialDeadline, referenceDate]);
-  const resultCopy = findingCopy(assessment.finding, language);
-  const worksheet = useMemo(() => buildCitizenChallanWorksheet({
-    stateLabel: jurisdiction,
-    vehicleSuffix,
-    allegedOffence: offence,
-    eventDate,
-    officialDeadline,
-    assessment,
-    answers,
-  }), [jurisdiction, vehicleSuffix, offence, eventDate, officialDeadline, assessment, answers]);
-  const safetyReady = Boolean(role && device && consent.manual && consent.minimum && (role !== 'helper' || consent.citizenConfirmed));
-  const observationsReady = (role !== 'helper' || helperFinalConfirmed)
+
+  const safetyReady = Boolean(
+    role
+      && device
+      && consent.manual
+      && consent.minimum
+      && (role !== 'helper' || consent.citizenConfirmed),
+  );
+  const observationsReady = factsConfirmed
+    && (role !== 'helper' || helperConfirmed)
     && (vehicleSuffix.length === 0 || vehicleSuffix.length === 4)
     && (!officialDeadline || Boolean(deadline));
+
   const guide = getChallanGuideContent({
     step,
     safetyReady,
     sourceStatus: answers.sourceStatus,
-    jurisdictionSelected: Boolean(jurisdiction && jurisdiction !== 'Not sure' && jurisdiction !== 'Virtual Court / court notice'),
+    jurisdictionSelected: Boolean(jurisdiction && (recordSelection || manualEntryMode)),
     observationsReady,
-    worksheetAvailable: assessment.canPrepareWorksheet,
+    worksheetAvailable: factsConfirmed && assessment.canPrepareWorksheet,
     exportAllowed: device !== 'shared',
   });
-  const guideProgress = buildChallanGuidedProgress(step, answers.sourceStatus);
+  const view = factsConfirmed
+    ? buildCitizenEvidenceView({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      recordMeta: recordSelection?.meta,
+      photographMeta: photographSelection?.meta,
+    })
+    : null;
+  const timelineFor = (generated: boolean) => buildCitizenTimeline({
+    recordSelected: Boolean(recordSelection),
+    imageSelected: Boolean(photographSelection),
+    sourceConfirmed:
+      answers.sourceStatus !== 'not-selected' && answers.sourceStatus !== 'message-only',
+    observationsConfirmed: factsConfirmed,
+    summaryGenerated: generated,
+  });
+  const summaryFor = (generated: boolean) => (factsConfirmed
+    ? buildCitizenEvidenceSummary({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      jurisdiction,
+      vehicleSuffix,
+      allegedOffence: offence,
+      eventDate,
+      officialDeadline,
+      recordMeta: recordSelection?.meta,
+      photographMeta: photographSelection?.meta,
+      timeline: timelineFor(generated),
+    })
+    : '');
+  const situation = citizenSituationForFinding(assessment.finding);
+  const copy = resultText[situation];
+  const resultBody = simpleMode
+    ? copy.simple[language === 'hi' ? 1 : 0]
+    : copy.body[language === 'hi' ? 1 : 0];
+
+  useEffect(() => {
+    let active = true;
+    const parsedGoal = parseCitizenGoal(window.location.search);
+    queueMicrotask(() => {
+      if (active) setGoal(parsedGoal);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (recordSelection?.previewUrl) URL.revokeObjectURL(recordSelection.previewUrl);
+    },
+    [recordSelection?.previewUrl],
+  );
+
+  useEffect(
+    () => () => {
+      if (photographSelection?.previewUrl) URL.revokeObjectURL(photographSelection.previewUrl);
+    },
+    [photographSelection?.previewUrl],
+  );
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setFactsConfirmed(false);
+      setHelperSignature('');
+      setArtifactStatus('');
+      setSummaryGenerated(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [signature]);
+
+  useEffect(() => {
+    const refresh = () => setReferenceDate(indiaDateNow());
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (previousStep.current !== step) {
+      previousStep.current = step;
+      headingRef.current?.focus();
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (device !== 'shared') return;
+
+    const ms = 10 * 60 * 1000;
+    let timer = window.setTimeout(() => window.location.replace('/'), ms);
+    const rearm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => window.location.replace('/'), ms);
+    };
+    const events: Array<keyof WindowEventMap> = [
+      'pointerdown',
+      'keydown',
+      'input',
+      'touchstart',
+    ];
+    events.forEach((name) => window.addEventListener(name, rearm, { passive: true }));
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((name) => window.removeEventListener(name, rearm));
+    };
+  }, [device]);
+
+  const invalidate = () => {
+    setFactsConfirmed(false);
+    setHelperSignature('');
+    setArtifactStatus('');
+    setSummaryGenerated(false);
+  };
 
   const reset = () => {
     setStep('safety');
     setRole(null);
     setDevice(null);
     setConsent({ manual: false, minimum: false, citizenConfirmed: false });
-    setHelperConfirmationSignature('');
-    setAnswers(defaultAnswers);
+    setRecordSelection(null);
+    setPhotographSelection(null);
+    invalidate();
+    setManualEntryMode(false);
+    setAnswers(defaults);
     setJurisdiction('');
     setVehicleSuffix('');
     setEventDate('');
     setOfficialDeadline('');
     setOffence('');
     setError('');
-    setArtifactStatus('');
   };
 
-  useEffect(() => {
-    if (device !== 'shared') return;
-    const inactivityMs = 10 * 60 * 1000;
-    let expiresAt = Date.now() + inactivityMs;
-    let timeout = window.setTimeout(() => window.location.replace('/'), inactivityMs);
-    const checkExpiry = () => {
-      window.clearTimeout(timeout);
-      if (Date.now() >= expiresAt) window.location.replace('/');
-      else timeout = window.setTimeout(() => window.location.replace('/'), expiresAt - Date.now());
-    };
-    const rearm = () => {
-      window.clearTimeout(timeout);
-      expiresAt = Date.now() + inactivityMs;
-      timeout = window.setTimeout(() => window.location.replace('/'), inactivityMs);
-    };
-    const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'input', 'touchstart'];
-    events.forEach((eventName) => window.addEventListener(eventName, rearm, { passive: true }));
-    window.addEventListener('focus', checkExpiry);
-    window.addEventListener('pageshow', checkExpiry);
-    document.addEventListener('visibilitychange', checkExpiry);
-    return () => {
-      window.clearTimeout(timeout);
-      events.forEach((eventName) => window.removeEventListener(eventName, rearm));
-      window.removeEventListener('focus', checkExpiry);
-      window.removeEventListener('pageshow', checkExpiry);
-      document.removeEventListener('visibilitychange', checkExpiry);
-    };
-  }, [device]);
-
-  useEffect(() => {
-    const refreshReferenceDate = () => setReferenceDate(indiaDateNow());
-    const interval = window.setInterval(refreshReferenceDate, 60_000);
-    window.addEventListener('focus', refreshReferenceDate);
-    window.addEventListener('pageshow', refreshReferenceDate);
-    document.addEventListener('visibilitychange', refreshReferenceDate);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refreshReferenceDate);
-      window.removeEventListener('pageshow', refreshReferenceDate);
-      document.removeEventListener('visibilitychange', refreshReferenceDate);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (previousStepRef.current === step) return;
-    previousStepRef.current = step;
-    guideHeadingRef.current?.focus();
-  }, [step]);
-
   const quickExit = () => {
+    if (recordSelection?.previewUrl) {
+      URL.revokeObjectURL(recordSelection.previewUrl);
+    }
+    if (photographSelection?.previewUrl) {
+      URL.revokeObjectURL(photographSelection.previewUrl);
+    }
     reset();
     window.location.replace('/');
   };
 
   const continueSafety = () => {
-    if (!role || !device || !consent.manual || !consent.minimum || (role === 'helper' && !consent.citizenConfirmed)) {
-      setError(t(language, 'Choose who is using the tool and the device type, then confirm each required safety statement.', 'टूल उपयोगकर्ता और डिवाइस प्रकार चुनें, फिर हर ज़रूरी सुरक्षा कथन की पुष्टि करें।'));
+    if (!safetyReady) {
+      setError(t(
+        language,
+        'Choose the reviewer and device, then confirm every safety statement.',
+        'समीक्षक और डिवाइस चुनें, फिर हर सुरक्षा कथन की पुष्टि करें।',
+      ));
       return;
     }
     setError('');
@@ -205,73 +513,151 @@ export default function CitizenReviewApp() {
   };
 
   const continueSource = () => {
-    setError('');
     if (answers.sourceStatus === 'not-selected') {
-      setError(t(language, 'Choose how you independently obtained the record.', 'चुनें कि आपने रिकॉर्ड स्वतंत्र रूप से कैसे प्राप्त किया।'));
-      return;
-    }
-    if (jurisdiction === 'Virtual Court / court notice') {
-      setError(t(language, answers.sourceStatus === 'message-only' ? 'Do not use the message link. This tool does not cover Virtual Court or court notices: independently locate the exact official court record and qualified assistance; do not use the generic e-Challan route.' : 'This manual e-Challan worksheet does not cover Virtual Court or court notices. Use the exact official court record and qualified assistance; do not continue through the generic challan route.', answers.sourceStatus === 'message-only' ? 'संदेश का लिंक उपयोग न करें। यह टूल वर्चुअल कोर्ट या अदालत नोटिस के लिए नहीं है: सही आधिकारिक अदालत रिकॉर्ड स्वतंत्र रूप से खोजें और योग्य सहायता लें; सामान्य ई-चालान रास्ता उपयोग न करें।' : 'यह मैन्युअल ई-चालान वर्कशीट वर्चुअल कोर्ट या अदालत नोटिस के लिए नहीं है। सही आधिकारिक अदालत रिकॉर्ड और योग्य सहायता उपयोग करें; सामान्य चालान रास्ते से आगे न बढ़ें।'));
-      return;
-    }
-    if (answers.sourceStatus === 'message-only') {
-      setStep('result');
+      setError(t(
+        language,
+        'Choose how you independently obtained the record.',
+        'चुनें कि रिकॉर्ड स्वतंत्र रूप से कैसे मिला।',
+      ));
       return;
     }
     if (!jurisdiction) {
-      setError(t(language, 'Choose the jurisdiction shown by the official record, or select “Not sure”.', 'आधिकारिक रिकॉर्ड में दिखा क्षेत्र चुनें, या “पता नहीं” चुनें।'));
+      setError(t(
+        language,
+        'Choose the official service or “I am not sure”.',
+        'आधिकारिक सेवा या “मुझे पता नहीं” चुनें।',
+      ));
       return;
     }
-    if (jurisdiction === 'Not sure') {
-      setError(t(language, 'Identify the responsible official service before entering evidence. Use the Safety & official routes page if needed.', 'सबूत दर्ज करने से पहले जिम्मेदार आधिकारिक सेवा पहचानें। आवश्यकता हो तो सुरक्षा और आधिकारिक रास्ते पेज का उपयोग करें।'));
+    if (!recordSelection && !manualEntryMode) {
+      setError(t(
+        language,
+        'Choose an official-record file or deliberately select manual fact entry.',
+        'आधिकारिक रिकॉर्ड फ़ाइल या मैन्युअल तथ्य प्रविष्टि चुनें।',
+      ));
       return;
     }
-    setStep('observations');
+    setError('');
+    setStep(answers.sourceStatus === 'message-only' ? 'result' : 'observations');
   };
 
   const continueObservations = () => {
-    if (role === 'helper' && !helperFinalConfirmed) {
-      setError(t(language, 'The citizen must confirm the final recorded observations before a worksheet is prepared.', 'वर्कशीट बनने से पहले नागरिक को अंतिम दर्ज अवलोकनों की पुष्टि करनी होगी।'));
+    if (!factsConfirmed) {
+      setError(t(
+        language,
+        'Confirm every fact or mark it unclear/not supplied.',
+        'हर तथ्य पुष्ट करें या अस्पष्ट/नहीं दिया गया चिह्नित करें।',
+      ));
       return;
     }
-    if (vehicleSuffix.length > 0 && vehicleSuffix.length !== 4) {
-      setError(t(language, 'Enter exactly the last four registration characters, or leave the field blank.', 'वाहन नंबर के ठीक अंतिम चार अक्षर/अंक दर्ज करें, या फ़ील्ड खाली छोड़ें।'));
+    if (role === 'helper' && !helperConfirmed) {
+      setError(t(
+        language,
+        'The citizen must confirm the final entries after the facts checkbox.',
+        'तथ्य चेकबॉक्स के बाद नागरिक अंतिम प्रविष्टियाँ पुष्ट करे।',
+      ));
+      return;
+    }
+    if (vehicleSuffix && vehicleSuffix.length !== 4) {
+      setError(t(
+        language,
+        'Enter exactly four registration characters or leave it blank.',
+        'ठीक चार वाहन अक्षर/अंक दर्ज करें या खाली छोड़ें।',
+      ));
       return;
     }
     if (officialDeadline && !deadline) {
-      setError(t(language, 'The copied official deadline is not a valid date.', 'कॉपी की गई आधिकारिक अंतिम तारीख मान्य नहीं है।'));
+      setError(t(
+        language,
+        'The copied official date is invalid.',
+        'कॉपी की गई आधिकारिक तारीख अमान्य है।',
+      ));
       return;
     }
     setError('');
     setStep('result');
   };
 
-  const copyWorksheet = async () => {
-    if (device === 'shared' || !assessment.canPrepareWorksheet) return;
+  const recordChanged = (selection: LocalRecordSelection | null) => {
+    invalidate();
+    setRecordSelection(selection);
+    if (selection) setManualEntryMode(false);
+  };
+  const photographChanged = (selection: LocalRecordSelection | null) => {
+    invalidate();
+    setPhotographSelection(selection);
+  };
+  const useManual = () => {
+    invalidate();
+    setManualEntryMode(true);
+  };
+
+  const copySummary = async () => {
+    if (device === 'shared' || !factsConfirmed) return;
     try {
-      await navigator.clipboard.writeText(worksheet);
-      setArtifactStatus(t(language, 'Worksheet copied. Remember: the clipboard may retain it.', 'वर्कशीट कॉपी हो गई। याद रखें: क्लिपबोर्ड इसे रख सकता है।'));
+      await navigator.clipboard.writeText(summaryFor(true));
+      setSummaryGenerated(true);
+      setArtifactStatus(t(
+        language,
+        'Summary copied locally.',
+        'सारांश स्थानीय रूप से कॉपी हुआ।',
+      ));
     } catch {
-      setArtifactStatus(t(language, 'Copy was blocked by the browser. Select the text manually if this is a private device.', 'ब्राउज़र ने कॉपी रोक दी। निजी डिवाइस हो तो टेक्स्ट मैन्युअली चुनें।'));
+      setArtifactStatus(t(
+        language,
+        'Copy was blocked; no summary action was recorded.',
+        'कॉपी रोकी गई; कोई सारांश कार्रवाई दर्ज नहीं हुई।',
+      ));
     }
   };
 
-  const downloadWorksheet = () => {
-    if (device === 'shared' || !assessment.canPrepareWorksheet) return;
-    const blob = new Blob([worksheet], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'challansakshi-local-worksheet.txt';
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setArtifactStatus(t(language, 'Downloaded locally. ChallanSakshi cannot erase the Downloads copy.', 'स्थानीय रूप से डाउनलोड हुआ। ChallanSakshi डाउनलोड की कॉपी मिटा नहीं सकता।'));
+  const saveSummary = () => {
+    if (device === 'shared' || !factsConfirmed) return;
+    downloadSummary(summaryFor(true));
+    setSummaryGenerated(true);
+    setArtifactStatus(t(
+      language,
+      'Summary downloaded locally.',
+      'सारांश स्थानीय रूप से डाउनलोड हुआ।',
+    ));
   };
 
+  const printSummary = () => {
+    if (device === 'shared' || !factsConfirmed) return;
+    window.print();
+    setSummaryGenerated(true);
+    setArtifactStatus(t(
+      language,
+      'The browser print dialog opened.',
+      'ब्राउज़र प्रिंट संवाद खुला।',
+    ));
+  };
+
+  const route = jurisdiction === 'National e-Challan'
+    ? {
+      href: NATIONAL_URL,
+      external: true,
+      label: t(language, 'Open National e-Challan', 'राष्ट्रीय ई-चालान खोलें'),
+    }
+    : jurisdiction === 'Virtual Court'
+      ? {
+        href: COURT_URL,
+        external: true,
+        label: t(language, 'Open Virtual Courts', 'वर्चुअल कोर्ट खोलें'),
+      }
+      : {
+        href: '/safety',
+        external: false,
+        label: t(
+          language,
+          'Find the responsible official route safely',
+          'जिम्मेदार आधिकारिक रास्ता सुरक्षित खोजें',
+        ),
+      };
   const observationOptions: Array<[Observation, string]> = [
     ['match', t(language, 'Appears to match', 'मेल खाता दिखता है')],
-    ['different', t(language, 'Appears materially different', 'महत्वपूर्ण रूप से अलग दिखता है')],
-    ['unclear', t(language, 'Cannot determine', 'तय नहीं कर सकता/सकती')],
+    ['different', t(language, 'Appears materially different', 'महत्वपूर्ण रूप से अलग')],
+    ['unclear', t(language, 'Cannot determine', 'तय नहीं')],
     ['not-visible', t(language, 'Not visible', 'दिखाई नहीं देता')],
   ];
   const recordOptions: Array<[RecordAvailability, string]> = [
@@ -282,158 +668,894 @@ export default function CitizenReviewApp() {
   ];
 
   return (
-    <PublicBetaShell language={language} setLanguage={setLanguage} service="ChallanSakshi" serviceHindi="चालान साक्षी" onQuickExit={quickExit} englishOnly>
+    <PublicBetaShell
+      language={language}
+      setLanguage={setLanguage}
+      service="ChallanSakshi"
+      serviceHindi="चालान साक्षी"
+      onQuickExit={quickExit}
+      simpleMode={simpleMode}
+      onSimpleModeChange={setSimpleMode}
+    >
       <main className={styles.main}>
         <GuidedStepHeader
           {...guide}
-          steps={guideProgress}
-          progressLabel={t(language, 'e-Challan review progress', 'ई-चालान समीक्षा प्रगति')}
-          headingRef={guideHeadingRef}
+          steps={buildChallanGuidedProgress(step, answers.sourceStatus)}
+          progressLabel={t(
+            language,
+            'e-Challan review progress',
+            'ई-चालान समीक्षा प्रगति',
+          )}
+          headingRef={headingRef}
           headingId="challan-guided-step-title"
           labels={{
             doNow: t(language, 'Do this now', 'अभी यह करें'),
             why: t(language, 'Why this matters', 'यह क्यों ज़रूरी है'),
             status: t(language, 'Status', 'स्थिति'),
             next: t(language, 'Next', 'आगे'),
-            allSteps: t(language, 'See all steps', 'सभी चरण देखें'),
           }}
         />
-
         <section className={`${styles.hero} ${styles.heroCompact}`}>
           <div>
-            <p className={styles.eyebrow}>{t(language, 'Local manual workspace', 'स्थानीय मैन्युअल कार्यक्षेत्र')}</p>
-            <h1>{t(language, 'Inspect the official record. Record only ', 'आधिकारिक रिकॉर्ड देखें। केवल वही दर्ज करें जो ')}<em>{t(language, 'what you can see.', 'आप देख सकते हैं।')}</em></h1>
-            <p className={styles.lede}>{t(language, 'A structured self-review for a real e-Challan—without uploading the notice, photograph, RC, or personal identity.', 'असली ई-चालान की संरचित स्वयं-समीक्षा—नोटिस, तस्वीर, RC या व्यक्तिगत पहचान अपलोड किए बिना।')}</p>
-          </div>
-          <div className={styles.heroCard}>
-            <span>{t(language, 'REAL CASE · MANUAL ONLY', 'असली मामला · केवल मैन्युअल')}</span>
-            <strong>{t(language, 'What this safe first release can do', 'यह सुरक्षित पहला संस्करण क्या कर सकता है')}</strong>
-            <ul>
-              <li>{t(language, 'Check whether your own observations contain a material conflict', 'जाँचें कि आपके अवलोकनों में महत्वपूर्ण अंतर है या नहीं')}</li>
-              <li>{t(language, 'Track unclear or missing supplied evidence', 'अस्पष्ट या गायब दिए गए सबूत दर्ज करें')}</li>
-              <li>{t(language, 'Prepare a masked, neutral worksheet for an official route', 'आधिकारिक रास्ते के लिए मास्क की गई निष्पक्ष वर्कशीट बनाएँ')}</li>
-            </ul>
+            <h1>
+              {t(
+                language,
+                'Inspect the official record. Record only ',
+                'आधिकारिक रिकॉर्ड देखें। केवल वही दर्ज करें जो ',
+              )}
+              <em>{t(language, 'what you can see.', 'आप देख सकते हैं।')}</em>
+            </h1>
+            <p className={styles.lede}>
+              {goal === 'evidence'
+                ? t(
+                  language,
+                  'Bring the record and supplied photograph together, then confirm each observation.',
+                  'रिकॉर्ड और तस्वीर साथ लाएँ, फिर हर अवलोकन पुष्ट करें।',
+                )
+                : t(
+                  language,
+                  'Open the official service yourself, preview a selected record locally, and confirm structured facts.',
+                  'आधिकारिक सेवा स्वयं खोलें, रिकॉर्ड स्थानीय रूप से देखें और संरचित तथ्य पुष्ट करें।',
+                )}
+            </p>
           </div>
         </section>
-
         <SafetyBoundary language={language} />
 
         {step === 'safety' && (
           <section className={styles.panel} aria-labelledby="safety-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Before any case detail', 'किसी भी मामले की जानकारी से पहले')}</p><h2 id="safety-title">{t(language, 'Set the privacy boundary', 'गोपनीयता सीमा तय करें')}</h2><p>{t(language, 'Case answers are not persisted by this app. Reloading, closing, or quick-exiting clears them from page memory. The host still receives technical request logs; downloads, clipboard copies, screenshots, and browser history are outside that clear action.', 'मामले के उत्तर इस ऐप द्वारा स्थायी रूप से सेव नहीं होते। रीलोड, बंद करने या तुरंत बाहर निकलने पर वे पेज मेमोरी से साफ़ होते हैं। होस्ट को तकनीकी अनुरोध लॉग मिलते हैं; डाउनलोड, क्लिपबोर्ड, स्क्रीनशॉट और ब्राउज़र इतिहास इस सफ़ाई से बाहर हैं।')}</p></div></div>
+            <div className={styles.sectionTitle}>
+              <div>
+                <h2 id="safety-title">
+                  {t(language, 'Set the privacy boundary', 'गोपनीयता सीमा तय करें')}
+                </h2>
+                <p>
+                  {t(
+                    language,
+                    'Answers and selected files remain in this tab memory. Downloads, clipboard history, screenshots, backups, and ordinary hosting request metadata are outside Quick Exit.',
+                    'उत्तर और फ़ाइलें इस टैब मेमोरी में रहती हैं। डाउनलोड, क्लिपबोर्ड, स्क्रीनशॉट, बैकअप और सामान्य होस्टिंग मेटाडेटा तुरंत बाहर निकलने से साफ़ नहीं होते।',
+                  )}
+                </p>
+              </div>
+            </div>
             <div className={styles.choiceGrid}>
               <fieldset className={styles.choiceFieldset}>
-                <legend className={styles.choiceLegend}>{t(language, 'A. Who is reviewing this case?', 'A. इस मामले की समीक्षा कौन कर रहा है?')}</legend>
+                <legend className={styles.choiceLegend}>
+                  {t(language, 'Who is reviewing?', 'समीक्षा कौन कर रहा है?')}
+                </legend>
                 <div className={styles.choiceGroup}>
-                  <button type="button" aria-pressed={role === 'self'} className={`${styles.choice} ${role === 'self' ? styles.choiceActive : ''}`} onClick={() => { setRole('self'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'This is my case', 'यह मेरा मामला है')}</strong><small>{t(language, 'I will record only my own observations.', 'मैं केवल अपने अवलोकन दर्ज करूँगा/करूँगी।')}</small></button>
-                  <button type="button" aria-pressed={role === 'helper'} className={`${styles.choice} ${role === 'helper' ? styles.choiceActive : ''}`} onClick={() => { setRole('helper'); setHelperConfirmationSignature(''); }}><strong>{t(language, 'I am helping someone who is present', 'मैं सामने मौजूद किसी व्यक्ति की मदद कर रहा/रही हूँ')}</strong><small>{t(language, 'They have agreed; I will not infer answers or collect their identity.', 'उन्होंने सहमति दी है; मैं उत्तर का अनुमान या उनकी पहचान दर्ज नहीं करूँगा/करूँगी।')}</small></button>
+                  <button
+                    type="button"
+                    aria-pressed={role === 'self'}
+                    className={`${styles.choice} ${role === 'self' ? styles.choiceActive : ''}`}
+                    onClick={() => setRole('self')}
+                  >
+                    <strong>{t(language, 'This is my case', 'यह मेरा मामला है')}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={role === 'helper'}
+                    className={`${styles.choice} ${role === 'helper' ? styles.choiceActive : ''}`}
+                    onClick={() => setRole('helper')}
+                  >
+                    <strong>
+                      {t(
+                        language,
+                        'I am helping someone present',
+                        'मैं मौजूद व्यक्ति की मदद कर रहा/रही हूँ',
+                      )}
+                    </strong>
+                  </button>
                 </div>
               </fieldset>
               <fieldset className={styles.choiceFieldset}>
-                <legend className={styles.choiceLegend}>{t(language, 'B. What kind of device is this?', 'B. यह किस तरह का डिवाइस है?')}</legend>
+                <legend className={styles.choiceLegend}>
+                  {t(language, 'What kind of device?', 'किस तरह का डिवाइस?')}
+                </legend>
                 <div className={styles.choiceGroup}>
-                  <button type="button" aria-pressed={device === 'private'} className={`${styles.choice} ${device === 'private' ? styles.choiceActive : ''}`} onClick={() => setDevice('private')}><strong>{t(language, 'Private device', 'निजी डिवाइस')}</strong><small>{t(language, 'Copy and download can be enabled at the end.', 'अंत में कॉपी और डाउनलोड उपलब्ध होंगे।')}</small></button>
-                  <button type="button" aria-pressed={device === 'shared'} className={`${styles.choice} ${device === 'shared' ? styles.choiceActive : ''}`} onClick={() => setDevice('shared')}><strong>{t(language, 'Shared or public device', 'साझा या सार्वजनिक डिवाइस')}</strong><small>{t(language, 'In-app copy/download controls stay disabled; the page attempts to leave after about 10 minutes of inactivity. Use Quick exit when done.', 'ऐप के कॉपी/डाउनलोड नियंत्रण बंद रहते हैं; लगभग 10 मिनट निष्क्रिय रहने पर पेज बाहर निकलने का प्रयास करता है। अंत में तुरंत बाहर निकलें।')}</small></button>
+                  <button
+                    type="button"
+                    aria-pressed={device === 'private'}
+                    className={`${styles.choice} ${device === 'private' ? styles.choiceActive : ''}`}
+                    onClick={() => setDevice('private')}
+                  >
+                    <strong>{t(language, 'Private device', 'निजी डिवाइस')}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={device === 'shared'}
+                    className={`${styles.choice} ${device === 'shared' ? styles.choiceActive : ''}`}
+                    onClick={() => setDevice('shared')}
+                  >
+                    <strong>
+                      {t(language, 'Shared or public device', 'साझा या सार्वजनिक डिवाइस')}
+                    </strong>
+                  </button>
                 </div>
               </fieldset>
             </div>
             <div className={styles.acknowledgements}>
-              <label className={styles.check}><input type="checkbox" checked={consent.manual} onChange={(event) => setConsent({ ...consent, manual: event.target.checked })} />{t(language, 'I understand this is manual self-review, not document analysis, filing, payment, or legal advice.', 'मैं समझता/समझती हूँ कि यह मैन्युअल स्वयं-समीक्षा है, दस्तावेज़ विश्लेषण, फाइलिंग, भुगतान या कानूनी सलाह नहीं।')}</label>
-              <label className={styles.check}><input type="checkbox" checked={consent.minimum} onChange={(event) => setConsent({ ...consent, minimum: event.target.checked })} />{t(language, 'I will enter only the minimum masked details requested.', 'मैं केवल माँगी गई न्यूनतम मास्क की जानकारी दर्ज करूँगा/करूँगी।')}</label>
-              {role === 'helper' && <label className={styles.check}><input type="checkbox" checked={consent.citizenConfirmed} onChange={(event) => setConsent({ ...consent, citizenConfirmed: event.target.checked })} />{t(language, 'The citizen is present, has agreed, and will confirm the final observations.', 'नागरिक मौजूद है, सहमत है और अंतिम अवलोकनों की पुष्टि करेगा/करेगी।')}</label>}
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={consent.manual}
+                  onChange={(e) => setConsent({ ...consent, manual: e.target.checked })}
+                />
+                {t(
+                  language,
+                  'I understand this is manual self-review, not authentication, filing, payment, or legal advice.',
+                  'मैं समझता/समझती हूँ कि यह मैन्युअल समीक्षा है, प्रमाणीकरण, फाइलिंग, भुगतान या कानूनी सलाह नहीं।',
+                )}
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={consent.minimum}
+                  onChange={(e) => setConsent({ ...consent, minimum: e.target.checked })}
+                />
+                {t(
+                  language,
+                  'I will enter only minimum masked details.',
+                  'मैं केवल न्यूनतम मास्क जानकारी दर्ज करूँगा/करूँगी।',
+                )}
+              </label>
+              {role === 'helper' && (
+                <label className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={consent.citizenConfirmed}
+                    onChange={(e) => setConsent({
+                      ...consent,
+                      citizenConfirmed: e.target.checked,
+                    })}
+                  />
+                  {t(
+                    language,
+                    'The citizen is present and will confirm final observations.',
+                    'नागरिक मौजूद है और अंतिम अवलोकन पुष्ट करेगा।',
+                  )}
+                </label>
+              )}
             </div>
-            <p className={styles.restricted}><strong>{t(language, 'Never enter or paste:', 'कभी दर्ज या पेस्ट न करें:')}</strong> {t(language, 'names, phone/address, Aadhaar, full registration or challan number, RC/DL images, chassis/engine number, bank/card details, OTP, password, UPI PIN, or an entire notice/order.', 'नाम, फ़ोन/पता, आधार, पूरा वाहन या चालान नंबर, RC/DL तस्वीर, चेसिस/इंजन नंबर, बैंक/कार्ड जानकारी, OTP, पासवर्ड, UPI PIN या पूरा नोटिस/आदेश।')}</p>
-            {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><a className={styles.buttonQuiet} href="/demo">{t(language, 'Use the synthetic demo instead', 'इसके बजाय सिंथेटिक डेमो इस्तेमाल करें')}</a><button type="button" className={styles.button} onClick={continueSafety}>{t(language, 'Continue safely', 'सुरक्षित रूप से आगे बढ़ें')} →</button></div>
+            {error && (
+              <p className={styles.inlineError} role="alert">{error}</p>
+            )}
+            <div className={styles.actions}>
+              <a className={styles.buttonQuiet} href="/demo">
+                {t(language, 'Use synthetic demo', 'सिंथेटिक डेमो')}
+              </a>
+              <button type="button" className={styles.button} onClick={continueSafety}>
+                {t(language, 'Continue safely', 'सुरक्षित रूप से आगे')} →
+              </button>
+            </div>
           </section>
         )}
 
         {step === 'source' && (
           <section className={styles.panel} aria-labelledby="source-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Source before facts', 'तथ्यों से पहले स्रोत')}</p><h2 id="source-title">{t(language, 'How did you independently obtain the record?', 'आपने रिकॉर्ड स्वतंत्र रूप से कैसे प्राप्त किया?')}</h2><p>{t(language, 'Do not trust a link, number, or payment route merely because it appears in a message.', 'किसी संदेश में लिंक, नंबर या भुगतान रास्ता होने मात्र से उस पर भरोसा न करें।')}</p></div></div>
-            <div className={styles.choiceGrid}>
+            <div className={styles.sectionTitle}>
+              <div>
+                <h2 id="source-title">
+                  {t(language, 'Open the official service', 'आधिकारिक सेवा खोलें')}
+                </h2>
+                <p>
+                  {t(
+                    language,
+                    'Complete login, CAPTCHA, OTP, identity checks, or payment only on that official service.',
+                    'लॉगिन, CAPTCHA, OTP, पहचान या भुगतान केवल आधिकारिक सेवा पर पूरा करें।',
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className={styles.serviceGrid}>
               {([
-                ['official-service', t(language, 'I opened the official service myself', 'मैंने आधिकारिक सेवा खुद खोली'), t(language, 'The record/status is visible there.', 'रिकॉर्ड/स्थिति वहाँ दिखाई दे रही है।')],
-                ['downloaded-official-record', t(language, 'I downloaded it from an official service', 'मैंने इसे आधिकारिक सेवा से डाउनलोड किया'), t(language, 'I can still identify the official source.', 'मैं अभी भी आधिकारिक स्रोत पहचान सकता/सकती हूँ।')],
-                ['message-only', t(language, 'I only have a message or forwarded link', 'मेरे पास केवल संदेश या भेजा हुआ लिंक है'), t(language, 'Comparison stops until the source is independently verified.', 'स्वतंत्र पुष्टि तक तुलना रुक जाएगी।')],
-              ] as const).map(([value, title, body]) => <button type="button" key={value} className={`${styles.choice} ${answers.sourceStatus === value ? styles.choiceActive : ''}`} onClick={() => setAnswers({ ...answers, sourceStatus: value })}><strong>{title}</strong><small>{body}</small></button>)}
+                ['National e-Challan', NATIONAL_URL, true],
+                ['State or UT traffic service', '/safety', false],
+                ['Virtual Court', COURT_URL, true],
+                ['I am not sure', '/safety', false],
+              ] as const).map(([label, href, external]) => (
+                <article
+                  key={label}
+                  className={jurisdiction === label ? styles.serviceActive : ''}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={jurisdiction === label}
+                    onClick={() => setJurisdiction(label)}
+                  >
+                    {t(
+                      language,
+                      label,
+                      label === 'National e-Challan'
+                        ? 'राष्ट्रीय ई-चालान'
+                        : label === 'State or UT traffic service'
+                          ? 'राज्य/केंद्रशासित यातायात सेवा'
+                          : label === 'Virtual Court'
+                            ? 'वर्चुअल कोर्ट'
+                            : 'मुझे पता नहीं',
+                    )}
+                  </button>
+                  <a
+                    href={href}
+                    target={external ? '_blank' : undefined}
+                    rel={external ? 'noreferrer' : undefined}
+                  >
+                    {external
+                      ? t(language, 'Open official service ↗', 'आधिकारिक सेवा खोलें ↗')
+                      : t(language, 'Use safety route guidance', 'सुरक्षित रास्ता देखें')}
+                  </a>
+                </article>
+              ))}
             </div>
-            <div className={styles.formGrid} style={{ marginTop: 22 }}>
-              <SelectField id="jurisdiction" label={t(language, 'Jurisdiction shown on the official record', 'आधिकारिक रिकॉर्ड पर दिखा क्षेत्र')} value={jurisdiction} onChange={setJurisdiction} options={[
-                ['', t(language, 'Choose one', 'एक चुनें')], ['Central e-Challan service', t(language, 'Central e-Challan service', 'केंद्रीय ई-चालान सेवा')], ['State or UT service', t(language, 'State or UT service', 'राज्य या केंद्रशासित सेवा')], ['Virtual Court / court notice', t(language, 'Virtual Court or court notice', 'वर्चुअल कोर्ट या अदालत नोटिस')], ['Not sure', t(language, 'Not sure', 'पता नहीं')],
-              ]} help={t(language, 'This beta does not assume every state uses the same route.', 'यह बीटा नहीं मानता कि हर राज्य एक ही रास्ता उपयोग करता है।')} />
-              <SelectField id="offence" label={t(language, 'Alleged offence category (optional)', 'आरोपित अपराध श्रेणी (वैकल्पिक)')} value={offence} onChange={setOffence} options={[
-                ['', t(language, 'Not selected', 'नहीं चुना')], ['Helmet / seatbelt', t(language, 'Helmet or seatbelt', 'हेलमेट या सीटबेल्ट')], ['Signal / lane', t(language, 'Signal or lane', 'सिग्नल या लेन')], ['Speed', t(language, 'Speed', 'गति')], ['Parking / stopping', t(language, 'Parking or stopping', 'पार्किंग या रुकना')], ['Registration / document', t(language, 'Registration or document', 'पंजीकरण या दस्तावेज़')], ['Other / unclear', t(language, 'Other or unclear', 'अन्य या अस्पष्ट')],
-              ]} />
+            <div className={styles.recordSection}>
+              <h3>
+                {t(
+                  language,
+                  'Confirm how you obtained this copy',
+                  'पुष्टि करें कि कॉपी कैसे मिली',
+                )}
+              </h3>
+              <p>
+                {t(
+                  language,
+                  'Selecting a file does not authenticate its origin.',
+                  'फ़ाइल चुनना स्रोत प्रमाणित नहीं करता।',
+                )}
+              </p>
+              <div className={styles.choiceGrid}>
+                {([
+                  [
+                    'official-service',
+                    t(
+                      language,
+                      'I opened the official service myself',
+                      'मैंने आधिकारिक सेवा खुद खोली',
+                    ),
+                  ],
+                  [
+                    'downloaded-official-record',
+                    t(
+                      language,
+                      'I downloaded it from an official service',
+                      'मैंने इसे आधिकारिक सेवा से डाउनलोड किया',
+                    ),
+                  ],
+                  [
+                    'message-only',
+                    t(
+                      language,
+                      'I only have a message or forwarded link',
+                      'मेरे पास केवल संदेश या लिंक है',
+                    ),
+                  ],
+                ] as const).map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={answers.sourceStatus === value}
+                    className={`${styles.choice} ${
+                      answers.sourceStatus === value ? styles.choiceActive : ''
+                    }`}
+                    onClick={() => setAnswers({ ...answers, sourceStatus: value })}
+                  >
+                    <strong>{label}</strong>
+                  </button>
+                ))}
+              </div>
             </div>
-            {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('safety')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueSource}>{answers.sourceStatus === 'message-only' ? t(language, 'See the safe next step', 'सुरक्षित अगला कदम देखें') : t(language, 'Continue to evidence comparison', 'सबूत की तुलना पर आगे बढ़ें')} →</button></div>
+            <div className={styles.recordSection}>
+              <h3>
+                {t(
+                  language,
+                  'Choose one deliberate way to continue',
+                  'आगे बढ़ने का एक तरीका चुनें',
+                )}
+              </h3>
+              <p>
+                {t(
+                  language,
+                  'A file never changes your source or notice-copy answers.',
+                  'फ़ाइल आपके स्रोत या नोटिस-कॉपी उत्तर नहीं बदलती।',
+                )}
+              </p>
+              <button
+                type="button"
+                aria-pressed={manualEntryMode}
+                className={`${styles.buttonSecondary} ${
+                  manualEntryMode ? styles.manualActive : ''
+                }`}
+                onClick={useManual}
+              >
+                {t(
+                  language,
+                  'Enter the essential facts yourself',
+                  'आवश्यक तथ्य स्वयं दर्ज करें',
+                )}
+              </button>
+            </div>
+            <LocalRecordIntake
+              record={recordSelection}
+              photograph={photographSelection}
+              onRecordChange={recordChanged}
+              onPhotographChange={photographChanged}
+              language={language}
+            />
+            {error && (
+              <p className={styles.inlineError} role="alert">{error}</p>
+            )}
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.buttonSecondary}
+                onClick={() => setStep('safety')}
+              >
+                ← {t(language, 'Back', 'पीछे')}
+              </button>
+              <button type="button" className={styles.button} onClick={continueSource}>
+                {answers.sourceStatus === 'message-only'
+                  ? t(language, 'See safe next step', 'सुरक्षित अगला कदम')
+                  : t(language, 'Continue to fact checking', 'तथ्य जाँच पर आगे')} →
+              </button>
+            </div>
           </section>
         )}
 
         {step === 'observations' && (
           <section className={styles.panel} aria-labelledby="observe-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Your observation—not extraction', 'आपका अवलोकन—न कि निष्कर्षण')}</p><h2 id="observe-title">{t(language, 'Record only what the official evidence shows', 'केवल वही दर्ज करें जो आधिकारिक सबूत दिखाता है')}</h2><p>{t(language, 'Use the official record in a separate tab or device. Do not paste it here.', 'आधिकारिक रिकॉर्ड अलग टैब या डिवाइस में देखें। उसे यहाँ पेस्ट न करें।')}</p></div></div>
+            <div className={styles.sectionTitle}>
+              <div>
+                <h2 id="observe-title">
+                  {t(
+                    language,
+                    'Check the selected record beside every fact',
+                    'हर तथ्य के साथ रिकॉर्ड जाँचें',
+                  )}
+                </h2>
+                <p>
+                  {t(
+                    language,
+                    'These are citizen-recorded facts, not OCR or model extraction.',
+                    'ये नागरिक-दर्ज तथ्य हैं, OCR या मॉडल निष्कर्षण नहीं।',
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className={styles.evidenceWorkspace}>
+              <aside className={styles.previewColumn}>
+                {recordSelection ? (
+                  <Preview
+                    selection={recordSelection}
+                    title={t(language, 'Official record', 'आधिकारिक रिकॉर्ड')}
+                    language={language}
+                  />
+                ) : (
+                  <p>
+                    {t(
+                      language,
+                      'Manual fact entry selected; no record file is previewed.',
+                      'मैन्युअल तथ्य प्रविष्टि चुनी गई; कोई फ़ाइल प्रीव्यू नहीं है।',
+                    )}
+                  </p>
+                )}
+                {photographSelection && (
+                  <Preview
+                    selection={photographSelection}
+                    title={t(language, 'Supplied photograph', 'दी गई तस्वीर')}
+                    language={language}
+                  />
+                )}
+              </aside>
+          <div>
             <div className={styles.formGrid}>
-              <div className={styles.field}><label htmlFor="vehicle-suffix">{t(language, 'Your vehicle registration — last 4 only (optional)', 'आपका वाहन नंबर — केवल अंतिम 4 (वैकल्पिक)')}</label><input id="vehicle-suffix" value={vehicleSuffix} inputMode="text" maxLength={4} autoComplete="off" placeholder="3317" onChange={(event) => setVehicleSuffix(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))} /><small>{t(language, 'Never enter the full registration.', 'पूरा वाहन नंबर कभी दर्ज न करें।')}</small></div>
-              <div className={styles.field}><label htmlFor="event-date">{t(language, 'Event date shown (optional)', 'दिखाई गई घटना तारीख (वैकल्पिक)')}</label><input id="event-date" type="date" value={eventDate} max={indiaDateNow()} onInput={(event) => setEventDate(event.currentTarget.value)} onChange={(event) => setEventDate(event.target.value)} /><small>{t(language, 'Do not substitute the message-received date.', 'संदेश मिलने की तारीख को घटना तारीख न मानें।')}</small></div>
-              <div className={styles.field}><label htmlFor="official-deadline">{t(language, 'Deadline visibly shown by official service (optional)', 'आधिकारिक सेवा पर दिखाई अंतिम तारीख (वैकल्पिक)')}</label><input id="official-deadline" type="date" value={officialDeadline} onInput={(event) => setOfficialDeadline(event.currentTarget.value)} onChange={(event) => setOfficialDeadline(event.target.value)} /><small>{t(language, 'We do not infer a legal deadline when this is blank.', 'खाली होने पर हम कानूनी अंतिम तारीख का अनुमान नहीं लगाते।')}</small></div>
-              <div className={styles.field}><label htmlFor="image-inspected">{t(language, 'Did you inspect the officially supplied image?', 'क्या आपने आधिकारिक रूप से दी गई तस्वीर देखी?')}</label><select id="image-inspected" value={answers.imageInspected ? 'yes' : 'no'} onChange={(event) => setAnswers({ ...answers, imageInspected: event.target.value === 'yes' })}><option value="no">{t(language, 'No / image not supplied', 'नहीं / तस्वीर नहीं दी गई')}</option><option value="yes">{t(language, 'Yes, I inspected it', 'हाँ, मैंने देखी')}</option></select></div>
+              <div className={styles.field}>
+                <label htmlFor="vehicle-suffix">
+                  {t(
+                    language,
+                    'Vehicle registration — last 4 only',
+                    'वाहन नंबर — केवल अंतिम 4',
+                  )}
+                </label>
+                <input
+                  id="vehicle-suffix"
+                  value={vehicleSuffix}
+                  maxLength={4}
+                  autoComplete="off"
+                  onChange={(e) => setVehicleSuffix(
+                    e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4),
+                  )}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="offence">
+                  {t(language, 'Alleged offence category', 'आरोपित अपराध श्रेणी')}
+                </label>
+                <input
+                  id="offence"
+                  value={offence}
+                  autoComplete="off"
+                  onChange={(e) => setOffence(e.target.value.slice(0, 80))}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="event-date">
+                  {t(language, 'Displayed event date', 'दिखाई घटना तारीख')}
+                </label>
+                <input
+                  id="event-date"
+                  type="date"
+                  value={eventDate}
+                  max={indiaDateNow()}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="official-deadline">
+                  {t(
+                    language,
+                    'Displayed official deadline',
+                    'दिखाई आधिकारिक अंतिम तारीख',
+                  )}
+                </label>
+                <input
+                  id="official-deadline"
+                  type="date"
+                  value={officialDeadline}
+                  onChange={(e) => setOfficialDeadline(e.target.value)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="image-inspected">
+                  {t(
+                    language,
+                    'Did you inspect the supplied photograph?',
+                    'क्या आपने दी गई तस्वीर देखी?',
+                  )}
+                </label>
+                <select
+                  id="image-inspected"
+                  value={answers.imageInspected ? 'yes' : 'no'}
+                  onChange={(e) => setAnswers({
+                    ...answers,
+                    imageInspected: e.target.value === 'yes',
+                  })}
+                >
+                  <option value="no">
+                    {t(language, 'No / not supplied', 'नहीं / नहीं दी गई')}
+                  </option>
+                  <option value="yes">
+                    {t(language, 'Yes, inspected', 'हाँ, देखी')}
+                  </option>
+                </select>
+              </div>
             </div>
-
-            <div className={styles.observationGrid} style={{ marginTop: 22 }}>
+            <div className={styles.observationGrid}>
               {([
-                ['plateObservation', t(language, 'Plate comparison', 'नंबर प्लेट तुलना')],
+                ['plateObservation', t(language, 'Plate comparison', 'नंबर प्लेट')],
                 ['categoryObservation', t(language, 'Vehicle category', 'वाहन श्रेणी')],
-                ['colourObservation', t(language, 'Vehicle colour', 'वाहन का रंग')],
-              ] as const).map(([key, label]) => <div className={styles.observationCard} key={key}><label htmlFor={key}><span>{t(language, 'YOUR OBSERVATION', 'आपका अवलोकन')}</span>{label}</label><select id={key} value={answers[key]} disabled={!answers.imageInspected} onChange={(event) => setAnswers({ ...answers, [key]: event.target.value as Observation })}>{observationOptions.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></div>)}
-              <div className={styles.observationCard}><label htmlFor="offence-observation"><span>{t(language, 'YOUR OBSERVATION', 'आपका अवलोकन')}</span>{t(language, 'Alleged offence', 'आरोपित अपराध')}</label><select id="offence-observation" value={answers.offenceObservation} disabled={!answers.imageInspected} onChange={(event) => setAnswers({ ...answers, offenceObservation: event.target.value as OffenceObservation })}><option value="appears-visible">{t(language, 'Appears visible', 'दिखाई देता है')}</option><option value="not-visible">{t(language, 'Not visible in supplied image', 'दी गई तस्वीर में नहीं दिखता')}</option><option value="not-assessable-from-still">{t(language, 'Not assessable from one still', 'एक तस्वीर से जाँचना संभव नहीं')}</option><option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option></select></div>
-              <div className={styles.observationCard}><label htmlFor="timestamp-status"><span>{t(language, 'YOUR OBSERVATION', 'आपका अवलोकन')}</span>{t(language, 'Image timestamp', 'तस्वीर का समय')}</label><select id="timestamp-status" value={answers.timestampStatus} disabled={!answers.imageInspected} onChange={(event) => setAnswers({ ...answers, timestampStatus: event.target.value as CitizenChallanAnswers['timestampStatus'] })}><option value="displayed">{t(language, 'Displayed and readable', 'दिखता और पढ़ने योग्य')}</option><option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option><option value="not-found">{t(language, 'Not found', 'नहीं मिला')}</option></select></div>
-              <div className={styles.observationCard}><label htmlFor="location-status"><span>{t(language, 'YOUR OBSERVATION', 'आपका अवलोकन')}</span>{t(language, 'Image location', 'तस्वीर का स्थान')}</label><select id="location-status" value={answers.locationStatus} disabled={!answers.imageInspected} onChange={(event) => setAnswers({ ...answers, locationStatus: event.target.value as CitizenChallanAnswers['locationStatus'] })}><option value="displayed">{t(language, 'Displayed and readable', 'दिखता और पढ़ने योग्य')}</option><option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option><option value="not-found">{t(language, 'Not found', 'नहीं मिला')}</option></select></div>
+                ['colourObservation', t(language, 'Vehicle colour', 'वाहन रंग')],
+              ] as const).map(([key, label]) => (
+                <div className={styles.observationCard} key={key}>
+                  <label htmlFor={key}>{label}</label>
+                  <select
+                    id={key}
+                    value={answers[key]}
+                    disabled={!answers.imageInspected}
+                    onChange={(e) => setAnswers({
+                      ...answers,
+                      [key]: e.target.value as Observation,
+                    })}
+                  >
+                    {observationOptions.map(([v, labelText]) => (
+                      <option value={v} key={v}>{labelText}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <div className={styles.observationCard}>
+                <label htmlFor="offence-observation">
+                  {t(language, 'Offence visibility', 'अपराध दृश्यता')}
+                </label>
+                <select
+                  id="offence-observation"
+                  value={answers.offenceObservation}
+                  disabled={!answers.imageInspected}
+                  onChange={(e) => setAnswers({
+                    ...answers,
+                    offenceObservation: e.target.value as OffenceObservation,
+                  })}
+                >
+                  <option value="appears-visible">
+                    {t(language, 'Appears visible', 'दिखता है')}
+                  </option>
+                  <option value="not-visible">
+                    {t(language, 'Not visible', 'नहीं दिखता')}
+                  </option>
+                  <option value="not-assessable-from-still">
+                    {t(language, 'Not assessable from one still', 'एक तस्वीर से संभव नहीं')}
+                  </option>
+                  <option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option>
+                </select>
+              </div>
+              <SelectField
+                id="timestamp-status"
+                label={t(language, 'Evidence timestamp', 'सबूत समय')}
+                value={answers.timestampStatus}
+                onChange={(v) => setAnswers({
+                  ...answers,
+                  timestampStatus: v as CitizenChallanAnswers['timestampStatus'],
+                })}
+                options={[
+                  ['displayed', 'Displayed'],
+                  ['unclear', 'Unclear'],
+                  ['not-found', 'Not found'],
+                ]}
+              />
+              <SelectField
+                id="location-status"
+                label={t(language, 'Evidence location', 'सबूत स्थान')}
+                value={answers.locationStatus}
+                onChange={(v) => setAnswers({
+                  ...answers,
+                  locationStatus: v as CitizenChallanAnswers['locationStatus'],
+                })}
+                options={[
+                  ['displayed', 'Displayed'],
+                  ['unclear', 'Unclear'],
+                  ['not-found', 'Not found'],
+                ]}
+              />
             </div>
-
-            <div className={styles.formGrid} style={{ marginTop: 22 }}>
-              <SelectField id="own-record" label={t(language, 'Vehicle record you can compare', 'तुलना के लिए वाहन रिकॉर्ड')} value={answers.ownRecordAvailable} onChange={(value) => setAnswers({ ...answers, ownRecordAvailable: value as RecordAvailability })} options={recordOptions} />
-              <SelectField id="notice-copy" label={t(language, 'Official notice copy', 'आधिकारिक नोटिस कॉपी')} value={answers.noticeCopyAvailable} onChange={(value) => setAnswers({ ...answers, noticeCopyAvailable: value as RecordAvailability })} options={recordOptions} />
-              <SelectField id="custody-record" label={t(language, 'Event-time vehicle custody record (context only)', 'घटना समय वाहन अभिरक्षा रिकॉर्ड (केवल संदर्भ)')} value={answers.custodyRecordAvailable} onChange={(value) => setAnswers({ ...answers, custodyRecordAvailable: value as RecordAvailability })} options={recordOptions} help={t(language, 'This does not identify the driver or determine responsibility.', 'यह चालक की पहचान या जिम्मेदारी तय नहीं करता।')} />
+            <div className={styles.formGrid}>
+              <SelectField
+                id="own-record"
+                label={t(language, 'Vehicle comparison record', 'वाहन तुलना रिकॉर्ड')}
+                value={answers.ownRecordAvailable}
+                onChange={(v) => setAnswers({
+                  ...answers,
+                  ownRecordAvailable: v as RecordAvailability,
+                })}
+                options={recordOptions}
+              />
+              <SelectField
+                id="notice-copy"
+                label={t(language, 'Official notice copy', 'आधिकारिक नोटिस कॉपी')}
+                value={answers.noticeCopyAvailable}
+                onChange={(v) => setAnswers({
+                  ...answers,
+                  noticeCopyAvailable: v as RecordAvailability,
+                })}
+                options={recordOptions}
+              />
+              <SelectField
+                id="custody-record"
+                label={t(language, 'Custody record (context only)', 'अभिरक्षा रिकॉर्ड')}
+                value={answers.custodyRecordAvailable}
+                onChange={(v) => setAnswers({
+                  ...answers,
+                  custodyRecordAvailable: v as RecordAvailability,
+                })}
+                options={recordOptions}
+              />
             </div>
-            {role === 'helper' && <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={helperFinalConfirmed} onChange={(event) => setHelperConfirmationSignature(event.target.checked ? currentReviewSignature : '')} />{t(language, 'The citizen is still present. I read back these final observations and they confirmed each answer. Any later edit requires confirmation again.', 'नागरिक अभी मौजूद है। मैंने अंतिम अवलोकन पढ़कर सुनाए और उन्होंने हर उत्तर की पुष्टि की। बाद का कोई भी बदलाव फिर पुष्टि माँगेगा।')}</label></div>}
-            {error && <p className={styles.inlineError} role="alert">{error}</p>}
-            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('source')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueObservations}>{t(language, 'Show what my entries support', 'दिखाएँ कि मेरी प्रविष्टियाँ क्या समर्थन करती हैं')} →</button></div>
+          </div>
+        </div>
+            <div className={styles.acknowledgements}>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={factsConfirmed}
+                  onChange={(e) => {
+                    setFactsConfirmed(e.target.checked);
+                    setHelperSignature('');
+                  }}
+                />
+                {t(
+                  language,
+                  'I checked the selected record and photograph beside these entries. Every fact above is either confirmed by me or marked unclear/not supplied.',
+                  'मैंने रिकॉर्ड और तस्वीर के साथ ये प्रविष्टियाँ जाँचीं। हर तथ्य पुष्ट है या अस्पष्ट/नहीं दिया गया चिह्नित है।',
+                )}
+              </label>
+            </div>
+            {role === 'helper' && factsConfirmed && (
+              <div className={styles.acknowledgements}>
+                <label className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={helperConfirmed}
+                    onChange={(e) => setHelperSignature(e.target.checked ? signature : '')}
+                  />
+                  {t(
+                    language,
+                    'The citizen is present and confirmed every final entry.',
+                    'नागरिक मौजूद है और हर अंतिम प्रविष्टि पुष्ट की।',
+                  )}
+                </label>
+              </div>
+            )}
+            {view && (
+              <section className={styles.evidenceTableSection}>
+                <h3>
+                  {t(language, 'Source-linked evidence view', 'स्रोत-जुड़ा सबूत दृश्य')}
+                </h3>
+                <p>
+                  {t(
+                    language,
+                    'Confidence describes how clear your recorded observation is. It does not authenticate the document.',
+                    'विश्वास अवलोकन की स्पष्टता बताता है। यह दस्तावेज़ प्रमाणित नहीं करता।',
+                  )}
+                </p>
+                <EvidenceRows evidence={view} language={language} />
+              </section>
+            )}
+            {error && (
+              <p className={styles.inlineError} role="alert">{error}</p>
+            )}
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.buttonSecondary}
+                onClick={() => setStep('source')}
+              >
+                ← {t(language, 'Back', 'पीछे')}
+              </button>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={continueObservations}
+              >
+                {t(language, 'Decide and resolve', 'निर्णय और समाधान')} →
+              </button>
+            </div>
           </section>
         )}
 
         {step === 'result' && (
           <section className={styles.panel} aria-labelledby="result-title">
-            <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Conservative result', 'सावधान नतीजा')}</p><h2 id="result-title">{t(language, 'What your answers support—and do not support', 'आपके उत्तर क्या समर्थन करते हैं—और क्या नहीं')}</h2></div></div>
-            <div className={styles.resultHero} data-tone={resultCopy.tone}><span className={styles.resultIcon} aria-hidden="true">{resultCopy.tone === 'good' ? '✓' : resultCopy.tone === 'stop' ? 'i' : '!'}</span><div><h2>{resultCopy.title}</h2><p>{resultCopy.body}</p><p><strong>{t(language, 'Based only on your answers.', 'केवल आपके उत्तरों पर आधारित।')}</strong> {t(language, 'ChallanSakshi did not inspect the photograph, challan, RC, authority record, or official status.', 'ChallanSakshi ने तस्वीर, चालान, RC, प्राधिकरण रिकॉर्ड या आधिकारिक स्थिति नहीं देखी।')}</p></div></div>
-
-            {answers.sourceStatus === 'message-only' ? (
-              <div className={styles.stopCard} style={{ marginTop: 18 }}><h2>{t(language, 'Do not use the message link', 'संदेश का लिंक उपयोग न करें')}</h2><p>{t(language, 'Independently locate the responsible official e-Challan or state/UT service. An official route must not be inferred from the message itself, and ChallanSakshi will not guess one from incomplete details.', 'जिम्मेदार आधिकारिक ई-चालान या राज्य/केंद्रशासित सेवा स्वतंत्र रूप से खोजें। संदेश से आधिकारिक रास्ते का अनुमान न लगाएँ; ChallanSakshi अधूरी जानकारी से रास्ता नहीं चुनेगा।')}</p><a className={styles.button} href={jurisdiction === 'Central e-Challan service' ? 'https://echallan.parivahan.gov.in/' : '/safety'} target={jurisdiction === 'Central e-Challan service' ? '_blank' : undefined} rel={jurisdiction === 'Central e-Challan service' ? 'noreferrer' : undefined}>{jurisdiction === 'Central e-Challan service' ? t(language, 'Open official central e-Challan service', 'आधिकारिक केंद्रीय ई-चालान सेवा खोलें') : t(language, 'Find the responsible official route safely', 'जिम्मेदार आधिकारिक रास्ता सुरक्षित रूप से खोजें')} ↗</a></div>
+            <div className={styles.sectionTitle}>
+              <div>
+                <h2 id="result-title">
+                  {t(
+                    language,
+                    'What your confirmed entries support',
+                    'आपकी पुष्ट प्रविष्टियाँ क्या समर्थन करती हैं',
+                  )}
+                </h2>
+              </div>
+            </div>
+            <div className={styles.resultHero} data-tone={copy.tone}>
+              <span className={styles.resultIcon} aria-hidden="true">
+                {copy.tone === 'good' ? '✓' : copy.tone === 'warn' ? '!' : 'i'}
+              </span>
+              <div>
+                <h2>{copy.title[language === 'hi' ? 1 : 0]}</h2>
+                <p>{resultBody}</p>
+                <p>
+                  <strong>{t(language, 'Limitation:', 'सीमा:')}</strong>{' '}
+                  {t(
+                    language,
+                    'Classification comes only from confirmed structured answers; ChallanSakshi did not authenticate or decide the case.',
+                    'वर्गीकरण केवल पुष्ट उत्तरों से आता है; ChallanSakshi ने प्रमाणित या निर्णय नहीं किया।',
+                  )}
+                </p>
+              </div>
+            </div>
+            {answers.sourceStatus === 'message-only' || !factsConfirmed || !view ? (
+              <div className={styles.stopCard}>
+                <h2>
+                  {t(language, 'Do not use the message link', 'संदेश लिंक उपयोग न करें')}
+                </h2>
+                <p>
+                  {t(
+                    language,
+                    'Find the responsible official service independently. Evidence comparison remains unavailable.',
+                    'जिम्मेदार आधिकारिक सेवा स्वतंत्र रूप से खोजें। सबूत तुलना उपलब्ध नहीं है।',
+                  )}
+                </p>
+                <a
+                  className={styles.button}
+                  href={route.href}
+                  target={route.external ? '_blank' : undefined}
+                  rel={route.external ? 'noreferrer' : undefined}
+                >
+                  {route.label} →
+                </a>
+              </div>
             ) : (
-              <>
-                <div className={styles.resultMeta}>
-                  <article><small>{t(language, 'Source', 'स्रोत')}</small><strong>{answers.sourceStatus.replaceAll('-', ' ')}</strong></article>
-                  <article><small>{t(language, 'Identifier shown here', 'यहाँ दिखाई पहचान')}</small><strong>{vehicleSuffix ? `•••• ${vehicleSuffix}` : t(language, 'Not entered', 'दर्ज नहीं')}</strong></article>
-                  <article><small>{t(language, 'Worksheet', 'वर्कशीट')}</small><strong>{assessment.canPrepareWorksheet ? t(language, 'Neutral preparation available', 'निष्पक्ष तैयारी उपलब्ध') : t(language, 'Dispute request withheld', 'विवाद अनुरोध रोका गया')}</strong></article>
-                </div>
-
-                {deadline && deadline.status !== 'not-entered' && <div className={styles.deadline}><strong>{deadline.status === 'open' ? t(language, `${deadline.daysRemaining} calendar days to the copied official date`, `कॉपी की गई आधिकारिक तारीख तक ${deadline.daysRemaining} कैलेंडर दिन`) : deadline.status === 'today' ? t(language, 'The copied official date is today', 'कॉपी की गई आधिकारिक तारीख आज है') : t(language, 'The copied official date has passed', 'कॉपी की गई आधिकारिक तारीख बीत चुकी है')}</strong><p>{t(language, 'This is not a legal deadline calculation. It only counts to the date you copied. Verify the current case state and route now.', 'यह कानूनी अंतिम तारीख की गणना नहीं है। यह केवल आपके कॉपी किए दिन तक गिनती है। वर्तमान केस स्थिति और रास्ता अभी जाँचें।')}</p></div>}
-
-                <div className={styles.listPanel}><h3>{t(language, 'What to verify before acting', 'कार्रवाई से पहले क्या जाँचें')}</h3><ul>{assessment.materialSignals.map((item) => <li key={item}>{item}</li>)}{assessment.missingEvidence.map((item) => <li key={item}>{item}</li>)}<li>{t(language, 'Re-check the current official status, applicable route, and any displayed deadline.', 'वर्तमान आधिकारिक स्थिति, लागू रास्ता और दिखाई अंतिम तारीख फिर जाँचें।')}</li></ul></div>
-
-                {assessment.canPrepareWorksheet ? <div className={styles.artifact}><h3>{t(language, 'Local masked worksheet', 'स्थानीय मास्क की गई वर्कशीट')}</h3><p className={styles.artifactWarning}>{device === 'shared' ? t(language, 'The in-app copy/download controls are disabled; text may still be manually selected. The page attempts to leave after about 10 minutes of inactivity. Read the checklist, then Quick exit & clear.', 'ऐप के कॉपी/डाउनलोड नियंत्रण बंद हैं; टेक्स्ट फिर भी मैन्युअली चुना जा सकता है। लगभग 10 मिनट निष्क्रिय रहने पर पेज बाहर निकलने का प्रयास करता है। सूची पढ़ें, फिर तुरंत बाहर निकलें और साफ़ करें।') : t(language, 'Copying or downloading may leave information in the clipboard or Downloads folder. ChallanSakshi cannot erase those copies.', 'कॉपी या डाउनलोड से जानकारी क्लिपबोर्ड या डाउनलोड फ़ोल्डर में रह सकती है। ChallanSakshi उन कॉपी को मिटा नहीं सकता।')}</p><pre>{worksheet}</pre></div> : <div className={styles.stopCard}><h3>{t(language, 'No dispute request prepared', 'कोई विवाद अनुरोध तैयार नहीं किया गया')}</h3><p>{t(language, 'This outcome does not support a request from the entered observations. Review the official record or correct an answer; ChallanSakshi will not manufacture a dispute.', 'दर्ज अवलोकन इस नतीजे में अनुरोध का समर्थन नहीं करते। आधिकारिक रिकॉर्ड फिर देखें या उत्तर सुधारें; ChallanSakshi विवाद नहीं गढ़ेगा।')}</p></div>}
-
-                <div className={styles.sourceGrid}>
-                  {jurisdiction === 'Central e-Challan service' ? <a href="https://echallan.parivahan.gov.in/" target="_blank" rel="noreferrer"><strong>{t(language, 'Official central e-Challan service ↗', 'आधिकारिक केंद्रीय ई-चालान सेवा ↗')}</strong><small>{t(language, 'Nothing from this review is transferred. Re-enter required details only there.', 'इस समीक्षा से कुछ स्थानांतरित नहीं होता। आवश्यक जानकारी केवल वहाँ फिर दर्ज करें।')}</small></a> : <a href="/safety"><strong>{t(language, 'Return to the State/UT service you independently verified', 'स्वतंत्र रूप से सत्यापित राज्य/केंद्रशासित सेवा पर लौटें')}</strong><small>{t(language, 'ChallanSakshi does not guess or redirect a state route from your entries.', 'ChallanSakshi आपकी प्रविष्टियों से राज्य रास्ते का अनुमान या रीडायरेक्ट नहीं करता।')}</small></a>}
-                  <a href="/safety"><strong>{t(language, 'Check route and scam safety', 'रास्ता और स्कैम सुरक्षा जाँचें')}</strong><small>{t(language, 'Official domains, court handoff limits, and credential red flags.', 'आधिकारिक डोमेन, अदालत हस्तांतरण सीमाएँ और क्रेडेंशियल खतरे।')}</small></a>
-                </div>
-
-                {artifactStatus && <p className={styles.inlineError} role="status">{artifactStatus}</p>}
-              </>
-            )}
-
-            <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep(answers.sourceStatus === 'message-only' ? 'source' : 'observations')}>← {t(language, 'Edit answers', 'उत्तर बदलें')}</button>{assessment.canPrepareWorksheet && answers.sourceStatus !== 'message-only' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}><button type="button" className={styles.buttonSecondary} disabled={device === 'shared'} onClick={copyWorksheet}>{t(language, 'Copy worksheet', 'वर्कशीट कॉपी करें')}</button><button type="button" className={styles.button} disabled={device === 'shared'} onClick={downloadWorksheet}>{t(language, 'Download .txt', '.txt डाउनलोड करें')}</button></div>}</div>
+                <>
+                  <div className={styles.resultColumns}>
+                    <section className={styles.listPanel}>
+                      <h3>{t(language, 'What can be established', 'क्या स्थापित है')}</h3>
+                      <ul>
+                        {assessment.materialSignals.length ? (
+                          assessment.materialSignals.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))
+                        ) : (
+                          <li>
+                            {t(
+                              language,
+                              'No material inconsistency was established.',
+                              'कोई महत्वपूर्ण असंगति स्थापित नहीं हुई।',
+                            )}
+                          </li>
+                        )}
+                      </ul>
+                    </section>
+                    <section className={styles.listPanel}>
+                      <h3>{t(language, 'What remains unclear', 'क्या अस्पष्ट है')}</h3>
+                      <ul>
+                        {assessment.cautions.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
+                  <section className={styles.listPanel}>
+                    <h3>{t(language, 'Evidence still needed', 'अभी आवश्यक सबूत')}</h3>
+                    <ul>
+                      {assessment.missingEvidence.length ? (
+                        assessment.missingEvidence.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))
+                      ) : (
+                        <li>
+                          {t(
+                            language,
+                            'No missing record marked.',
+                            'कोई गायब रिकॉर्ड चिह्नित नहीं।',
+                          )}
+                        </li>
+                      )}
+                    </ul>
+                  </section>
+                  <section className={styles.evidenceTableSection}>
+                    <h3>
+                      {t(
+                        language,
+                        'Evidence sources and confidence',
+                        'सबूत स्रोत और विश्वास',
+                      )}
+                    </h3>
+                    <p>
+                      {t(
+                        language,
+                        'Confidence describes how clear your recorded observation is. It does not authenticate the document.',
+                        'विश्वास अवलोकन की स्पष्टता बताता है। यह दस्तावेज़ प्रमाणित नहीं करता।',
+                      )}
+                    </p>
+                    <EvidenceRows evidence={view} language={language} />
+                  </section>
+                  {deadline && deadline.status !== 'not-entered' && (
+                    <div className={styles.deadline}>
+                      <strong>
+                        {deadline.status === 'open'
+                          ? `${deadline.daysRemaining} calendar days to the copied official date`
+                          : deadline.status === 'today'
+                            ? 'The copied official date is today'
+                            : 'The copied official date has passed'}
+                      </strong>
+                      <p>
+                        {t(
+                          language,
+                          'This is not a legal deadline calculation.',
+                          'यह कानूनी समयसीमा गणना नहीं है।',
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  <section className={styles.timeline}>
+                    <h3>
+                      {t(language, 'Citizen-recorded timeline', 'नागरिक-दर्ज समयरेखा')}
+                    </h3>
+                    <ol>
+                      {timelineFor(summaryGenerated).map((item) => (
+                        <li key={item.id}>{item.label}</li>
+                      ))}
+                    </ol>
+                  </section>
+                  <section className={styles.officialHandoff}>
+                    <div>
+                      <h3>{t(language, 'Exact official route', 'सटीक आधिकारिक रास्ता')}</h3>
+                      <p>
+                        {t(
+                          language,
+                          'Nothing is transferred; enter identifiers only there.',
+                          'कुछ स्थानांतरित नहीं होता; पहचान केवल वहाँ दर्ज करें।',
+                        )}
+                      </p>
+                    </div>
+                    <a
+                      className={styles.button}
+                      href={route.href}
+                      target={route.external ? '_blank' : undefined}
+                      rel={route.external ? 'noreferrer' : undefined}
+                    >
+                      {route.label} →
+                    </a>
+                  </section>
+                  <section className={styles.artifact}>
+                    <h3>
+                      {t(language, 'Citizen evidence summary', 'नागरिक सबूत सारांश')}
+                    </h3>
+                    <p className={styles.summaryDisclaimer}>{DISCLAIMER}</p>
+                    <p className={styles.artifactWarning}>
+                      {device === 'shared'
+                        ? t(
+                          language,
+                          'Download, copy, and print are disabled on this shared device. Screenshots, clipboard history, browser downloads, and backups are outside ChallanSakshi’s control.',
+                          'इस साझा डिवाइस पर डाउनलोड, कॉपी और प्रिंट बंद हैं। स्क्रीनशॉट, क्लिपबोर्ड, डाउनलोड और बैकअप नियंत्रण से बाहर हैं।',
+                        )
+                        : t(
+                          language,
+                          'Local actions may leave copies on this device.',
+                          'स्थानीय कार्रवाई से डिवाइस पर कॉपी रह सकती है।',
+                        )}
+                    </p>
+                    <pre>{summaryFor(summaryGenerated)}</pre>
+                    <div className={styles.summaryActions}>
+                      <button
+                        type="button"
+                        className={styles.buttonSecondary}
+                        disabled={device === 'shared'}
+                        onClick={copySummary}
+                      >
+                        {t(language, 'Copy summary', 'सारांश कॉपी')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.buttonSecondary}
+                        disabled={device === 'shared'}
+                        onClick={printSummary}
+                      >
+                        {t(language, 'Print / Save as PDF', 'प्रिंट / PDF')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.button}
+                        disabled={device === 'shared'}
+                        onClick={saveSummary}
+                      >
+                        {t(language, 'Download .txt', '.txt डाउनलोड')}
+                      </button>
+                    </div>
+                  </section>
+                  {artifactStatus && (
+                    <p className={styles.inlineStatus} role="status">{artifactStatus}</p>
+                  )}
+                </>
+              )}
+            <p className={styles.summaryDisclaimer}>{DISCLAIMER}</p>
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.buttonSecondary}
+                onClick={() => setStep(
+                  answers.sourceStatus === 'message-only' ? 'source' : 'observations',
+                )}
+              >
+                ← {t(language, 'Edit answers', 'उत्तर बदलें')}
+              </button>
+            </div>
           </section>
         )}
       </main>

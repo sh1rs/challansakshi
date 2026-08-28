@@ -55,7 +55,6 @@ export function GuidedStepHeader({
     why: labels.why ?? 'Why this matters',
     status: labels.status ?? 'Status',
     next: labels.next ?? 'Next',
-    allSteps: labels.allSteps ?? 'See all steps',
   };
   const stateLabels: Record<GuidedStepState, string> = {
     complete: labels.stateComplete ?? defaultStateLabels.complete,
@@ -91,22 +90,19 @@ export function GuidedStepHeader({
         <div><span>{copy.next}</span><p>{next}</p></div>
       </div>
 
-      <details className={styles.stepDisclosure}>
-        <summary>{copy.allSteps}</summary>
-        <ol aria-label={progressLabel}>
-          {steps.map((step, index) => (
-            <li
-              key={step.id}
-              data-state={step.state}
-              aria-current={step.state === 'current' ? 'step' : undefined}
-              aria-label={`${stateLabels[step.state]}: ${step.label}`}
-            >
-              <span aria-hidden="true">{step.state === 'complete' ? '✓' : step.state === 'skipped' || step.state === 'safe-stop' ? '—' : index + 1}</span>
-              <small><b className={styles.visuallyHidden}>{stateLabels[step.state]}: </b>{step.label}</small>
-            </li>
-          ))}
-        </ol>
-      </details>
+      <ol className={styles.stepList} aria-label={progressLabel}>
+        {steps.map((step, index) => (
+          <li
+            key={step.id}
+            data-state={step.state}
+            aria-current={step.state === 'current' ? 'step' : undefined}
+            aria-label={`${stateLabels[step.state]}: ${step.label}`}
+          >
+            <span aria-hidden="true">{step.state === 'complete' ? '✓' : step.state === 'skipped' || step.state === 'safe-stop' ? '—' : index + 1}</span>
+            <small><b className={styles.visuallyHidden}>{stateLabels[step.state]}: </b>{step.label}</small>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

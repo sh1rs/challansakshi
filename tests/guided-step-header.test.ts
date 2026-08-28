@@ -30,7 +30,10 @@ describe('GuidedStepHeader', () => {
     expect(html).toContain('Completed: Protect your information');
     expect(html).toContain('Current: Verify the source');
     expect(html).toContain('Upcoming: Compare the evidence');
-    expect(html).toContain('See all steps');
+    expect(html).toContain('<ol class=');
+    expect(html).toContain('aria-label="e-Challan review steps"');
+    expect(html).not.toContain('<details');
+    expect(html).not.toContain('<summary');
   });
 
   it('does not present a safe-stopped journey as 100 percent complete', () => {

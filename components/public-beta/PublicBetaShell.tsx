@@ -17,6 +17,8 @@ export function PublicBetaShell({
   children,
   onQuickExit,
   englishOnly = false,
+  simpleMode,
+  onSimpleModeChange,
 }: {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -25,9 +27,11 @@ export function PublicBetaShell({
   children: ReactNode;
   onQuickExit?: () => void;
   englishOnly?: boolean;
+  simpleMode?: boolean;
+  onSimpleModeChange?: (value: boolean) => void;
 }) {
   return (
-    <div className={styles.app}>
+    <div className={styles.app} data-simple-mode={simpleMode === undefined ? undefined : simpleMode}>
       <div className={styles.publicBar}>
         <span aria-hidden="true" />
         {t(language, 'Independent public-interest early access · Not a government, bank, court, or toll service', 'स्वतंत्र जनहित अर्ली एक्सेस · यह सरकारी, बैंक, अदालत या टोल सेवा नहीं है')}
@@ -41,6 +45,7 @@ export function PublicBetaShell({
           <a href="/review">{t(language, 'Challan review', 'चालान समीक्षा')}</a>
           <a href="/fastag">{t(language, 'FASTag check', 'FASTag जाँच')}</a>
           <a href="/privacy">{t(language, 'Privacy', 'गोपनीयता')}</a>
+          {simpleMode !== undefined && onSimpleModeChange ? <button type="button" className={styles.simpleMode} aria-pressed={simpleMode} onClick={() => onSimpleModeChange(!simpleMode)}>{t(language, 'Simple mode', 'सरल भाषा')}</button> : null}
           {onQuickExit && <button type="button" className={styles.quickExit} aria-label={t(language, 'Quick exit and clear this review', 'तुरंत बाहर निकलें और यह समीक्षा साफ़ करें')} onClick={onQuickExit}>{t(language, 'Quick exit & clear', 'तुरंत बाहर निकलें और साफ़ करें')}</button>}
           {englishOnly ? <span className={styles.englishOnly}>English-only safety beta</span> : <div className={styles.languages} role="group" aria-label={t(language, 'Language', 'भाषा')}>
             <button type="button" className={language === 'en' ? styles.active : ''} aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>EN</button>
@@ -70,8 +75,8 @@ export function SafetyBoundary({ language, children }: { language: Language; chi
     <aside className={styles.boundary} aria-label={t(language, 'Important product boundary', 'महत्वपूर्ण उत्पाद सीमा')}>
       <span aria-hidden="true">i</span>
       <div>
-        <strong>{t(language, 'Manual self-review · no document upload', 'मैन्युअल स्वयं-समीक्षा · कोई दस्तावेज़ अपलोड नहीं')}</strong>
-        <p>{t(language, 'Based only on your answers. ChallanSakshi did not inspect your records or official status. Your real-mode answers stay only in this tab and are not sent to our server, an AI model, an authority, a bank, or a toll operator.', 'केवल आपके उत्तरों पर आधारित। ChallanSakshi ने आपके रिकॉर्ड या आधिकारिक स्थिति नहीं देखी। रियल-मोड के उत्तर केवल इस टैब में रहते हैं और हमारे सर्वर, AI मॉडल, प्राधिकरण, बैंक या टोल ऑपरेटर को नहीं भेजे जाते।')}</p>
+        <strong>{t(language, 'Local record preview · no server upload', 'स्थानीय रिकॉर्ड प्रीव्यू · कोई सर्वर अपलोड नहीं')}</strong>
+        <p>{t(language, 'Selected records and answers remain in the current browser tab. They are not sent to a server, AI model, authority, bank, or toll operator. The hosting provider still receives ordinary page-request metadata.', 'चुने रिकॉर्ड और उत्तर मौजूदा ब्राउज़र टैब में रहते हैं। वे सर्वर, AI मॉडल, प्राधिकरण, बैंक या टोल ऑपरेटर को नहीं भेजे जाते। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
         {children}
       </div>
     </aside>

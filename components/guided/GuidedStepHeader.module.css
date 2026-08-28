@@ -3,7 +3,7 @@
   padding: 22px;
   border: 1px solid #b9d4cd;
   border-radius: 16px;
-  background: linear-gradient(145deg, #f7fcfa 0%, #edf7f3 100%);
+  background: #f7fcfa;
   color: #163f3b;
   box-shadow: 0 14px 38px rgb(23 65 61 / 8%);
 }
@@ -25,16 +25,14 @@
 .status[data-tone='safe-stop'] strong { color: #843d37; }
 .status[data-tone='ready'], .status[data-tone='complete'] { border-color: #a9cfbf; background: #f1faf6; }
 .status[data-tone='ready'] strong, .status[data-tone='complete'] strong { color: #17614e; }
-.stepDisclosure { margin-top: 18px; }
-.stepDisclosure summary { color: #17665f; font-size: 11px; font-weight: 850; cursor: pointer; }
-.stepDisclosure ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
-.stepDisclosure li { display: flex; align-items: center; gap: 8px; min-width: 0; color: #71827c; }
-.stepDisclosure li > span { width: 25px; height: 25px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid #c4d2cd; border-radius: 50%; background: #fff; font-size: 9px; font-weight: 900; }
-.stepDisclosure small { overflow: hidden; font-size: 10px; font-weight: 760; line-height: 1.3; text-overflow: ellipsis; }
-.stepDisclosure li[data-state='current'] { color: #135c55; }
-.stepDisclosure li[data-state='current'] > span, .stepDisclosure li[data-state='complete'] > span { border-color: #087a74; background: #087a74; color: #fff; }
-.stepDisclosure li[data-state='safe-stop'], .stepDisclosure li[data-state='skipped'] { color: #855148; }
-.stepDisclosure li[data-state='safe-stop'] > span, .stepDisclosure li[data-state='skipped'] > span { border-color: #d9aaa1; background: #fff1ee; color: #8b423a; }
+.stepList { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.stepList li { display: flex; align-items: center; gap: 8px; min-width: 0; color: #71827c; }
+.stepList li > span { width: 25px; height: 25px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid #c4d2cd; border-radius: 50%; background: #fff; font-size: 9px; font-weight: 900; }
+.stepList small { overflow: hidden; font-size: 10px; font-weight: 760; line-height: 1.3; text-overflow: ellipsis; }
+.stepList li[data-state='current'] { color: #135c55; }
+.stepList li[data-state='current'] > span, .stepList li[data-state='complete'] > span { border-color: #087a74; background: #087a74; color: #fff; }
+.stepList li[data-state='safe-stop'], .stepList li[data-state='skipped'] { color: #855148; }
+.stepList li[data-state='safe-stop'] > span, .stepList li[data-state='skipped'] > span { border-color: #d9aaa1; background: #fff1ee; color: #8b423a; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 700px) {
@@ -42,9 +40,7 @@
   .guideTopline span { display: none; }
   .primaryInstruction h2 { font-size: 24px; }
   .guideDetails { grid-template-columns: 1fr; }
-  .stepDisclosure:not([open]) ol { display: none; }
-  .stepDisclosure ol { grid-template-columns: 1fr; }
-  .stepDisclosure li { padding: 5px 0; }
+  .stepList { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) { .progressTrack span { transition: none; } }
