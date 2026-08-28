@@ -42,7 +42,7 @@
 .actionLink, .fastagDoorway a { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 20px; padding: 0 18px; border: 1.5px solid var(--teal-deep); border-radius: 7px; color: var(--teal-deep); font-size: 14px; font-weight: 760; text-decoration: none; }
 .actionLink svg, .fastagDoorway a svg { width: 20px; height: 20px; }
 .actionRow:nth-child(2) .actionLink { border-color: #cd8100; background: #e99100; color: white; }
-.actionLink:hover, .actionLink:focus-visible, .fastagDoorway a:hover, .fastagDoorway a:focus-visible { outline: 3px solid rgb(0 125 120 / 20%); outline-offset: 2px; }
+.actionLink:hover, .actionLink:focus-visible, .fastagDoorway a:hover, .fastagDoorway a:focus-visible { outline: 3px solid var(--teal-deep); outline-offset: 2px; }
 
 .situationRail { display: grid; grid-template-columns: 160px 1fr; align-items: stretch; margin-top: 24px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .situationRail > strong { display: grid; align-content: center; padding: 14px 18px; font-size: 14px; line-height: 1.25; }
@@ -104,9 +104,9 @@
   .header, .main { width: min(100% - 28px, 1320px); }
   .header { min-height: 66px; flex-wrap: wrap; gap: 6px 10px; padding: 8px 0; }
   .brand { font-size: 24px; }
-  .headerActions { width: 100%; justify-content: space-between; gap: 4px; }
-  .headerActions > a, .simpleToggle { width: auto; min-height: 40px; font-size: 11px; }
-  .languageToggle button { min-width: 48px; min-height: 34px; font-size: 11px; }
+  .headerActions { width: 100%; flex-wrap: wrap; justify-content: flex-start; gap: 4px 10px; }
+  .headerActions > a, .simpleToggle { width: auto; min-height: 48px; font-size: 13px; }
+  .languageToggle button { min-width: 48px; min-height: 48px; font-size: 13px; }
   .main { padding-top: 24px; }
   .hero > h1 { font-size: clamp(38px, 11vw, 51px); text-align: left; }
   .hero > p { margin: 13px 0 18px; font-size: 17px; text-align: left; }
