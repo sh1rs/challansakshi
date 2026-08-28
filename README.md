@@ -2,14 +2,16 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first citizen project built around one discipline: **inspect the official record, separate observation from conclusion, refuse unsupported claims, and hand the citizen a conservative next-step checklist.** The flagship synthetic journey asks whether a challan’s own evidence, timestamp, vehicle-relationship record, and case state agree. Two isolated real-mode tools now turn that discipline into immediate public utility without collecting documents:
+ChallanSakshi is an independent, evidence-first citizen project built around one discipline: **inspect the official record, separate observation from conclusion, refuse unsupported claims, and hand the citizen a conservative next-step checklist.** The flagship synthetic journey asks whether a challan’s own evidence, timestamp, vehicle-relationship record, and case state agree. The public routes keep the real citizen tools separate from that synthetic walkthrough:
 
-- `/review` — a no-upload, no-AI, memory-only e-Challan self-review using masked structured observations;
-- `/fastag` — TollSakshi, a no-upload FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport.
+- `/` — the clean citizen homepage and bounded goal chooser;
+- `/review` — a tab-memory-only e-Challan review with deliberate local record preview, citizen-confirmed structured facts, conservative findings, and exact official handoff;
+- `/fastag` — TollSakshi, a structured FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport; and
+- `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures.
 
-The original synthetic engine remains sealed from both real-mode workflows. It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note.
+The original synthetic engine remains sealed inside `/demo`. It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note.
 
-> Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. The homepage evidence journey is synthetic; the two real-mode routes accept only masked structured answers and never receive documents.
+> Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` can preview citizen-selected files locally in the current tab, but it does not upload them to a ChallanSakshi server or AI model.
 
 ## The exact citizen problem
 
@@ -33,12 +35,12 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 ## What is working
 
-- A hard-separated **real e-Challan manual review** that starts with source verification, refuses a message-only notice, asks only structured masked observations, blocks conclusions when the official image was not inspected, treats colour alone as non-action-ready, uses only a deadline copied from an official service, and generates a neutral local worksheet.
+- A hard-separated **real e-Challan manual review** that starts with an exact official-service handoff, accepts deliberate local selection of one official record and one supplied image, requires citizen-confirmed structured observations, refuses a message-only comparison, treats colour alone as non-action-ready, uses only a deadline copied from an official service, and generates a local citizen evidence summary.
 - **TollSakshi**, a recorded-FASTag-transaction self-review for unrecognised crossings, citizen-reported two-debit patterns, alternate payment, fare/class, pass/discount, and aligned-record checks. It distinguishes reader-read, debit-post, and SMS times; separates bank-issued from bank-neutral NHAI FASTag routes; applies no definitive duplicate-time threshold; and withholds an action note unless the final same-transaction attestation still matches every compared field. Tag-not-working and plaza/road incidents without a recorded debit are deliberately routed to the separate Safety page rather than forced through this transaction workflow.
 - A 14-element **Toll Evidence Passport** and **Transaction-to-Journey Map** covering vehicle identity, event time, plaza/direction, crossings, amount/class, alternate payment/pass, and credit adjustment.
 - Real-mode state is held only in React memory. It never enters localStorage, sessionStorage, cookies, URLs, forms, `/api/analyze`, analytics, or a case database. Shared-device mode disables the app’s copy/download controls, provides Quick exit & clear, and attempts to leave after about 10 minutes without pointer, keyboard, input, or touch activity; the UI does not claim a background browser timer is infallible.
 - Every action-bearing real-mode artifact has two gates: a pure domain rule and a UI gate. Aligned, already-credited, unverified, incomplete, court, and unknown-jurisdiction outcomes cannot render or download a dispute request.
-- Real-case workflows are explicitly English-only until their decision explanations and artifacts complete Hindi safety review. The synthetic core remains bilingual; Privacy and Safety reading pages remain bilingual.
+- The real e-Challan journey and the Privacy/Safety reading pages offer English and Hindi. FASTag remains English-only until its complete decision and artifact language finishes Hindi safety review. The synthetic core remains bilingual.
 - Public Privacy/Data Controls and Safety/Official Routes pages, exact-host official links, reviewed-source dates, no third-party analytics, and response security headers including CSP, frame denial, referrer policy, permissions policy, and content-type protection.
 - A complete mobile-first six-stage evidence journey, plus landing and Resolution Desk routes, with sensible browser back/forward behaviour.
 - A full-screen bilingual **Local Evidence Passport** that joins three questions—vehicle identity, event-time relationship, and supplied-packet completeness—without adding noise to the six-stage progress rail.
@@ -69,14 +71,17 @@ The official e-Challan and Virtual Courts services already support status, payme
 - An indexed, print-friendly contest or clarification pack generated from confirmed facts only.
 - A clearly fictional grievance reference, full tracking timeline, and three switchable reasoned outcomes.
 - Optional Responses API vision extraction with strict Structured Outputs and a reliable precomputed fallback.
-- No real-document upload or paste surface. The flagship engine remains visibly synthetic; real modes say “your observation” and never masquerade as model extraction.
+- No real-document server-upload or raw-paste surface. `/review` permits only deliberate local preview and says “your observation”; it performs no OCR and never masquerades as model extraction. The flagship demo remains visibly synthetic.
 - Accessible labels, visible focus states, reduced-motion support, 360 px layout support, and large touch targets.
 
 ## Architecture
 
 ```text
 app/page.tsx
-  └─ components/ChallanSakshiApp.tsx       UI, localization, V5 persistence, demo flow
+  └─ components/public-beta/CitizenHome.tsx clean citizen homepage and bounded goal chooser
+
+app/demo/page.tsx
+  └─ components/ChallanSakshiApp.tsx       UI, localization, V5 persistence, synthetic demo flow
        ├─ components/EvidencePassport.tsx  notice preflight, preferences, Passport UI
        ├─ components/ResolutionDesk.tsx     triage, routes, payment demo, official handoffs
        ├─ components/OrderEvidenceReview.tsx locked order, mapping, note, and ledger UI
@@ -101,6 +106,9 @@ app/fastag/page.tsx                        TollSakshi FASTag transaction review
 app/privacy/page.tsx                       implementation-matched data controls
 app/safety/page.tsx                        verified official-route registry
 components/public-beta/                    isolated real-mode shell and workflows
+components/public-beta/LocalRecordIntake.tsx deliberate local PDF/image intake
+lib/local-record-intake.ts                 MIME and 12 MiB local-file validation
+lib/evidence-intelligence.ts               citizen evidence view, timeline, and summary
 lib/public-challan.ts                      conservative citizen-observation rules and artifact
 lib/toll-domain.ts                         FASTag assessment, Passport, routes, and artifact
 lib/toll-fixtures.ts                       three wholly fictional TollSakshi examples
@@ -109,7 +117,7 @@ tests/toll-domain.test.ts                  toll reconciliation and refusal rules
 tests/public-mode-privacy.test.ts          static network/storage/upload/form isolation gate
 ```
 
-The application uses React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, and direct Cloudflare Worker-compatible ESM output. There is no account system, case database, payment, real filing, or live government/bank integration. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers are never passed into that contract.
+The application uses React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, and direct Cloudflare Worker-compatible ESM output. There is no account system, case database, payment, real filing, or live government/bank integration. Authorised government API access is a future connector boundary only and is not implemented. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers and files are never passed into that contract.
 
 ### AI versus deterministic rules
 
@@ -157,15 +165,18 @@ In local development, the route uses the OpenAI Responses API with image input, 
 ## Real-mode and synthetic-data privacy policy
 
 - Real-mode answers exist only in the current page’s in-memory React state. Reload, close, or Quick exit clears them from the app.
-- Real-mode components contain no `fetch`, XHR, beacon, client-storage, cookie, HTML-form, document-upload, raw-textarea, analytics, or `/api/analyze` surface. A test locks this boundary.
-- Real-mode inputs collect at most four-character suffixes and constrained observations. They never request a name, contact information, full vehicle/challan/tag/reference number, Aadhaar, RC/DL image, bank/card information, OTP, password, CVV, PIN, or UPI PIN.
-- The app’s copy/download controls are disabled in shared-device mode, which also attempts to leave the review after about 10 minutes of inactivity and re-checks the expiry on focus, visibility, and page-show events. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print queues, browser history, and backups sit outside the app’s clear action.
+- `/review` accepts PDF, JPEG, PNG, and WebP files up to 12 MiB each: at most one official record and one supplied image at a time. Validation uses the browser-provided MIME type rather than trusting the filename extension.
+- A valid selection receives a temporary object URL for local preview. The file stays in the current tab and is not sent through `fetch`, XHR, beacon, a server form, `/api/analyze`, or an AI model. This release performs no OCR. Replacing, removing, resetting, Quick Exit, and unmounting release the relevant preview URL.
+- File selection does not authenticate origin. Source and confidence labels remain citizen-provided observations, never government verification.
+- Real-mode components contain no client case storage, cookies, case identifiers in URLs, raw-textarea, analytics, or real-case `/api/analyze` path. Automated privacy tests lock this boundary while permitting the dedicated local file input.
+- Real-mode inputs never request CAPTCHA, OTP, Aadhaar/VID, a government/bank/FASTag password, or card/payment credentials. Any official login, identity check, CAPTCHA, OTP, or payment belongs only on the independently opened official service.
+- The app’s copy/download/print controls are disabled in shared-device mode, which attempts to leave the review after about 10 minutes of inactivity. Browser timer throttling can delay that attempt, so Quick Exit remains the required clear action when finished. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print-to-PDF files, browser history, and backups sit outside the app’s clear action.
 - Hosting infrastructure necessarily handles technical request data such as IP address, path, browser/device information, timestamps, and security logs to deliver and protect the site. Exact host log retention is not controlled or promised by this project.
 - In the synthetic demo, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional.
 - Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
 - The generic vehicle data card is intentionally not a replica of an official RC.
 - The synthetic prototype warns against entering real identity or vehicle records.
-- No route accepts real uploads. Source records for the demo remain preloaded fictional fixtures; real-mode citizens inspect their official records separately and record only structured observations.
+- No route accepts a real server upload. Source records for `/demo` remain preloaded fictional fixtures; `/review` previews deliberate local selections in tab memory and records only citizen-confirmed structured observations.
 - No demo submission reaches a government system.
 - No full registration or transaction reference is requested; real mode accepts only last-four suffixes. OTP, Aadhaar, engine numbers, and chassis numbers are never requested.
 - Reset clears local case state and restores the fictional fixtures while keeping the citizen’s Simpler view and text-first preferences.
@@ -175,7 +186,7 @@ In local development, the route uses the OpenAI Responses API with image input, 
 
 ## Local setup
 
-Requirements: Node.js 22.13+ and pnpm.
+Requirements: Node.js 22.13+ and pnpm. This workspace also includes a bundled Node runtime at `/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node`.
 
 ```bash
 pnpm install
@@ -186,23 +197,31 @@ Open the local URL printed by the development server (normally `http://localhost
 
 ## Validation commands
 
+Use the bundled Node runtime for reproducible repository verification:
+
 ```bash
-pnpm run test
-pnpm run typecheck
-pnpm run lint
-pnpm run build
+/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run
+/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit
+/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/eslint/bin/eslint.js . --ignore-pattern dist --ignore-pattern .next
+/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vinext/dist/cli.js build
 ```
 
 ## Deployment
 
-Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration. Deploy with `pnpm run deploy:cloudflare` after authenticating Wrangler with the Cloudflare account that owns the `sh1rs.com` zone.
+Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration.
+
+Deployment is not part of test, typecheck, lint, or build verification. It is a separate external side effect and must be run only after the current build and configuration are verified, Wrangler is authenticated to the correct Cloudflare account, domain ownership is confirmed, and the deployment is explicitly authorised:
+
+```bash
+pnpm run deploy:cloudflare
+```
 
 For another common host, install dependencies, configure the optional environment variables, and run `pnpm run build`. No persistent service or paid infrastructure is required.
 
 ## Known limitations
 
 - The real-mode tools are public-interest early access, not a government-ready production service. No secure incident/feedback inbox or external privacy/legal review has been completed; the UI says so rather than hiding the gap.
-- Real mode does not inspect, authenticate, upload, save, or submit the record. Every result is based only on the citizen’s answers and may be wrong if those answers are incomplete or mistaken.
+- Real mode does not authenticate, upload to a ChallanSakshi server, save as a case, or submit the record. `/review` locally previews a deliberate file selection but performs no OCR; every result is based only on citizen-confirmed structured answers and may be wrong if those answers are incomplete or mistaken.
 - TollSakshi does not access a bank or NETC system, raise a chargeback, prove fraud/cloning, promise a refund, or treat a current tag status as historical event-time status.
 - The October 2025 NETC evidence circular is source-labelled; a newer 2026 duplicate-validation circular appears in the current index, so the product deliberately avoids asserting a definitive duplicate time threshold.
 - 1033 is shown only for NHAI FASTag support or a recorded National Highway/NHAI plaza route, never as the universal bank-issued chargeback channel.
@@ -216,7 +235,7 @@ For another common host, install dependencies, configure the optional environmen
 - The government route, designated authority, required declaration, and implementation can vary by state.
 - The date boundary convention is an explicit product estimate, not a legal opinion.
 - Live analysis covers only the bundled synthetic demonstration image. Real personal documents are outside every AI and API path.
-- The synthetic core journey is bilingual. Real-case decision flows are English-only until the full rule, consent, and artifact language receives a safety review; Privacy and Safety reading pages remain bilingual.
+- The synthetic core, real e-Challan journey, and Privacy/Safety reading pages offer English and Hindi. FASTag remains English-only until its complete rule, consent, decision, and artifact language receives Hindi safety review.
 - Simulated authority outcomes do not represent a prediction or guarantee.
 - The Order-to-Evidence map describes textual coverage only. “Not found” never means a point was ignored, an order is invalid, or an appeal is warranted; content may exist in another page, annexure, or official record.
 
@@ -233,8 +252,8 @@ For another common host, install dependencies, configure the optional environmen
 - [NPCI current NETC circular index](https://www.npci.org.in/circulars/netc)
 - [NPCI NETC evidence circular, 28 October 2025](https://www.npci.org.in/uploads/NETC_OC_005_FY_25_26_New_chargeback_reason_codes_in_NRCS_and_guidelines_for_handling_chargebacks_f5b100df97.pdf)
 - [NPCI FASTag issuer helpline directory](https://www.npci.org.in/product/netc/netc-fastag-helpline)
-- [IHMCL National Highways helpline 1033 scope](https://ihmcl.co.in/24x7-national-highways-helpline-1033/)
-- [IHMCL FASTag user guidance](https://ihmcl.co.in/fastag-user/)
+- [IHMCL National Highways helpline 1033 scope](https://ihmcl.co.in/24x7-national-highways-helpline-1033-page/)
+- [IHMCL FASTag FAQ and grievance guidance](https://ihmcl.co.in/faq/)
 - [National Cyber Crime Reporting Portal](https://cybercrime.gov.in/)
 
 The parliamentary answer describes the 45-day action window, supporting-document requirement, 30-day resolution period for a properly contested challan, reasoned rejection, and state-specific submission mechanism. The amended rule describes the post-rejection choice and deposit condition, while leaving the manner state-specific. The official portals document pending-transaction checks, the warning against paying on both e-Challan and Virtual Courts, court-request handoff, alternative verification, and receipt reprint. Every screen keeps the official-service verification step visible.
