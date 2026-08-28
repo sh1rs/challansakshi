@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { formatLocalRecordSize, validateLocalRecordFile } from '../lib/local-record-intake';
 
 const MiB = 1024 * 1024;
+const intakeComponentSource = readFileSync(
+  new URL('../components/public-beta/LocalRecordIntake.tsx', import.meta.url),
+  'utf8',
+);
 
 describe('local official-record intake', () => {
   it('accepts only the approved PDF and image MIME types', () => {
@@ -22,5 +27,11 @@ describe('local official-record intake', () => {
   it('formats selected size without exposing file contents', () => {
     expect(formatLocalRecordSize(1536)).toBe('1.5 KiB');
     expect(formatLocalRecordSize(2 * MiB)).toBe('2.0 MiB');
+  });
+
+  it('keeps the visually hidden native file input out of keyboard tab order', () => {
+    expect(intakeComponentSource).toMatch(
+      /<input\s+[\s\S]*?className=\{styles\.visuallyHidden\}[\s\S]*?tabIndex=\{-1\}[\s\S]*?type="file"/,
+    );
   });
 });

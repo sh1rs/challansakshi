@@ -145,6 +145,7 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
       <input
         ref={inputRef}
         className={styles.visuallyHidden}
+        tabIndex={-1}
         type="file"
         accept={ACCEPTED_RECORD_TYPES}
         capture={isPhotograph ? 'environment' : undefined}
