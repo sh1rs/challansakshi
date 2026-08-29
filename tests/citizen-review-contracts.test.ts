@@ -14,6 +14,10 @@ const publicStyles = readFileSync(
   new URL('../components/public-beta/PublicBeta.module.css', import.meta.url),
   'utf8',
 );
+const chromeStyles = readFileSync(
+  new URL('../components/shared/CitizenChrome.module.css', import.meta.url),
+  'utf8',
+);
 const guidedStyles = readFileSync(
   new URL('../components/guided/GuidedStepHeader.module.css', import.meta.url),
   'utf8',
@@ -184,13 +188,11 @@ describe('citizen review release contracts', () => {
 
   it('sets every reviewed essential 320px selector to at least 16px explicitly', () => {
     const publicMobile = mediaBlock(publicStyles, '(max-width: 420px)');
+    const chromeMobile = mediaBlock(chromeStyles, '(max-width: 700px)');
+    const chromeNarrow = mediaBlock(chromeStyles, '(max-width: 480px)');
     const guideMobile = mediaBlock(guidedStyles, '(max-width: 420px)');
     for (const selector of [
-      '.publicBar',
       '.heroCompact .lede',
-      '.quickExit',
-      '.simpleMode',
-      '.languages button',
       '.button',
       '.buttonSecondary',
       '.buttonQuiet',
@@ -204,10 +206,13 @@ describe('citizen review release contracts', () => {
       '.artifact pre',
       '.panel small',
       '.passport em',
-      '.englishOnly',
     ]) {
       expectExplicitSixteenPixelRule(publicMobile, selector);
     }
+    for (const selector of ['.headerButton', '.languages button', '.englishOnly']) {
+      expectExplicitSixteenPixelRule(chromeMobile, selector);
+    }
+    expectExplicitSixteenPixelRule(chromeNarrow, '.publicBar');
     for (const selector of [
       '.guideTopline p',
       '.guideTopline span',
@@ -219,8 +224,8 @@ describe('citizen review release contracts', () => {
       expectExplicitSixteenPixelRule(guideMobile, selector);
     }
     expect(publicMobile).toMatch(/\.header\s*\{[^}]*flex-wrap:\s*wrap/);
-    expect(publicStyles).toMatch(/\.quickExit[^}]*min-height:\s*48px/);
-    expect(publicStyles).toMatch(/\.languages button[^}]*min-height:\s*48px/);
+    expect(chromeStyles).toMatch(/\.headerButton[^}]*min-height:\s*48px/);
+    expect(chromeStyles).toMatch(/\.languages button[^}]*min-height:\s*48px/);
     expect(guidedStyles).toMatch(/\.stepList li\s*\{[^}]*color:\s*#(?:[0-9a-f]{6})/);
   });
 

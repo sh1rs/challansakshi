@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { calculateAuthorityWindow, type Language, type LocalizedText } from '../lib/domain';
 import {
   calculatePostRejectionWindow,
@@ -68,6 +68,13 @@ export function ResolutionDesk({ language, onBack, onOpenRoute, onStartEvidence 
     setSuggestion(classifyResolutionIssue(example));
   };
 
+  const openIssue = (event: MouseEvent<HTMLAnchorElement>, issueId: ResolutionIssueId) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (issueId === 'wrong-evidence' || issueId === 'unclear-evidence') onStartEvidence(issueId);
+    else onOpenRoute(issueId);
+  };
+
   return (
     <main className="screen-shell shell resolution-desk-screen" tabIndex={-1}>
       <BackButton onClick={onBack} language={language} />
@@ -132,15 +139,21 @@ export function ResolutionDesk({ language, onBack, onOpenRoute, onStartEvidence 
           <h2 id="route-catalogue-title">{language === 'hi' ? 'सबूत से सुरक्षित अगले कदम तक' : 'From supplied evidence to a safer next step'}</h2>
         </div>
         <div className="route-card-grid">
-          {resolutionIssues.map((issue) => (
-            <article key={issue.id} className={`route-card route-stage-${issue.stage}`}>
-              <div className="route-card-top"><span className="route-icon" aria-hidden="true">{issue.icon}</span><small>{stageLabel(issue.stage, language)}</small></div>
-              <h3>{local(issue.title, language)}</h3>
-              <p>{local(issue.shortDescription, language)}</p>
-              <span className="route-output">{local(issue.resultLabel, language)}</span>
-              <button type="button" aria-label={`${language === 'hi' ? 'काल्पनिक रास्ता खोलें' : 'Open fictional route'}: ${local(issue.title, language)}`} onClick={() => issue.id === 'wrong-evidence' || issue.id === 'unclear-evidence' ? onStartEvidence(issue.id) : onOpenRoute(issue.id)}>{language === 'hi' ? 'काल्पनिक रास्ता खोलें' : 'Open fictional route'} <span aria-hidden="true">→</span></button>
-            </article>
-          ))}
+          {resolutionIssues.map((issue) => {
+            const href = issue.id === 'wrong-evidence' || issue.id === 'unclear-evidence'
+              ? `/demo#intake/${issue.id}`
+              : `/demo#route/${issue.id}`;
+
+            return (
+              <a key={issue.id} className={`route-card route-stage-${issue.stage}`} href={href} onClick={(event) => openIssue(event, issue.id)}>
+                <div className="route-card-top"><span className="route-icon" aria-hidden="true">{issue.icon}</span><small>{stageLabel(issue.stage, language)}</small></div>
+                <h3>{local(issue.title, language)}</h3>
+                <p>{local(issue.shortDescription, language)}</p>
+                <span className="route-output">{local(issue.resultLabel, language)}</span>
+                <span className="route-card-cta">{language === 'hi' ? 'काल्पनिक रास्ता खोलें' : 'Open fictional route'} <span aria-hidden="true">→</span></span>
+              </a>
+            );
+          })}
         </div>
       </section>
 

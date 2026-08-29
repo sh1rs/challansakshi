@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   calculateAuthorityWindow,
   calculateContestWindow,
@@ -73,6 +73,7 @@ import {
 } from './EvidencePassport';
 import { GuidedStepHeader } from './guided/GuidedStepHeader';
 import { getSyntheticGuide, type SyntheticGuideState, type SyntheticGuidedScreen } from '../lib/guided-journey';
+import { CitizenFooter, CitizenHeader, CitizenHeaderButton } from './shared/CitizenChrome';
 
 type AnalysisMode = 'precomputed' | 'live' | 'fallback';
 type Pair = { en: string; hi: string };
@@ -177,9 +178,19 @@ function isStoredPreferences(value: unknown): value is UiPreferencesV1 {
   return preferences.version === 1 && typeof preferences.easyRead === 'boolean' && typeof preferences.textFirst === 'boolean';
 }
 
-function parseAppHash(hash: string): { step: StepId; issueId?: ResolutionIssueId } | null {
+export function evidenceFixtureForIssue(issueId: ResolutionIssueId): FixtureId | null {
+  if (issueId === 'wrong-evidence') return 'mismatch';
+  if (issueId === 'unclear-evidence') return 'inconclusive';
+  return null;
+}
+
+export function parseAppHash(hash: string): { step: StepId; issueId?: ResolutionIssueId } | null {
   const raw = hash.replace(/^#/, '');
   if (raw === 'how-it-works') return { step: 'landing' };
+  if (raw.startsWith('intake/')) {
+    const issueId = raw.slice('intake/'.length) as ResolutionIssueId;
+    return evidenceFixtureForIssue(issueId) ? { step: 'intake', issueId } : null;
+  }
   if (raw.startsWith('route/')) {
     const issueId = raw.slice('route/'.length) as ResolutionIssueId;
     return resolutionIssues.some((item) => item.id === issueId) ? { step: 'route', issueId } : null;
@@ -187,8 +198,10 @@ function parseAppHash(hash: string): { step: StepId; issueId?: ResolutionIssueId
   return steps.includes(raw as StepId) ? { step: raw as StepId } : null;
 }
 
-function hashForStep(step: StepId, issueId: ResolutionIssueId): string {
-  return step === 'route' ? `#route/${issueId}` : `#${step}`;
+export function hashForStep(step: StepId, issueId: ResolutionIssueId): string {
+  if (step === 'route') return `#route/${issueId}`;
+  if (step === 'intake' && evidenceFixtureForIssue(issueId)) return `#intake/${issueId}`;
+  return `#${step}`;
 }
 
 const copy = {
@@ -403,38 +416,28 @@ function StatusPill({ mode, language }: { mode: AnalysisMode; language: Language
   return <span className={`status-pill status-${mode}`}><span aria-hidden="true" />{local(labels, language)}</span>;
 }
 
-function AppHeader({ language, setLanguage, step, onReset, onHome, onDesk, easyRead, textFirst, onEasyReadChange, onTextFirstChange }: {
+function AppHeader({ language, setLanguage, step, onReset, onDesk, easyRead, textFirst, onEasyReadChange, onTextFirstChange }: {
   language: Language;
   setLanguage: (language: Language) => void;
   step: StepId;
   onReset: () => void;
-  onHome: () => void;
   onDesk: () => void;
   easyRead: boolean;
   textFirst: boolean;
   onEasyReadChange: (value: boolean) => void;
   onTextFirstChange: (value: boolean) => void;
 }) {
-  return (
-    <>
-      <div className="prototype-bar"><span className="prototype-dot" aria-hidden="true" />{local(copy.prototype, language)}</div>
-      <header className="site-header shell">
-        <button type="button" className="brand brand-button" onClick={onHome} aria-label="ChallanSakshi home">
-          <ShieldMark />
-          <span><strong>ChallanSakshi</strong><small>चालान साक्षी</small></span>
-        </button>
-        <nav aria-label={language === 'hi' ? 'मुख्य नेविगेशन' : 'Primary navigation'}>
-          {step === 'landing' && <><a href="/review">{language === 'hi' ? 'असली चालान समीक्षा' : 'Review my challan'}</a><a href="/fastag">{language === 'hi' ? 'FASTag जाँच' : 'FASTag check'}</a><button type="button" className="reset-link resolution-nav-link" onClick={onDesk}>{language === 'hi' ? 'डेमो डेस्क' : 'Demo desk'}</button><a href="#how-it-works">{local(copy.navHow, language)}</a></>}
-          {step !== 'landing' && <button type="button" className="reset-link" onClick={onReset}>{local(copy.reset, language)}</button>}
-          <ReadingDataOptions language={language} easyRead={easyRead} textFirst={textFirst} onEasyReadChange={onEasyReadChange} onTextFirstChange={onTextFirstChange} onClearCase={onReset} />
-          <div className="language-switch" role="group" aria-label={language === 'hi' ? 'भाषा' : 'Language'}>
-            <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')} aria-pressed={language === 'en'}>EN</button>
-            <button type="button" className={language === 'hi' ? 'active' : ''} onClick={() => setLanguage('hi')} aria-pressed={language === 'hi'}>हिं</button>
-          </div>
-        </nav>
-      </header>
-    </>
-  );
+  return <CitizenHeader
+    language={language}
+    setLanguage={setLanguage}
+    service="ChallanSakshi"
+    serviceHindi="चालान साक्षी"
+    boundary="demo"
+    utilities={<>
+      <CitizenHeaderButton type="button" onClick={step === 'landing' ? onDesk : onReset}>{step === 'landing' ? (language === 'hi' ? 'डेमो डेस्क' : 'Demo desk') : local(copy.reset, language)}</CitizenHeaderButton>
+      <ReadingDataOptions language={language} easyRead={easyRead} textFirst={textFirst} onEasyReadChange={onEasyReadChange} onTextFirstChange={onTextFirstChange} onClearCase={onReset} />
+    </>}
+  />;
 }
 
 export function SyntheticGuidedHeader({
@@ -658,11 +661,7 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
 }
 
 function Footer({ language }: { language: Language }) {
-  return (
-    <footer className="site-footer">
-      <div className="shell"><div className="footer-brand"><ShieldMark /><span><strong>ChallanSakshi</strong><small>{local(copy.evidenceBefore, language)}</small></span></div><p>{local(copy.disclaimer, language)} {local(copy.currentStateRoute, language)} <a href="/review">{language === 'hi' ? 'असली चालान समीक्षा' : 'Manual real-case review'}</a> · <a href="/fastag">FASTag</a> · <a href="/privacy">{language === 'hi' ? 'गोपनीयता' : 'Privacy'}</a> · <a href="/safety">{language === 'hi' ? 'सुरक्षा' : 'Safety'}</a></p></div>
-    </footer>
-  );
+  return <CitizenFooter language={language} boundary="demo" />;
 }
 
 function Screen({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -848,6 +847,39 @@ export default function ChallanSakshiApp() {
   const [textFirst, setTextFirst] = useState(true);
   const [revealedImages, setRevealedImages] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+
+  const loadEvidenceIssue = useCallback((issueId: 'wrong-evidence' | 'unclear-evidence') => {
+    const nextId = evidenceFixtureForIssue(issueId);
+    if (!nextId) return;
+    setResolutionIssue(issueId);
+    setFixtureId(nextId);
+    setFacts(fixtures[nextId].extractedFacts);
+    setAnalysisFacts(fixtures[nextId].extractedFacts);
+    setConfirmed(false);
+    setAnalysisMode('precomputed');
+    setAnalysisBusy(false);
+    setAnalysisMessage('');
+    setFormError('');
+    setCopied(false);
+    setTrackingStage(2);
+    setOutcome('none');
+    setSubmittedFacts(null);
+    setSubmittedRevisionId(null);
+    setOrderExtractedFacts([]);
+    setOrderConfirmedFactIds([]);
+    setOrderCompleteness(null);
+    setOrderMapReviews({});
+    setOrderLimitationConfirmed(false);
+    setOrderNoteCreated(false);
+    setOrderFormError('');
+    setOrderCopied(false);
+    setCustodyScenarioId('owner-aligned');
+    setCustodyReviewed(false);
+    setPassportScopeReviewed(false);
+    setSubmittedPassport(null);
+    setPassportError('');
+    setRevealedImages([]);
+  }, []);
 
   const fixture = fixtures[fixtureId];
   const enforcementImageKey = `${fixtureId}-enforcement`;
@@ -1096,6 +1128,9 @@ export default function ChallanSakshiApp() {
         }
         const location = parseAppHash(window.location.hash);
         if (location) {
+          if (location.step === 'intake' && location.issueId && evidenceFixtureForIssue(location.issueId)) {
+            loadEvidenceIssue(location.issueId as 'wrong-evidence' | 'unclear-evidence');
+          }
           setStep(location.step);
           if (location.issueId) setResolutionIssue(location.issueId);
         } else {
@@ -1109,18 +1144,21 @@ export default function ChallanSakshiApp() {
       }
     }, 0);
     return () => window.clearTimeout(hydrationTimer);
-  }, []);
+  }, [loadEvidenceIssue]);
 
   useEffect(() => {
     const onPopState = () => {
       const location = parseAppHash(window.location.hash);
       if (!location) return;
+      if (location.step === 'intake' && location.issueId && evidenceFixtureForIssue(location.issueId)) {
+        loadEvidenceIssue(location.issueId as 'wrong-evidence' | 'unclear-evidence');
+      }
       setStep(location.step);
       if (location.issueId) setResolutionIssue(location.issueId);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [loadEvidenceIssue]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1374,9 +1412,8 @@ export default function ChallanSakshiApp() {
   };
 
   const startResolutionEvidence = (issueId: 'wrong-evidence' | 'unclear-evidence') => {
-    setResolutionIssue(issueId);
-    chooseFixture(issueId === 'unclear-evidence' ? 'inconclusive' : 'mismatch');
-    go('intake');
+    loadEvidenceIssue(issueId);
+    go('intake', issueId);
   };
 
   const downloadBlob = (contents: string, mimeType: string, filename: string) => {
@@ -1672,7 +1709,6 @@ export default function ChallanSakshiApp() {
         setLanguage={setLanguage}
         step={renderStep}
         onReset={resetDemo}
-        onHome={() => go('landing')}
         onDesk={() => go('desk')}
         easyRead={easyRead}
         textFirst={textFirst}

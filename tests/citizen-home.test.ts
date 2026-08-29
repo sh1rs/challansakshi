@@ -16,6 +16,23 @@ function ruleFor(source: string, selector: string) {
     .at(-1)?.[2] ?? '';
 }
 
+function renderedLink(html: string, href: string) {
+  const escapedHref = href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return html.match(new RegExp(`<a\\b[^>]*href="${escapedHref}"[^>]*>[\\s\\S]*?<\\/a>`))?.[0] ?? '';
+}
+
+function accessibleName(link: string) {
+  const explicit = link.match(/\baria-label="([^"]+)"/)?.[1];
+  if (explicit) return explicit;
+
+  return link
+    .replace(/<([a-z][a-z0-9]*)\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 describe('citizen homepage routing', () => {
   it('exposes the four approved citizen goals in order', () => {
     expect(HOME_ACTIONS.map((item) => [item.goal, item.title, item.cta])).toEqual([
@@ -47,6 +64,37 @@ describe('citizen homepage routing', () => {
     ]);
   });
 
+  it('makes each primary journey card one complete semantic link', () => {
+    const html = renderToStaticMarkup(createElement(CitizenHome));
+
+    const expectedCards = [
+      ['/review?goal=verify', 'Verify Is this challan actually connected to you or your vehicle? Find the official record'],
+      ['/review?goal=understand', 'Understand What does this notice, status, or Virtual Court update mean? Explain my situation'],
+      ['/review?goal=evidence', 'Check evidence Does the supplied evidence agree with the record and your vehicle? Compare the evidence'],
+      ['/review?goal=resolve', 'Resolve What is the safest official next step? Show my next step'],
+    ] as const;
+
+    for (const [href, name] of expectedCards) {
+      const link = renderedLink(html, href);
+      expect(link, href).not.toBe('');
+      expect(accessibleName(link), href).toBe(name);
+      expect(link.replace(/^<a\b[^>]*>/, '').replace(/<\/a>$/, ''), href).not.toMatch(/<(?:a|button)\b/i);
+    }
+  });
+
+  it('makes the FASTag doorway one complete semantic link', () => {
+    const html = renderToStaticMarkup(createElement(CitizenHome));
+    const link = [...html.matchAll(/<a\b[^>]*href="\/fastag"[^>]*>[\s\S]*?<\/a>/g)]
+      .map((match) => match[0])
+      .find((candidate) => accessibleName(candidate).includes('Go to FASTag help')) ?? '';
+
+    expect(link).not.toBe('');
+    expect(accessibleName(link)).toBe(
+      'Have a FASTag transaction problem instead? Compare the plaza record, issuer transaction, debit status, and the appropriate official escalation route. Go to FASTag help',
+    );
+    expect(link.replace(/^<a\b[^>]*>/, '').replace(/<\/a>$/, '')).not.toMatch(/<(?:a|button)\b/i);
+  });
+
   it('describes the browser-local file boundary without implying optional upload', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
 
@@ -57,13 +105,10 @@ describe('citizen homepage routing', () => {
     expect(html).not.toContain('future product decision');
   });
 
-  it('keeps the mobile home brand and compact journey arrows at least 48px wide', () => {
+  it('keeps the mobile home brand and compact journey affordances at least 48px wide', () => {
     const mobile = citizenHomeStyles.slice(citizenHomeStyles.indexOf('@media (max-width: 700px)'));
 
-    expect(citizenHomeStyles).toMatch(
-      /\.brand\s*\{[^}]*min-height:\s*48px[^}]*display:\s*inline-flex/,
-    );
-    expect(mobile).toMatch(/\.actionLink\s*\{[^}]*min-width:\s*48px/);
+    expect(mobile).toMatch(/\.actionCta\s*\{[^}]*min-width:\s*48px/);
   });
 
   it('keeps mobile citizen explanations at 16px', () => {
@@ -76,8 +121,6 @@ describe('citizen homepage routing', () => {
       '.privacyGroup h3',
       '.privacyGroup li',
       '.fastagDoorway p',
-      '.footer a',
-      '.footer p',
     ]) {
       expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);
     }

@@ -51,10 +51,10 @@ describe('synthetic demo mobile accessibility', () => {
 
   it('keeps audited mobile demo controls at 16px', () => {
     const mobile = mediaBlock(globalStyles, '(max-width: 480px)');
+    const compact = mediaBlock(globalStyles, '(max-width: 900px)');
 
     for (const selector of [
       '.language-switch button',
-      '.reading-options > summary',
       '.evidence-photo-placeholder .button',
       '.text-skip-button',
       '.public-service-boundary a',
@@ -63,5 +63,7 @@ describe('synthetic demo mobile accessibility', () => {
     ]) {
       expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);
     }
+
+    expect(ruleFor(compact, '.reading-options > summary::before')).toMatch(/font-size:\s*16px/);
   });
 });

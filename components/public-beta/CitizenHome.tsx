@@ -1,8 +1,8 @@
 'use client';
-/* eslint-disable @next/next/no-html-link-for-pages -- Same-origin anchors intentionally clear memory-only review state. */
 
 import { useState } from 'react';
 import { buildReviewHref, HOME_ACTIONS, SITUATION_LINKS, type CitizenGoal } from '../../lib/citizen-home';
+import { CitizenFooter, CitizenHeader, CitizenHeaderButton } from '../shared/CitizenChrome';
 import styles from './CitizenHome.module.css';
 
 type Language = 'en' | 'hi';
@@ -170,18 +170,13 @@ export default function CitizenHome() {
 
   return (
     <div className={styles.page} lang={language === 'hi' ? 'hi' : 'en'}>
-      <header className={styles.header}>
-        <a className={styles.brand} href="/" aria-label={text.home}>ChallanSakshi</a>
-        <nav className={styles.headerActions} aria-label={text.language}>
-          <div className={styles.languageToggle} role="group" aria-label={text.language}>
-            <button type="button" aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>{text.english}</button>
-            <button type="button" aria-pressed={language === 'hi'} onClick={() => setLanguage('hi')}>{text.hindi}</button>
-          </div>
-          <button type="button" className={styles.simpleToggle} aria-pressed={simpleMode} onClick={() => setSimpleMode((current) => !current)}>{text.simpleMode}</button>
-          <a href="/privacy">{text.privacy}</a>
-          <a href="/demo">{text.demo}</a>
-        </nav>
-      </header>
+      <CitizenHeader
+        language={language}
+        setLanguage={setLanguage}
+        service="ChallanSakshi"
+        serviceHindi="चालान साक्षी"
+        utilities={<CitizenHeaderButton type="button" aria-pressed={simpleMode} onClick={() => setSimpleMode((current) => !current)}>{text.simpleMode}</CitizenHeaderButton>}
+      />
 
       <main className={styles.main}>
         <section className={styles.hero} aria-labelledby="citizen-home-heading">
@@ -191,17 +186,17 @@ export default function CitizenHome() {
             {HOME_ACTIONS.map((action) => {
               const actionCopy = text.actions[action.goal];
               return (
-                <article className={styles.actionRow} key={action.goal}>
+                <a className={styles.actionRow} href={buildReviewHref(action.goal)} key={action.goal}>
                   <div className={styles.goalIcon}><GoalIcon goal={action.goal} /></div>
                   <div className={styles.actionCopy}>
                     <h2>{actionCopy.title}</h2>
                     <p>{simpleMode ? actionCopy.simpleQuestion : actionCopy.question}</p>
                   </div>
-                  <a className={styles.actionLink} href={buildReviewHref(action.goal)}>
+                  <span className={styles.actionCta}>
                     <span>{actionCopy.cta}</span>
                     <ArrowIcon />
-                  </a>
-                </article>
+                  </span>
+                </a>
               );
             })}
           </div>
@@ -238,19 +233,16 @@ export default function CitizenHome() {
           {text.privacyGroups.map((group) => <div className={styles.privacyGroup} key={group.title}><h3>{group.title}</h3><ul>{group.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
         </section>
 
-        <aside className={styles.fastagDoorway}>
-          <span className={styles.fastagIcon}><FastagIcon /></span>
-          <div><h2>{text.fastagHeading}</h2><p>{text.fastagBody}</p></div>
-          <a href="/fastag"><span>{text.fastagAction}</span><ArrowIcon /></a>
+        <aside className={styles.fastagDoorwayShell} aria-labelledby="fastag-doorway-title">
+          <a className={styles.fastagDoorway} href="/fastag">
+            <span className={styles.fastagIcon}><FastagIcon /></span>
+            <div><h2 id="fastag-doorway-title">{text.fastagHeading}</h2><p>{text.fastagBody}</p></div>
+            <span className={styles.fastagCta}><span>{text.fastagAction}</span><ArrowIcon /></span>
+          </a>
         </aside>
       </main>
 
-      <footer className={styles.footer}>
-        <a href="/privacy">{text.footerPrivacy}</a>
-        <a href="/safety">{text.footerSafety}</a>
-        <a href="/demo">{text.footerDemo}</a>
-        <p>{text.footerLimit}</p>
-      </footer>
+      <CitizenFooter language={language} />
     </div>
   );
 }

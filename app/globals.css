@@ -154,7 +154,7 @@ h1 em { color: var(--teal); font-weight: inherit; }
 @media print { .prototype-bar, .site-header, .hero-actions { display: none !important; } body { background: white; } }
 
 /* Application shell */
-.app-root { min-height: 100vh; overflow-x: clip; }
+.app-root { min-height: 100vh; overflow-x: clip; background: #fff; }
 .sr-only {
   position: absolute !important;
   width: 1px !important;
@@ -626,7 +626,9 @@ h1 em { color: var(--teal); font-weight: inherit; }
 .triage-fallback .route-icon { background: #a9782b; }
 .route-catalogue { margin-top: 72px; }
 .route-card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-top: 24px; }
-.route-card { min-height: 255px; display: flex; flex-direction: column; padding: 20px; border: 1px solid #d2d6cf; border-radius: 14px; background: #fffef9; }
+.route-card { min-height: 255px; display: flex; flex-direction: column; padding: 20px; border: 1px solid #d2d6cf; border-radius: 14px; background: #fffef9; color: inherit; text-decoration: none; cursor: pointer; }
+.route-card:hover { border-color: #7fa79c; background: #f5fbf8; }
+.route-card:focus-visible { outline: 3px solid var(--teal-dark); outline-offset: 3px; }
 .route-card-top { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .route-card-top small { color: #79847e; font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .route-icon { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; background: #e3efea; color: var(--teal-dark); font: 800 18px Georgia, serif; }
@@ -636,7 +638,7 @@ h1 em { color: var(--teal); font-weight: inherit; }
 .route-card h3 { margin: 20px 0 0; font: 700 19px/1.2 Georgia, serif; }
 .route-card > p { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .route-output { width: fit-content; margin-top: 13px; padding: 5px 7px; border-radius: 5px; background: #eef2ee; color: #4d655d; font-size: 8px; font-weight: 820; }
-.route-card > button { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: auto; padding: 15px 0 0; border: 0; border-top: 1px solid #ebeae3; background: transparent; color: var(--teal-dark); font-size: 10px; font-weight: 850; text-align: left; cursor: pointer; }
+.route-card-cta { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: auto; padding: 15px 0 0; border-top: 1px solid #ebeae3; color: var(--teal-dark); font-size: 10px; font-weight: 850; text-align: left; }
 .desk-warning { margin-top: 34px; }
 
 .journey-map { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 35px; }
@@ -734,8 +736,8 @@ main:focus { outline: none; }
 .triage-privacy-inline { margin: 14px 0 -6px; padding-left: 12px; border-left: 3px solid #a8792d; color: #705d3a; font-size: 13px; font-weight: 720; line-height: 1.5; }
 .breadth-grid small, .desk-scope-card small, .route-card-top small, .route-output, .journey-map span, .post-order-clock small, .payment-record-grid article > span, .payment-finding small, .fictional-court-card > small, .route-record-card > small { font-size: 11px; }
 .breadth-grid p, .route-card > p, .triage-copy p, .triage-suggestion p, .triage-no-match p, .payment-finding p, .court-handoff li strong, .fictional-court-card > p, .route-next-card li p, .route-record-card ul, .route-boundaries p, .official-handoff p:last-child, .resolution-reveal p:last-child { font-size: 14px; }
-.example-chips button, .scenario-switch button, .triage-suggestion > button, .route-card > button, .official-link-stack a, .route-actions .button, .resolution-reveal .button { min-height: 44px; font-size: 12px; }
-.route-card > button { align-items: center; padding-top: 10px; }
+.example-chips button, .scenario-switch button, .triage-suggestion > button, .route-card-cta, .official-link-stack a, .route-actions .button, .resolution-reveal .button { min-height: 44px; font-size: 12px; }
+.route-card-cta { align-items: center; padding-top: 10px; }
 .payment-record-grid dt, .payment-record-grid dd { font-size: 12px; }
 .payment-record-grid article > strong { font-size: 12px; }
 .payment-record-grid article > small { font-size: 10px; }
@@ -1143,22 +1145,23 @@ main:focus { outline: none; }
 /* Reading, data, notice-safety, and Local Evidence Passport expansion. */
 .reading-options { position: relative; }
 .reading-options > summary {
-  min-height: 40px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
-  padding: 0 13px;
-  border: 1px solid #cbd3d1;
-  border-radius: 999px;
-  background: #fffef9;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 760;
+  padding: 0 12px;
+  border: 1px solid #667e77;
+  border-radius: 8px;
+  background: #fff;
+  color: #075b58;
+  font-size: 13px;
+  font-weight: 820;
   cursor: pointer;
   list-style: none;
 }
 .reading-options > summary::-webkit-details-marker { display: none; }
 .reading-options > summary::after { margin-left: 8px; color: var(--teal); content: '▾'; }
 .reading-options[open] > summary::after { transform: rotate(180deg); }
+.reading-options > summary:focus-visible { outline: 3px solid #075650; outline-offset: 3px; }
 .reading-options-panel {
   position: absolute;
   z-index: 50;
@@ -1376,9 +1379,9 @@ main:focus { outline: none; }
 @media (max-width: 900px) {
   .site-header nav { gap: 10px; }
   .site-header nav > a { display: none; }
-  .reading-options > summary { max-width: 52px; overflow: hidden; color: transparent; }
-  .reading-options > summary::before { color: var(--ink); content: 'Aa'; }
-  .reading-options > summary::after { color: var(--teal); }
+  .reading-options > summary { box-sizing: border-box; width: 48px; max-width: 48px; min-height: 48px; justify-content: center; overflow: hidden; padding: 0; color: transparent; font-size: 0; white-space: nowrap; }
+  .reading-options > summary::before { color: var(--ink); content: 'Aa'; font-size: 16px; }
+  .reading-options > summary::after { margin-left: 3px; color: var(--teal); font-size: 12px; }
   .notice-preflight-heading, .preflight-layout, .passport-hero { grid-template-columns: 1fr; }
   .preflight-boundary { max-width: none; justify-self: start; }
   .passport-id { min-width: 0; }
@@ -1388,7 +1391,8 @@ main:focus { outline: none; }
 }
 
 @media (max-width: 650px) {
-  .reading-options-panel { position: fixed; top: 118px; right: 14px; }
+  .reading-options { position: static; }
+  .reading-options-panel { position: absolute; top: calc(100% + 10px); right: 0; width: min(370px, 100%); }
   .notice-preflight { padding-block: 62px; }
   .notice-preflight-heading h2 { font-size: 36px; }
   .preflight-result { padding: 18px; }
@@ -1417,8 +1421,7 @@ main:focus { outline: none; }
   .brand strong { font-size: 14px; }
   .brand small { font-size: 9px; }
   .site-header nav { gap: 6px; }
-  .reading-options > summary { width: 48px; max-width: 48px; min-height: 48px; padding-inline: 8px; font-size: 16px; }
-  .reading-options > summary::after { margin-left: 4px; }
+  .reading-options > summary { width: 48px; max-width: 48px; min-height: 48px; }
   .language-switch { padding: 2px; }
   .language-switch button { min-width: 48px; min-height: 48px; padding-inline: 5px; font-size: 16px; }
   .evidence-photo-placeholder .button,

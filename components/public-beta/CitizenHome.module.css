@@ -29,20 +29,22 @@
 .hero > h1 { margin: 0; font: 760 clamp(39px, 4.1vw, 58px)/1.04 Georgia, "Times New Roman", serif; letter-spacing: -.042em; text-align: center; }
 .hero > p { max-width: 820px; margin: 14px auto 24px; color: var(--muted); font-size: 17px; line-height: 1.5; text-align: center; }
 .actionList { display: grid; gap: 4px; }
-.actionRow { min-height: 82px; display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(232px, 278px); align-items: center; gap: 16px; padding: 9px 16px; border: 1px solid transparent; border-radius: 9px; }
+.actionRow { min-height: 82px; display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(232px, 278px); align-items: center; gap: 16px; padding: 9px 16px; border: 1px solid transparent; border-radius: 9px; color: inherit; text-decoration: none; cursor: pointer; }
 .actionRow:nth-child(2) { border-color: var(--gold); background: var(--gold-soft); }
+.actionRow:hover { border-color: #8faaa7; background: #f3faf8; }
+.actionRow:focus-visible { outline: 3px solid var(--teal-deep); outline-offset: 2px; }
+.actionRow:nth-child(2):hover { border-color: #cd8100; background: #ffedc2; }
 .goalIcon, .journeyIcon, .fastagIcon { display: grid; place-items: center; border-radius: 50%; }
 .goalIcon { width: 62px; height: 62px; background: var(--teal-soft); color: var(--teal-deep); }
 .actionRow:nth-child(2) .goalIcon, .fastagIcon { background: #ffe6a9; color: #b57200; }
-.goalIcon svg, .journeyIcon svg, .fastagIcon svg, .privacyLead svg, .situationRail svg, .actionLink svg, .fastagDoorway a svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.goalIcon svg, .journeyIcon svg, .fastagIcon svg, .privacyLead svg, .situationRail svg, .actionCta svg, .fastagCta svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
 .actionCopy h2, .actionCopy p { margin: 0; }
 .actionCopy h2 { color: var(--teal-deep); font-size: 24px; letter-spacing: -.035em; }
 .actionRow:nth-child(2) .actionCopy h2 { color: #c07a00; }
 .actionCopy p { margin-top: 5px; color: #27354f; font-size: 15px; line-height: 1.42; }
-.actionLink, .fastagDoorway a { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 20px; padding: 0 18px; border: 1.5px solid var(--teal-deep); border-radius: 7px; color: var(--teal-deep); font-size: 14px; font-weight: 760; text-decoration: none; }
-.actionLink svg, .fastagDoorway a svg { width: 20px; height: 20px; }
-.actionRow:nth-child(2) .actionLink { border-color: #cd8100; background: #e99100; color: white; }
-.actionLink:hover, .actionLink:focus-visible, .fastagDoorway a:hover, .fastagDoorway a:focus-visible { outline: 3px solid var(--teal-deep); outline-offset: 2px; }
+.actionCta, .fastagCta { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 20px; padding: 0 18px; border: 1.5px solid var(--teal-deep); border-radius: 7px; color: var(--teal-deep); font-size: 14px; font-weight: 760; text-decoration: none; }
+.actionCta svg, .fastagCta svg { width: 20px; height: 20px; }
+.actionRow:nth-child(2) .actionCta { border-color: #cd8100; background: #e99100; color: white; }
 
 .situationRail { display: grid; grid-template-columns: 160px 1fr; align-items: stretch; margin-top: 24px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .situationRail > strong { display: grid; align-content: center; padding: 14px 18px; font-size: 14px; line-height: 1.25; }
@@ -75,12 +77,15 @@
 .privacyGroup li { color: #354359; font-size: 12px; line-height: 1.35; }
 .privacyGroup li::before { content: '✓'; margin-right: 8px; color: var(--teal-deep); font-weight: 900; }
 
-.fastagDoorway { display: grid; grid-template-columns: 78px minmax(0, 1fr) 235px; align-items: center; gap: 18px; margin-top: 20px; padding: 14px 22px; border: 1px solid var(--gold); border-radius: 8px; background: #fff9ec; }
+.fastagDoorwayShell { margin-top: 20px; }
+.fastagDoorway { display: grid; grid-template-columns: 78px minmax(0, 1fr) 235px; align-items: center; gap: 18px; padding: 14px 22px; border: 1px solid var(--gold); border-radius: 8px; background: #fff9ec; color: inherit; text-decoration: none; cursor: pointer; }
+.fastagDoorway:hover { border-color: #cb7d00; background: #fff3d3; }
+.fastagDoorway:focus-visible { outline: 3px solid var(--teal-deep); outline-offset: 3px; }
 .fastagIcon { width: 58px; height: 58px; }
 .fastagDoorway h2, .fastagDoorway p { margin: 0; }
 .fastagDoorway h2 { font-size: 18px; letter-spacing: -.025em; }
 .fastagDoorway p { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.42; }
-.fastagDoorway a { border-color: #cb7d00; color: #b56e00; }
+.fastagCta { border-color: #cb7d00; color: #b56e00; }
 
 .footer { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; min-height: 72px; padding: 16px max(24px, calc((100% - 1320px) / 2)); border-top: 1px solid var(--line); }
 .footer a { min-height: 44px; display: inline-flex; align-items: center; color: #0b428e; font-size: 13px; font-weight: 650; text-decoration: none; }
@@ -118,10 +123,10 @@
   .actionCopy h2 { color: var(--ink); font-size: 24px; }
   .actionRow:nth-child(2) .actionCopy h2 { color: var(--ink); }
   .actionCopy p { margin-top: 3px; font-size: 14px; }
-  .actionLink { min-width: 48px; min-height: 72px; padding: 0; border: 0; color: var(--ink); }
-  .actionLink span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .actionLink svg { width: 28px; height: 28px; }
-  .actionRow:nth-child(2) .actionLink { background: transparent; color: var(--ink); }
+  .actionCta { min-width: 48px; min-height: 72px; padding: 0; border: 0; color: var(--ink); }
+  .actionCta > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .actionCta svg { width: 28px; height: 28px; }
+  .actionRow:nth-child(2) .actionCta { background: transparent; color: var(--ink); }
   .situationRail { display: block; margin-top: 18px; border: 0; border-radius: 0; }
   .situationRail > strong { display: none; }
   .situationRail > div { display: block; }
@@ -137,7 +142,7 @@
   .privacyGroup { padding: 0; border: 0; }
   .fastagDoorway { grid-template-columns: 56px 1fr; gap: 12px; padding: 16px; }
   .fastagIcon { width: 52px; height: 52px; }
-  .fastagDoorway a { grid-column: 1 / -1; width: 100%; min-height: 50px; }
+  .fastagCta { grid-column: 1 / -1; width: 100%; min-height: 50px; }
   .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; padding: 14px; }
   .footer a { min-height: 48px; font-size: 12px; }
   .footer p { grid-column: 1 / -1; margin: 8px 0 0; text-align: left; }
