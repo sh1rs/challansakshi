@@ -7,9 +7,10 @@ ChallanSakshi is an independent, evidence-first citizen project built around one
 - `/` — the clean citizen homepage and bounded goal chooser;
 - `/review` — a tab-memory-only e-Challan review with deliberate local record preview, citizen-confirmed structured facts, conservative findings, and exact official handoff;
 - `/fastag` — TollSakshi, a structured FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport; and
-- `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures.
+- `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures; and
+- `/demo/test-lab` — a ten-case synthetic evidence laboratory that recomputes every result from editable record and observation fields.
 
-The original synthetic engine remains sealed inside `/demo`. It carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note.
+Synthetic state remains sealed inside the demo routes. The flagship walkthrough carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. The Test Lab proves that the comparison engine is not a blue-scooter/white-motorcycle script: ten different vectors and citizen edits pass through the same normalization, comparison, confirmation, and routing functions.
 
 > Independent public-interest early access. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` can preview citizen-selected files browser-locally, but it does not upload them to a ChallanSakshi server or AI model. Opening a selected PDF creates a separate browser-local tab that the citizen must close.
 
@@ -71,6 +72,9 @@ The official e-Challan and Virtual Courts services already support status, payme
 - An indexed, print-friendly contest or clarification pack generated from confirmed facts only.
 - A clearly fictional grievance reference, full tracking timeline, and three switchable reasoned outcomes.
 - Optional Responses API vision extraction with strict Structured Outputs and a reliable precomputed fallback.
+- A separate **ten-case Evidence Test Lab** covering consistent evidence, an explicit challan-versus-vehicle-record conflict, image registration/category/time/location conflicts, unreadable and partial plates, formatting normalization, and an allegation that cannot be assessed from the supplied photograph. Every displayed outcome is recalculated at runtime from the selected vector.
+- A reusable, versioned synthetic extraction contract with field-level source, visibility, evidence reference, limitation, and confidence; deterministic comparison states; a mandatory citizen-confirmation gate; immediate result invalidation after any edit; and a filename-free Citizen Action Pack.
+- A local custom-evidence workbench for synthetic testing: a citizen can preview a JPEG or PNG in the current tab and manually record what is visible, but the public app never sends those bytes to a server or model. This intentionally demonstrates the safe human-verification workflow without opening an unauthenticated vision endpoint.
 - No real-document server-upload or raw-paste surface. `/review` permits only deliberate local preview and says “your observation”; it performs no OCR and never masquerades as model extraction. The flagship demo remains visibly synthetic.
 - Accessible labels, visible focus states, reduced-motion support, 360 px layout support, and large touch targets.
 
@@ -93,7 +97,17 @@ app/demo/page.tsx
        ├─ lib/case-ledger.ts                evidence registry, revisions, provenance, ledger
        └─ lib/order-evidence.ts             order fixture, mapping, validation, artifacts
 
-app/api/analyze/route.ts                    optional Responses API image extraction
+app/demo/test-lab/page.tsx
+  └─ components/test-lab/SyntheticTestLabApp.tsx runtime corpus, editor, confirmation, result, action pack
+       ├─ lib/synthetic-evidence-pipeline.ts      extraction schema, normalization, comparison, route, pack
+       ├─ lib/synthetic-evidence-corpus.ts        ten synthetic evaluation vectors
+       ├─ lib/synthetic-lab-state.ts              confirmation and edit-invalidation state machine
+       └─ lib/synthetic-lab-file.ts               browser-local preview validation
+
+app/demo/test-lab/operator/page.tsx
+  └─ components/test-lab/OperatorAnalysisLab.tsx  server-gated synthetic text/image extraction UI
+
+app/api/analyze/route.ts                    feature-flagged, policy-limited Responses API extraction
 worker.ts                                  production-host HTTP → HTTPS boundary, then Vinext
 tests/domain.test.ts                        core deterministic rule coverage
 tests/resolution.test.ts                    resolution and reconciliation rule coverage
@@ -116,6 +130,11 @@ lib/toll-fixtures.ts                       three wholly fictional TollSakshi exa
 tests/public-challan.test.ts               real-mode refusal and deadline rules
 tests/toll-domain.test.ts                  toll reconciliation and refusal rules
 tests/public-mode-privacy.test.ts          static network/storage/upload/form isolation gate
+tests/synthetic-evidence-pipeline.test.ts  reusable comparator and ten-case evaluation corpus
+tests/synthetic-lab-state.test.ts          confirmation, invalidation, and recomputation rules
+tests/synthetic-lab-file.test.ts           local-preview file boundary
+tests/test-lab-contracts.test.ts           UI, mobile, privacy, and accessibility contracts
+tests/analyze-route.test.ts                route gates, media validation, schema, and safe failures
 ```
 
 The application uses React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, and direct Cloudflare Worker-compatible ESM output. There is no account system, case database, payment, real filing, or live government/bank integration. Authorised government API access is a future connector boundary only and is not implemented. Synthetic demo state is separately persisted under its V5 fixture-only contract; real-mode answers and files are never passed into that contract.
@@ -152,16 +171,27 @@ Normal TypeScript code handles:
 
 The product treats the issue date as Day 0 and displays D+45 as an **indicative, provisionally included deadline day**. The acknowledgement date is Day 0 for the D+30 authority boundary. The source does not settle cutoff time, holiday rollover, or every state implementation, so the interface labels these dates as estimates and always directs the citizen to verify the official portal.
 
-## Optional live OpenAI analysis
+## Optional controlled OpenAI analysis
 
-The complete journey works without an API key. Public production builds deliberately disable live model reruns to prevent an unauthenticated demo endpoint from spending an operator key; the bundled precomputed analysis remains available. To exercise the optional “Re-run AI analysis” control in local development:
+The complete public experience works without an API key. The Cloudflare configuration explicitly sets `ANALYSIS_ENABLED=false` and `SYNTHETIC_UPLOADS_ENABLED=false`; the public Test Lab therefore performs no model or upload request. Its custom-image workbench creates only a temporary browser object URL and asks the human to enter the observation.
+
+The repository also contains a narrow extraction adapter for controlled local evaluation or a separately access-protected environment. It can analyze either a bundled fixture or caller-supplied test inputs: one challan text, one vehicle-record text, and one JPEG/PNG. Caller-supplied material must be synthetic, but ChallanSakshi cannot establish its provenance from an assertion or checkbox. To exercise it locally:
 
 1. Copy `.env.example` to `.env.local`.
-2. Set `OPENAI_API_KEY` locally.
-3. Set `OPENAI_MODEL` to a vision-capable Responses API model available to your OpenAI project. The app deliberately does not hard-code an unverified model.
-4. Restart the development server.
+2. Set `OPENAI_API_KEY` locally and keep it server-side.
+3. Set `ANALYSIS_ENABLED=true`. Set `SYNTHETIC_UPLOADS_ENABLED=true` only on localhost or in a separately authenticated, access-controlled environment with a curated synthetic corpus—not for citizen documents. `ANALYSIS_ENABLED` gates the adapter; `SYNTHETIC_UPLOADS_ENABLED` separately gates caller-supplied text and image bytes. Bundled fixture analysis does not require the upload switch.
+4. Keep `OPENAI_MODEL=gpt-5.4-mini` or choose the other allow-listed model, `gpt-5-mini`, if available to the OpenAI project.
+5. Restart the development server.
 
-In local development, the route uses the OpenAI Responses API with image input, `store: false`, and a strict JSON Schema. The client sends only a known fixture ID; the server loads the bundled synthetic contact sheet and never accepts caller-supplied document data. It validates request size/type and the returned object before any observation reaches the UI. It does not log image data or raw document contents. In production—or if local configuration, network, model access, or validation fails—the UI keeps the typed fixture and shows **Precomputed fallback active**.
+Then open `/demo/test-lab/operator`. The route renders controls only while both server-side switches are true; in the public deployment it shows a disabled boundary and performs no upload. The controlled UI requires both a synthetic-only attestation and explicit acknowledgement of provider transfer, hides the local filename, sends one bounded PNG/JPEG plus the two separate source texts, validates the returned contract, and opens the same human-confirmed Evidence → Explain → Verify → Act workbench. It does not persist inputs or results.
+
+Those switches are kill switches, not authentication. The page is intentionally described as **controlled**, not private or operator-authenticated. It must not be internet-enabled on the public Worker. A remote operator environment needs server-verified identity protection for both the page and API, rate/concurrency/spend limits, and an incident path before use.
+
+The adapter uses the OpenAI Responses API with image input, `store: false`, no tools, a strict versioned JSON Schema, bounded request and response streams, media signature and dimension checks, a timeout, same-origin checks, source-line reference validation, legal/directive/URL output rejection, and generic failure messages. It returns observations only; TypeScript performs comparison and routing after a human confirms or corrects every displayed field. User text is explicitly treated as untrusted evidence, never as model instructions. The route does not intentionally log the submitted text, image, API key, model response, or upstream error body.
+
+The enabled adapter currently sends the original accepted image bytes to OpenAI. Header and dimension checks do not remove EXIF/XMP/IPTC/GPS metadata or fully canonicalize a decoder input. Caller-supplied model analysis therefore remains blocked in the public deployment until the project has server-side access control, canonical re-encoding/metadata removal, rate and spend controls, and external privacy/security review.
+
+This is **not a zero-retention claim**. OpenAI states that API data is not used to train models by default, while ordinary abuse-monitoring logs may retain content for up to 30 days unless an approved data-control arrangement applies. `store: false` prevents application-state storage but does not by itself remove that abuse-monitoring boundary. See the official [data controls](https://developers.openai.com/api/docs/guides/your-data), [image input](https://developers.openai.com/api/docs/guides/images-vision), and [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documentation. Public arbitrary uploads remain blocked until the project has authentication or attestation enforcement, Turnstile, rate and spend limits, image canonicalization/metadata stripping, a secure incident path, and external privacy/legal review.
 
 ## Real-mode and synthetic-data privacy policy
 
@@ -173,11 +203,11 @@ In local development, the route uses the OpenAI Responses API with image input, 
 - Real-mode inputs never request CAPTCHA, OTP, Aadhaar/VID, a government/bank/FASTag password, or card/payment credentials. Any official login, identity check, CAPTCHA, OTP, or payment belongs only on the independently opened official service.
 - The app’s copy/download/formatted-print controls are disabled in shared-device mode, which attempts to leave the review after about 10 minutes of inactivity. Browser-native print is reduced to a non-sensitive warning, but screenshots, manual selection, browser history, browser extensions, and device backups remain outside the app's control. Browser timer throttling can delay the exit attempt, so Quick Exit remains the required clear action when finished. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print-to-PDF files, browser history, and backups sit outside the app’s clear action.
 - Hosting infrastructure necessarily handles technical request data such as IP address, path, browser/device information, timestamps, and security logs to deliver and protect the site. Exact host log retention is not controlled or promised by this project.
-- In the synthetic demo, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional.
+- In the bundled synthetic demo and ten bundled Test Lab cases, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional. A custom Test Lab selection is user-supplied; the product instructs the user to choose synthetic material but cannot verify its provenance.
 - Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
 - The generic vehicle data card is intentionally not a replica of an official RC.
 - The synthetic prototype warns against entering real identity or vehicle records.
-- No route accepts a real server upload. Source records for `/demo` remain preloaded fictional fixtures; `/review` previews deliberate local selections in tab memory and records only citizen-confirmed structured observations.
+- No public route accepts a real server upload. Source records for `/demo` remain preloaded fictional fixtures; `/review` previews deliberate local selections in tab memory; and the public `/demo/test-lab` custom-image workbench is browser-local and manual. A feature-flagged, policy-limited model adapter exists in code, but both enabling flags are false in public production and it must never be used with real citizen material.
 - No demo submission reaches a government system.
 - No full registration or transaction reference is requested; real mode accepts only last-four suffixes. OTP, Aadhaar, engine numbers, and chassis numbers are never requested.
 - Reset clears local case state and restores the fictional fixtures while keeping the citizen’s Simpler view and text-first preferences.
@@ -209,7 +239,7 @@ Use the bundled Node runtime for reproducible repository verification:
 
 ## Deployment
 
-Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, and supplies the trusted production origin through its runtime configuration. Its versioned entrypoint returns a hostname-scoped `308` from HTTP to the same HTTPS path and query before invoking Vinext. HTTPS responses set a one-year HSTS policy for this hostname without `includeSubDomains` or preload, so the portfolio apex and future sibling subdomains are not silently enrolled.
+Production is configured as a direct Cloudflare Worker at `challansakshi.sh1rs.com`. The Worker owns only that subdomain, leaves the `sh1rs.com` apex available for the portfolio, disables optional Worker observability, supplies the trusted production origin, and explicitly keeps both synthetic analysis switches off. Its versioned entrypoint returns a hostname-scoped `308` from HTTP to the same HTTPS path and query before invoking Vinext. HTTPS responses set a one-year HSTS policy for this hostname without `includeSubDomains` or preload, so the portfolio apex and future sibling subdomains are not silently enrolled. If an independently access-protected operator environment is later created, add `OPENAI_API_KEY` there only with `wrangler secret put OPENAI_API_KEY`; never place it in `wrangler.jsonc` or bind it to the public Worker.
 
 Deployment is not part of test, typecheck, lint, or build verification. It is a separate external side effect and must be run only after the current build and configuration are verified, Wrangler is authenticated to the correct Cloudflare account, domain ownership is confirmed, and the deployment is explicitly authorised:
 
@@ -235,7 +265,7 @@ For another common host, install dependencies, configure the optional environmen
 - The Virtual Courts route does not retrieve, list, transfer, or file any real case.
 - The government route, designated authority, required declaration, and implementation can vary by state.
 - The date boundary convention is an explicit product estimate, not a legal opinion.
-- Live analysis covers only the bundled synthetic demonstration image. Real personal documents are outside every AI and API path.
+- Dynamic three-source model extraction exists in code but is disabled on the public Worker. If deliberately enabled in a controlled environment, it transmits the supplied challan text, vehicle-record text, and original image bytes to OpenAI; it must never receive real personal documents in the current architecture.
 - The synthetic core, real e-Challan journey, and Privacy/Safety reading pages offer English and Hindi. FASTag remains English-only until its complete rule, consent, decision, and artifact language receives Hindi safety review.
 - Simulated authority outcomes do not represent a prediction or guarantee.
 - The Order-to-Evidence map describes textual coverage only. “Not found” never means a point was ignored, an order is invalid, or an appeal is warranted; content may exist in another page, annexure, or official record.

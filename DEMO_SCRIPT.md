@@ -1,81 +1,72 @@
-# ChallanSakshi demo script — 1:58 target
+# ChallanSakshi judge demo — 90 seconds
 
-The official recording should solve one problem: **does the challan’s own evidence, timestamp, custody record, and case state agree with the citizen it is accusing—and, if contested, does the supplied order address what they submitted?**
+The recording proves one thing beyond polish: **the result changes with reviewed evidence; a case ID never selects the answer.** Use `/demo/test-lab` for the timed demo. Keep the longer `/demo` lifecycle ready only for Q&A.
 
-Use **Case A — Clear vehicle mismatch** and the precomputed analysis. Record edited cuts rather than performing every confirmation live. Pre-stage four browser states: the scam preflight, the Passport, the contest pack, and the reviewed Order-to-Evidence map. Keep **Case C + Sold vehicle** ready for one five-second trust demonstration.
+## 0:00–0:09 · The citizen question
 
-## Minute one — the citizen journey
+**Screen:** Test Lab hero.
 
-### 0:00–0:10 · The accusation
+> “A citizen receives a challan but cannot tell whether the supplied evidence is about their vehicle. ChallanSakshi turns three sources into reviewable observations—never a legal verdict.”
 
-**Screen:** Landing comparison, then Case A evidence.
+## 0:09–0:20 · One engine, ten cases
 
-> “Asha owns a blue scooter ending 3317. Her fictional helmet challan shows what appears to be a white motorcycle ending 3817.”
+**Action:** Press **Run all 10 cases**.
 
-### 0:10–0:21 · Before trusting the message
+> “One deterministic TypeScript engine recomputes ten fictional relationships: four potential discrepancies, three consistent cases, and three honest abstentions.”
 
-**Cut to:** Compact notice preflight. Switch from “Official-domain reference” to “APK attachment.”
+Hold on **10 / 10 expected outcomes reproduced**. Each card must show **Expected**, runtime **Actual**, and **PASS**.
 
-> “First, ChallanSakshi checks only observable warning signs in a synthetic message. An APK, OTP, remote-access, or personal-payment request stops the flow. It never opens the supplied destination, calls a link safe, or proves fraud.”
+## 0:20–0:38 · Three sources stay separate
 
-### 0:21–0:29 · Text first means text first
+**Action:** Open **Challan and vehicle record disagree**. Show the Evidence stage while the result is still locked.
 
-**Screen:** Text-first hero placeholder, then tap “Load demo image.”
+> “The challan alleges a plate ending 3817. The vehicle record and image show 3317. Every observation keeps its source, confidence, visibility, reference, and limitation. AI may extract these facts; it cannot decide legality, guilt, or the route.”
 
-> “In text-first mode, the 1.6 megabyte evidence sheet is not requested until Asha chooses to inspect it. If she cannot inspect it, the product records uncertainty instead of confirming visual facts.”
+Do not reveal a result before confirmation.
 
-### 0:29–0:42 · Evidence before action
+## 0:38–0:58 · Human gate and anti-hardcoding proof
 
-**Cut to:** Confirmed facts and the mismatch finding.
+**Action:** Press **I reviewed these values · Compare now**. Show **Potential discrepancy**. Change the challan plate to the matching value shown by the vehicle record.
 
-> “ChallanSakshi reads the supplied records, but Asha must verify every observation. Only then do deterministic rules report a possible mismatch and the indicative contest clock—never innocence or illegality.”
+> “Only after human review do rules compare the sources. Any edit immediately destroys the old result and action pack.”
 
-### 0:42–0:58 · One Local Evidence Passport
+Show **Previous confirmation cleared because evidence changed**, reconfirm, then hold on **Appears consistent**.
 
-**Cut to:** Passport hero, three questions, the owner-aligned timeline, and completeness counts.
+## 0:58–1:09 · Honest abstention
 
-> “The Local Evidence Passport joins identity, event time, and supplied-packet completeness. ‘Not found’ means only not found in this packet. The custody timeline does not identify the driver, prove ownership, or decide responsibility.”
+**Action:** Open **Plate and alleged offence are unclear**.
 
-### 0:58–1:09 · One frozen submission trail
+> “When the image cannot support a reading, ChallanSakshi says inconclusive. It never invents plate characters or manufactures a dispute.”
 
-**Cut to:** Pack and compact case ledger.
+## 1:09–1:22 · Bounded citizen action
 
-> “The factual pack indexes core and timeline sources, embeds the Passport snapshot, and receives stable local fact and Passport revision IDs. The ledger keeps analysis, citizen review, rules, and the simulated authority distinct.”
+**Action:** Return to a confirmed discrepancy and show the deterministic path and source-linked action pack.
 
-### 1:09–1:23 · What did the order address?
+> “Rules map confirmed evidence to one bounded next step: prepare a factual review, request clarification, or refuse to invent a dispute. The citizen controls the pack and continues only on the verified official service.”
 
-**Cut to:** Pre-reviewed P1–P6 map; briefly highlight the summary and one paragraph jump.
+## 1:22–1:30 · Trust boundary
 
-> “After a fictional rejection, the same revision is compared against the supplied six-paragraph order: one point is explicit, three references are unclear, and two are not found in this text. ‘Not found’ never means ignored or invalid.”
+**Screen:** Four-stage rail or final boundary.
 
-### 1:23–1:33 · Trustworthy breadth, not claim inflation
+> “Evidence. Explain. Verify. Act. ChallanSakshi helps citizens say exactly what the supplied record supports—and nothing more.”
 
-**Cut to:** Case C refusal, then Case C Passport with “Sold vehicle” selected.
+## Recording setup
 
-> “Matching visual evidence still refuses a dispute. A separate, confirmed sold-before-event record can permit only a narrowly scoped timeline review request—without changing the visual result.”
+- Use English, 100% browser zoom, and an edited take with no waiting.
+- Press **Run all 10 cases** visibly; do not substitute a screenshot.
+- Pre-stage the three-source case, edit-invalidation moment, unreadable case, and confirmed action pack.
+- Keep the console, environment variables, and API keys out of frame.
+- Never upload real data. The public custom-image mode is browser-local and manual; its user-selected provenance cannot be verified. The model adapter is disabled publicly.
+- Hold each result for at least two seconds and verify the final video is 90 seconds or shorter on a phone-size player.
 
-## Final technical close
+## Judge questions
 
-### 1:33–1:47 · AI has a narrow job; rules own the consequence
+- **“Is this hardcoded?”** — Run ten cases, show Expected versus runtime Actual, edit a source, show invalidation, and reconfirm the changed result.
+- **“Does AI decide the challan?”** — No. AI may return bounded observations. Deterministic code compares only human-confirmed facts and selects a safe workflow.
+- **“Why is public image AI off?”** — The current flag-gated adapter is not authentication and sends original bytes. Public enablement needs server-verified access, abuse/cost controls, metadata removal, and external privacy/security review.
+- **“What happens with a blurry plate?”** — The field and overall result remain inconclusive; unreadable characters are never guessed.
+- **“Does it submit to government?”** — No. It prepares a factual, citizen-controlled pack and hands off to an independently opened official service.
 
-**Screen:** Source-linked observations and evidence references.
+## Optional Q&A follow-up
 
-> “OpenAI has one narrow job: source-linked visual observations and uncertainty over bundled synthetic fixtures. Pure TypeScript owns dates, completeness, timeline intervals, permitted artifacts, revisions, citation validity, and every state transition.”
-
-### 1:47–1:58 · Final line
-
-**Screen:** Hindi Simpler view toggle, then final Passport/pack frame.
-
-> “No real upload, OTP, payment, filing, or government connection exists. ChallanSakshi helps a citizen preserve what was supplied, say only what the evidence supports, and carry one reviewable record into the next official conversation.”
-
-## Recording checklist
-
-- Keep browser zoom at 100% and use English for the primary recording.
-- Use precomputed analysis; do not wait for the optional API.
-- Keep Text first on for the initial placeholder shot, then reveal the synthetic evidence image before confirming facts.
-- Use cuts between prepared states. Do not perform every fact, Passport, and map confirmation on camera.
-- Show the APK result only long enough to read “Stop and verify independently”; never click the suspicious text.
-- Hold the Passport’s three-question summary and completeness counts for two seconds.
-- Keep the 1 / 3 / 2 map visible for two seconds, then show the final note and Oct 27 indicative boundary.
-- Show Case C’s no-claim refusal before selecting the sold-vehicle timeline; that contrast is the trust proof.
-- Export at no more than 2:00 and test every submitted link in a signed-out browser.
+Open `/demo` to show the deeper Local Evidence Passport, custody timeline, case ledger, fictional authority response, and Order-to-Evidence Map. Present these as the same evidence discipline extended through a full lifecycle—not as part of the 90-second core proof.

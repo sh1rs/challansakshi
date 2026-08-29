@@ -26,7 +26,12 @@ describe('direct Cloudflare deployment', () => {
       workers_dev?: boolean;
       routes?: Array<{ pattern?: string; custom_domain?: boolean }>;
       observability?: { enabled?: boolean };
-      vars?: { NEXT_PUBLIC_SITE_URL?: string };
+      vars?: {
+        NEXT_PUBLIC_SITE_URL?: string;
+        ANALYSIS_ENABLED?: string;
+        SYNTHETIC_UPLOADS_ENABLED?: string;
+        OPENAI_MODEL?: string;
+      };
     };
 
     expect(config).toMatchObject({
@@ -35,7 +40,12 @@ describe('direct Cloudflare deployment', () => {
       workers_dev: false,
       routes: [{ pattern: 'challansakshi.sh1rs.com', custom_domain: true }],
       observability: { enabled: false },
-      vars: { NEXT_PUBLIC_SITE_URL: 'https://challansakshi.sh1rs.com' },
+      vars: {
+        NEXT_PUBLIC_SITE_URL: 'https://challansakshi.sh1rs.com',
+        ANALYSIS_ENABLED: 'false',
+        SYNTHETIC_UPLOADS_ENABLED: 'false',
+        OPENAI_MODEL: 'gpt-5.4-mini',
+      },
     });
   });
 

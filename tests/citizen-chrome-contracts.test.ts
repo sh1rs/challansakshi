@@ -102,10 +102,10 @@ describe('shared citizen product chrome', () => {
   it('keeps the synthetic status explicit while using the citizen shell', () => {
     const html = renderToStaticMarkup(createElement(ChallanSakshiApp));
 
-    expect(html).toContain('Synthetic hackathon walkthrough');
+    expect(html).toContain('Demo boundary · use fictional or synthetic test data only');
     expect(html).toContain('fictional data only');
     expect(html).toContain('no government connection');
-    expect(landmarkFrom(html, 'footer')).toContain('Synthetic data only');
+    expect(landmarkFrom(html, 'footer')).toContain('Use synthetic test data only');
     expect(html).toContain('Does the challan photo show');
   });
 

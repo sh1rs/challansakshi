@@ -595,6 +595,7 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
           <div className="hero-actions">
             <a className="button button-primary" href="/review">{language === 'hi' ? 'अपने असली चालान की सुरक्षित समीक्षा करें' : 'Review my real challan safely'} <span aria-hidden="true">→</span></a>
             <Button variant="secondary" type="button" onClick={onStart}>{local(copy.tryDemo, language)}</Button>
+            <a className="button button-secondary" href="/demo/test-lab">{language === 'hi' ? '10-केस टेस्ट लैब खोलें' : 'Open the 10-case Test Lab'}</a>
             <Button variant="quiet" type="button" onClick={onOpenDesk}>{language === 'hi' ? 'काल्पनिक समस्या डेस्क' : 'Explore fictional issue routes'}</Button>
           </div>
           <p className="microcopy"><span aria-hidden="true">◉</span>{local(copy.noSignup, language)}</p>
