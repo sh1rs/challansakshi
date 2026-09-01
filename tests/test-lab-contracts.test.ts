@@ -146,6 +146,8 @@ describe('synthetic Test Lab product contract', () => {
     for (const selector of [
       '.heroLead',
       '.caseButton',
+      '.caseButton > span',
+      '.liveRegion',
       '.workbench p',
       '.fieldInput',
       '.fieldSelect',

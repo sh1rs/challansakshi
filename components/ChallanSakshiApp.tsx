@@ -605,7 +605,7 @@ function Landing({ language, onStart, textFirst, imageRevealed, onRevealImage }:
         </div>
       </section>
 
-      <section className="trust-line" aria-label="Product safeguards">
+      <section className="trust-line" aria-label={language === 'hi' ? 'उत्पाद सुरक्षा' : 'Product safeguards'}>
         <p className="shell">{language === 'hi' ? 'स्रोत से जुड़े साक्ष्य · अस्पष्ट तथ्य अधूरे रहते हैं · तुलना से पहले लोग पुष्टि करते हैं' : 'Source-linked evidence · unclear facts stay inconclusive · people confirm before rules compare'}</p>
       </section>
 
@@ -625,6 +625,22 @@ function Footer({ language }: { language: Language }) {
   return <CitizenFooter language={language} boundary="demo" />;
 }
 
+export function DemoDeskEntry({ language, onBack, onOpenRoute, onStartEvidence }: {
+  language: Language;
+  onBack: () => void;
+  onOpenRoute: (issueId: ResolutionIssueId) => void;
+  onStartEvidence: (issueId: 'wrong-evidence' | 'unclear-evidence') => void;
+}) {
+  return <>
+    <ResolutionDesk language={language} onBack={onBack} onOpenRoute={onOpenRoute} onStartEvidence={onStartEvidence} />
+    <details className="desk-preflight-disclosure shell">
+      <summary>{language === 'hi' ? 'काल्पनिक नोटिस के चेतावनी संकेत जाँचें' : 'Check a fictional notice for warning signs'}</summary>
+      <NoticePreflight language={language} onContinue={() => onStartEvidence('wrong-evidence')} />
+    </details>
+    <Footer language={language} />
+  </>;
+}
+
 function Screen({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <main className={`screen-shell shell ${className}`} tabIndex={-1}>{children}</main>;
 }
@@ -632,7 +648,7 @@ function Screen({ children, className = '' }: { children: ReactNode; className?:
 function EasyReadSummary({ step, language, assessment }: { step: StepId; language: Language; assessment: ReturnType<typeof deriveCaseAssessment> }) {
   if (!['landing', 'intake', 'review', 'finding', 'passport', 'readiness', 'pack', 'tracking'].includes(step)) return null;
   const next: Record<string, Pair> = {
-    landing: { en: 'Choose a fictional message or demo case.', hi: 'एक काल्पनिक संदेश या डेमो मामला चुनें।' },
+    landing: { en: 'Start the fictional vehicle-photo comparison, or choose a real-record tool.', hi: 'काल्पनिक वाहन-फ़ोटो तुलना शुरू करें या असली रिकॉर्ड टूल चुनें।' },
     intake: { en: 'Open the three fictional records, then analyse them.', hi: 'तीन काल्पनिक रिकॉर्ड देखें, फिर उनका विश्लेषण करें।' },
     review: { en: 'Load the image or record that you could not inspect it. Then check every fact.', hi: 'फ़ोटो लोड करें या दर्ज करें कि आप उसे नहीं देख सके। फिर हर तथ्य जाँचें।' },
     finding: { en: 'Open the Local Evidence Passport to check identity, time, and packet gaps.', hi: 'पहचान, समय और पैकेट की कमी जाँचने के लिए स्थानीय सबूत पासपोर्ट खोलें।' },
@@ -1680,7 +1696,7 @@ export default function ChallanSakshiApp() {
 
       {renderStep === 'landing' && <Landing language={language} onStart={() => startResolutionEvidence('wrong-evidence')} textFirst={textFirst} imageRevealed={revealedImages.includes('mismatch-enforcement')} onRevealImage={() => revealImage('mismatch-enforcement')} />}
 
-      {renderStep === 'desk' && <><ResolutionDesk language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} /><details className="desk-preflight-disclosure shell"><summary>{language === 'hi' ? 'काल्पनिक नोटिस के चेतावनी संकेत जाँचें' : 'Check a fictional notice for warning signs'}</summary><NoticePreflight language={language} onContinue={() => startResolutionEvidence('wrong-evidence')} /></details><Footer language={language} /></>}
+      {renderStep === 'desk' && <DemoDeskEntry language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} />}
 
       {renderStep === 'route' && <><ResolutionRouteView language={language} issueId={resolutionIssue} onBack={() => go(orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? 'order-map' : 'desk')} onStartEvidence={startResolutionEvidence} postRejectionContext={orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? { orderDate: postRejectionClock.orderDate, referenceDate: postRejectionClock.referenceDate } : undefined} /><Footer language={language} /></>}
 

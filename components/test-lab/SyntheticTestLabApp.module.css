@@ -314,9 +314,11 @@
   .secondaryButton { min-height: 48px; font-size: 16px; }
   .filterButton { min-height: 48px; font-size: 16px; }
   .caseButton { min-height: 48px; grid-template-columns: auto minmax(0, 1fr); font-size: 16px; }
+  .caseButton > span { font-size: 16px; }
   .caseButton > b { grid-column: 2; justify-self: start; max-width: none; font-size: 16px; }
   .caseButton strong,
   .caseButton small { font-size: 16px; }
+  .liveRegion { font-size: 16px; }
   .workbenchHeader,
   .evidenceSection,
   .explainSection,

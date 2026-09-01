@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { createElement } from 'react';
+import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import ChallanSakshiApp from '../components/ChallanSakshiApp';
+import ChallanSakshiApp, * as DemoModule from '../components/ChallanSakshiApp';
 
 const globalStyles = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+const demoSource = readFileSync(new URL('../components/ChallanSakshiApp.tsx', import.meta.url), 'utf8');
 
 function mediaBlock(source: string, query: string) {
   const marker = `@media ${query}`;
@@ -80,5 +81,51 @@ describe('synthetic demo mobile accessibility', () => {
     }
 
     expect(ruleFor(compact, '.reading-options > summary::before')).toMatch(/font-size:\s*16px/);
+  });
+
+  it('keeps the mobile synthetic and real-record safety lines at 16px', () => {
+    const mobile = mediaBlock(globalStyles, '(max-width: 480px)');
+
+    for (const selector of ['.microcopy', '.trust-line p', '.real-help-band p']) {
+      expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);
+    }
+  });
+
+  it('keeps Simple Mode landing guidance aligned with the current actions in English and Hindi', () => {
+    expect(demoSource).toContain('Start the fictional vehicle-photo comparison, or choose a real-record tool.');
+    expect(demoSource).toContain('काल्पनिक वाहन-फ़ोटो तुलना शुरू करें या असली रिकॉर्ड टूल चुनें।');
+    expect(demoSource).not.toContain('Choose a fictional message or demo case.');
+    expect(demoSource).not.toContain('एक काल्पनिक संदेश या डेमो मामला चुनें।');
+  });
+
+  it('localizes the landing trust landmark for Hindi', () => {
+    const html = renderToStaticMarkup(createElement(ChallanSakshiApp));
+
+    expect(html).toContain('aria-label="Product safeguards"');
+    expect(demoSource).toContain("aria-label={language === 'hi' ? 'उत्पाद सुरक्षा' : 'Product safeguards'}");
+  });
+
+  it('renders NoticePreflight only from the Demo Desk branch', () => {
+    const landingHtml = renderToStaticMarkup(createElement(ChallanSakshiApp));
+    const DemoDeskEntry = Reflect.get(DemoModule, 'DemoDeskEntry') as ComponentType<{
+      language: 'en' | 'hi';
+      onBack: () => void;
+      onOpenRoute: () => void;
+      onStartEvidence: () => void;
+    }> | undefined;
+
+    expect(DemoDeskEntry).toBeTypeOf('function');
+    if (!DemoDeskEntry) return;
+
+    const deskHtml = renderToStaticMarkup(createElement(DemoDeskEntry, {
+      language: 'en',
+      onBack: () => undefined,
+      onOpenRoute: () => undefined,
+      onStartEvidence: () => undefined,
+    }));
+
+    expect(landingHtml).not.toContain('id="notice-preflight-title"');
+    expect(deskHtml).toContain('id="notice-preflight-title"');
+    expect(deskHtml).toContain('<summary>Check a fictional notice for warning signs</summary>');
   });
 });

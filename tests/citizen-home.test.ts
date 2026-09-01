@@ -141,4 +141,10 @@ describe('citizen homepage routing', () => {
       expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);
     }
   });
+
+  it('keeps the mobile FASTag doorway CTA at 16px', () => {
+    const mobile = citizenHomeStyles.slice(citizenHomeStyles.indexOf('@media (max-width: 700px)'));
+
+    expect(ruleFor(mobile, '.fastagCta')).toMatch(/font-size:\s*16px/);
+  });
 });

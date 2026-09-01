@@ -125,7 +125,7 @@
   .privacyLink { grid-column: auto; width: 100%; justify-self: stretch; font-size: 16px; }
   .fastagDoorway { grid-template-columns: 56px 1fr; gap: 12px; padding: 16px; }
   .fastagIcon { width: 52px; height: 52px; }
-  .fastagCta { grid-column: 1 / -1; width: 100%; min-height: 50px; }
+  .fastagCta { grid-column: 1 / -1; width: 100%; min-height: 50px; font-size: 16px; }
   .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; padding: 14px; }
   .footer a { min-height: 48px; font-size: 12px; }
   .footer p { grid-column: 1 / -1; margin: 8px 0 0; text-align: left; }

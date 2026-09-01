@@ -1448,6 +1448,9 @@ main:focus { outline: none; }
   .real-help-band { padding: 16px; }
   .real-help-band nav { grid-template-columns: 1fr; }
   .desk-preflight-disclosure > summary { min-height: 48px; font-size: 16px; }
+  .microcopy,
+  .trust-line p,
+  .real-help-band p { font-size: 16px; }
   .progress { grid-template-columns: repeat(6, 1fr); overflow: visible; padding-block: 9px; }
   .progress li { min-width: 0; flex-direction: column; gap: 3px; color: #59615d; }
   .progress li::after { top: 11px; right: -25%; width: 50%; }
