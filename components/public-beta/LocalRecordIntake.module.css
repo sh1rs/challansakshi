@@ -10,15 +10,12 @@
   color: var(--ink);
 }
 
-.header { max-width: 760px; margin-bottom: 20px; }
-.header h2 { margin: 0; font: 700 clamp(28px, 3.5vw, 43px)/1.08 Georgia, 'Times New Roman', serif; letter-spacing: -.035em; }
-.header p { margin: 10px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
-
-.receipt { display: grid; grid-template-columns: 185px 1fr; gap: 18px; margin-bottom: 18px; padding: 17px 20px; border: 1px solid #9bc6bf; border-radius: 12px; background: var(--pale-teal); }
-.receipt strong { align-self: center; color: var(--teal-deep); font-size: 15px; line-height: 1.25; }
-.receipt ul { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 0; list-style: none; }
-.receipt li { color: #274a48; font-size: 13px; line-height: 1.4; }
-.receipt li::before { content: '•'; margin-right: 7px; color: var(--teal); font-weight: 900; }
+.receipt { margin-bottom: 10px; padding: 15px 18px; border: 1px solid #9bc6bf; border-radius: 12px; background: var(--pale-teal); }
+.receipt strong { color: var(--teal-deep); font-size: 15px; line-height: 1.35; }
+.mechanics { margin-bottom: 18px; }
+.mechanics summary { min-height: 48px; display: inline-flex; align-items: center; color: var(--teal-deep); font-size: 14px; font-weight: 800; cursor: pointer; }
+.mechanics ul { margin: 0 0 8px; padding: 15px 18px 15px 36px; border-left: 3px solid #9bc6bf; background: var(--pale-teal); }
+.mechanics li { padding: 3px 0; color: #274a48; font-size: 13px; line-height: 1.45; }
 
 .rows { border-top: 1px solid var(--line); }
 .intakeRow { display: grid; grid-template-columns: minmax(190px, .8fr) minmax(260px, 1.2fr); gap: 16px 30px; align-items: start; padding: 24px 0; border-bottom: 1px solid var(--line); }
@@ -53,9 +50,7 @@
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 700px) {
-  .header h2 { font-size: clamp(30px, 10vw, 42px); }
-  .receipt { grid-template-columns: 1fr; gap: 9px; padding: 16px; }
-  .receipt ul { display: grid; gap: 7px; }
+  .receipt { padding: 16px; }
   .intakeRow { grid-template-columns: 1fr; gap: 15px; padding: 21px 0; }
   .choose { width: 100%; min-width: 0; }
   .actions { display: grid; grid-template-columns: 1fr 1fr; }
@@ -66,7 +61,8 @@
 
 @media (max-width: 420px) {
   .receipt strong,
-  .receipt li,
+  .mechanics summary,
+  .mechanics li,
   .rowCopy p:last-child,
   .choose,
   .actions button,

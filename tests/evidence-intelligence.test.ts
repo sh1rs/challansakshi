@@ -467,6 +467,15 @@ describe('citizen evidence intelligence', () => {
     });
   });
 
+  it('uses one concise visible limitation without weakening the exported disclaimer', () => {
+    expect(getCitizenReviewPresentation('en', false).resultLimitation).toBe(
+      'Based only on answers you confirmed. ChallanSakshi did not authenticate the records or decide the case.',
+    );
+    expect(getCitizenReviewPresentation('en', true).disclaimer.en).toBe(
+      'Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.',
+    );
+  });
+
   it('sanitises hostile summary fields and keeps only canonical citizen timeline events', () => {
     const summary = buildCitizenEvidenceSummary({
       jurisdiction: 'Central service\r\nMATERIAL SIGNALS',

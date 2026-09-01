@@ -5,8 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GuidedStepHeader } from '../guided/GuidedStepHeader';
 import { parseCitizenGoal, type CitizenGoal } from '../../lib/citizen-home';
 import {
-  CITIZEN_DISCLAIMER_EN,
-  CITIZEN_DISCLAIMER_HI,
   getCitizenReviewPresentation,
   localizeAssessment,
   localizeDeadline,
@@ -41,7 +39,6 @@ type ReviewError = { step: Step; message: string };
 
 const NATIONAL_URL = 'https://echallan.parivahan.gov.in/';
 const COURT_URL = 'https://vcourts.gov.in/virtualcourt/index.php';
-const DISCLAIMER = CITIZEN_DISCLAIMER_EN;
 
 const defaults: CitizenChallanAnswers = {
   sourceStatus: 'not-selected',
@@ -859,31 +856,33 @@ export default function CitizenReviewApp() {
           headingId="challan-guided-step-title"
           labels={presentation.guideLabels}
         />
-        <section className={`${styles.hero} ${styles.heroCompact}`}>
-          <div>
-            <h1>
-              {t(
-                language,
-                'Inspect the official record. Record only ',
-                'आधिकारिक रिकॉर्ड देखें। केवल वही दर्ज करें जो ',
-              )}
-              <em>{t(language, 'what you can see.', 'आप देख सकते हैं।')}</em>
-            </h1>
-            <p className={styles.lede}>
-              {goal === 'evidence'
-                ? t(
+        {step === 'safety' && (
+          <section className={`${styles.hero} ${styles.heroCompact}`}>
+            <div>
+              <h1>
+                {t(
                   language,
-                  'Bring the record and supplied photograph together, then confirm each observation.',
-                  'रिकॉर्ड और तस्वीर साथ लाएँ, फिर हर अवलोकन पुष्ट करें।',
-                )
-                : t(
-                  language,
-                  'Open the official service yourself, preview a selected record locally, and confirm structured facts.',
-                  'आधिकारिक सेवा स्वयं खोलें, रिकॉर्ड स्थानीय रूप से देखें और संरचित तथ्य पुष्ट करें।',
+                  'Inspect the official record. Record only ',
+                  'आधिकारिक रिकॉर्ड देखें। केवल वही दर्ज करें जो ',
                 )}
-            </p>
-          </div>
-        </section>
+                <em>{t(language, 'what you can see.', 'आप देख सकते हैं।')}</em>
+              </h1>
+              <p className={styles.lede}>
+                {goal === 'evidence'
+                  ? t(
+                    language,
+                    'Bring the record and supplied photograph together, then confirm each observation.',
+                    'रिकॉर्ड और तस्वीर साथ लाएँ, फिर हर अवलोकन पुष्ट करें।',
+                  )
+                  : t(
+                    language,
+                    'Open the official service yourself, preview a selected record locally, and confirm structured facts.',
+                    'आधिकारिक सेवा स्वयं खोलें, रिकॉर्ड स्थानीय रूप से देखें और संरचित तथ्य पुष्ट करें।',
+                  )}
+              </p>
+            </div>
+          </section>
+        )}
         <SafetyBoundary language={language}>
           <p>{t(
             language,
@@ -893,15 +892,7 @@ export default function CitizenReviewApp() {
         </SafetyBoundary>
 
         {step === 'safety' && (
-          <section className={styles.panel} aria-labelledby="safety-title">
-            <div className={styles.sectionTitle}>
-              <div>
-                <h2 id="safety-title">
-                  {presentation.stages.safety.heading}
-                </h2>
-                <p>{presentation.stages.safety.help}</p>
-              </div>
-            </div>
+          <section className={styles.panel} aria-labelledby="challan-guided-step-title">
             <div className={styles.choiceGrid}>
               <fieldset className={styles.choiceFieldset}>
                 <legend className={styles.choiceLegend}>
@@ -1019,15 +1010,10 @@ export default function CitizenReviewApp() {
         )}
 
         {step === 'source' && (
-          <section className={styles.panel} aria-labelledby="source-title">
-            <div className={styles.sectionTitle}>
-              <div>
-                <h2 id="source-title">
-                  {presentation.stages.source.heading}
-                </h2>
-                <p>{presentation.stages.source.help}</p>
-              </div>
-            </div>
+          <section className={styles.panel} aria-labelledby="challan-guided-step-title">
+            <h2 className={styles.decisionHeading}>
+              {t(language, 'Choose where to check', 'कहाँ जाँचना है चुनें')}
+            </h2>
             <div className={styles.serviceGrid}>
               {([
                 ['National e-Challan', NATIONAL_URL, true],
@@ -1072,8 +1058,8 @@ export default function CitizenReviewApp() {
               <h3>
                 {t(
                   language,
-                  'Confirm how you obtained this copy',
-                  'पुष्टि करें कि कॉपी कैसे मिली',
+                  'How did you get this record?',
+                  'यह रिकॉर्ड आपको कैसे मिला?',
                 )}
               </h3>
               <p>
@@ -1128,8 +1114,8 @@ export default function CitizenReviewApp() {
               <h3>
                 {t(
                   language,
-                  'Choose one deliberate way to continue',
-                  'आगे बढ़ने का एक तरीका चुनें',
+                  'Add a record or enter facts',
+                  'रिकॉर्ड जोड़ें या तथ्य दर्ज करें',
                 )}
               </h3>
               <p>
@@ -1182,15 +1168,7 @@ export default function CitizenReviewApp() {
         )}
 
         {step === 'observations' && (
-          <section className={styles.panel} aria-labelledby="observe-title">
-            <div className={styles.sectionTitle}>
-              <div>
-                <h2 id="observe-title">
-                  {presentation.stages.observations.heading}
-                </h2>
-                <p>{presentation.stages.observations.help}</p>
-              </div>
-            </div>
+          <section className={styles.panel} aria-labelledby="challan-guided-step-title">
             <div className={styles.evidenceWorkspace}>
               <aside className={styles.previewColumn}>
                 {recordSelection ? (
@@ -1216,200 +1194,239 @@ export default function CitizenReviewApp() {
                   />
                 )}
               </aside>
-          <div>
-            <div className={styles.formGrid}>
-              <div className={styles.field}>
-                <label htmlFor="vehicle-suffix">
-                  {t(
-                    language,
-                    'Vehicle registration — last 4 only',
-                    'वाहन नंबर — केवल अंतिम 4',
-                  )}
-                </label>
-                <input
-                  id="vehicle-suffix"
-                  value={vehicleSuffix}
-                  maxLength={4}
-                  autoComplete="off"
-                  onChange={(e) => changeVehicleSuffix(
-                    e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4),
-                  )}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="offence">
-                  {t(language, 'Alleged offence category', 'आरोपित अपराध श्रेणी')}
-                </label>
-                <input
-                  id="offence"
-                  value={offence}
-                  autoComplete="off"
-                  onChange={(e) => changeOffence(e.target.value.slice(0, 80))}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="event-date">
-                  {t(language, 'Displayed event date', 'दिखाई घटना तारीख')}
-                </label>
-                <input
-                  id="event-date"
-                  type="date"
-                  value={eventDate}
-                  max={indiaDateNow()}
-                  onChange={(e) => changeEventDate(e.target.value)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="official-deadline">
-                  {t(
-                    language,
-                    'Displayed official deadline',
-                    'दिखाई आधिकारिक अंतिम तारीख',
-                  )}
-                </label>
-                <input
-                  id="official-deadline"
-                  type="date"
-                  value={officialDeadline}
-                  onChange={(e) => changeOfficialDeadline(e.target.value)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="image-inspected">
-                  {t(
-                    language,
-                    'Did you inspect the supplied photograph?',
-                    'क्या आपने दी गई तस्वीर देखी?',
-                  )}
-                </label>
-                <select
-                  id="image-inspected"
-                  value={answers.imageInspected ? 'yes' : 'no'}
-                  onChange={(e) => changeAnswers({
-                    ...answers,
-                    imageInspected: e.target.value === 'yes',
-                  })}
-                >
-                  <option value="no">
-                    {t(language, 'No / not supplied', 'नहीं / नहीं दी गई')}
-                  </option>
-                  <option value="yes">
-                    {t(language, 'Yes, inspected', 'हाँ, देखी')}
-                  </option>
-                </select>
-              </div>
-            </div>
-            <div className={styles.observationGrid}>
-              {([
-                ['plateObservation', t(language, 'Plate comparison', 'नंबर प्लेट')],
-                ['categoryObservation', t(language, 'Vehicle category', 'वाहन श्रेणी')],
-                ['colourObservation', t(language, 'Vehicle colour', 'वाहन रंग')],
-              ] as const).map(([key, label]) => (
-                <div className={styles.observationCard} key={key}>
-                  <label htmlFor={key}>{label}</label>
-                  <select
-                    id={key}
-                    value={answers[key]}
-                    disabled={!answers.imageInspected}
-                    onChange={(e) => changeAnswers({
+              <div className={styles.observationControls}>
+                <div className={styles.formGrid}>
+                  <div className={styles.field}>
+                    <label htmlFor="vehicle-suffix">
+                      {t(
+                        language,
+                        'Vehicle registration — last 4 only',
+                        'वाहन नंबर — केवल अंतिम 4',
+                      )}
+                    </label>
+                    <input
+                      id="vehicle-suffix"
+                      value={vehicleSuffix}
+                      maxLength={4}
+                      autoComplete="off"
+                      onChange={(e) => changeVehicleSuffix(
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4),
+                      )}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="image-inspected">
+                      {t(
+                        language,
+                        'Did you inspect the supplied photograph?',
+                        'क्या आपने दी गई तस्वीर देखी?',
+                      )}
+                    </label>
+                    <select
+                      id="image-inspected"
+                      value={answers.imageInspected ? 'yes' : 'no'}
+                      onChange={(e) => changeAnswers({
+                        ...answers,
+                        imageInspected: e.target.value === 'yes',
+                      })}
+                    >
+                      <option value="no">
+                        {t(language, 'No / not supplied', 'नहीं / नहीं दी गई')}
+                      </option>
+                      <option value="yes">
+                        {t(language, 'Yes, inspected', 'हाँ, देखी')}
+                      </option>
+                    </select>
+                  </div>
+                  <SelectField
+                    id="own-record"
+                    label={t(language, 'Vehicle comparison record', 'वाहन तुलना रिकॉर्ड')}
+                    value={answers.ownRecordAvailable}
+                    onChange={(v) => changeAnswers({
                       ...answers,
-                      [key]: e.target.value as Observation,
+                      ownRecordAvailable: v as RecordAvailability,
                     })}
-                  >
-                    {observationOptions.map(([v, labelText]) => (
-                      <option value={v} key={v}>{labelText}</option>
-                    ))}
-                  </select>
+                    options={recordOptions}
+                  />
                 </div>
-              ))}
-              <div className={styles.observationCard}>
-                <label htmlFor="offence-observation">
-                  {t(language, 'Offence visibility', 'अपराध दृश्यता')}
-                </label>
-                <select
-                  id="offence-observation"
-                  value={answers.offenceObservation}
-                  disabled={!answers.imageInspected}
-                  onChange={(e) => changeAnswers({
-                    ...answers,
-                    offenceObservation: e.target.value as OffenceObservation,
-                  })}
-                >
-                  <option value="appears-visible">
-                    {t(language, 'Appears visible', 'दिखता है')}
-                  </option>
-                  <option value="not-visible">
-                    {t(language, 'Not visible', 'नहीं दिखता')}
-                  </option>
-                  <option value="not-assessable-from-still">
-                    {t(language, 'Not assessable from one still', 'एक तस्वीर से संभव नहीं')}
-                  </option>
-                  <option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option>
-                </select>
+                <p className={styles.deadlineCaveat}>
+                  {t(
+                    language,
+                    'If the record shows a deadline, add it under Dates and notice details. ChallanSakshi does not calculate a legal deadline.',
+                    'अगर रिकॉर्ड में अंतिम तारीख है, तो उसे तारीख और नोटिस विवरण में जोड़ें। ChallanSakshi कानूनी समयसीमा की गणना नहीं करता।',
+                  )}
+                </p>
+
+                <div className={styles.observationGrid}>
+                  {([
+                    ['plateObservation', t(language, 'Plate comparison', 'नंबर प्लेट')],
+                    ['categoryObservation', t(language, 'Vehicle type', 'वाहन का प्रकार')],
+                  ] as const).map(([key, label]) => (
+                    <div className={styles.observationCard} key={key}>
+                      <label htmlFor={key}>{label}</label>
+                      <select
+                        id={key}
+                        value={answers[key]}
+                        disabled={!answers.imageInspected}
+                        onChange={(e) => changeAnswers({
+                          ...answers,
+                          [key]: e.target.value as Observation,
+                        })}
+                      >
+                        {observationOptions.map(([v, labelText]) => (
+                          <option value={v} key={v}>{labelText}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+
+                <details className={styles.disclosure}>
+                  <summary>{t(language, 'More photo details', 'तस्वीर के और विवरण')}</summary>
+                  <div className={styles.observationGrid}>
+                    <div className={styles.observationCard}>
+                      <label htmlFor="colourObservation">
+                        {t(language, 'Vehicle colour', 'वाहन रंग')}
+                      </label>
+                      <select
+                        id="colourObservation"
+                        value={answers.colourObservation}
+                        disabled={!answers.imageInspected}
+                        onChange={(e) => changeAnswers({
+                          ...answers,
+                          colourObservation: e.target.value as Observation,
+                        })}
+                      >
+                        {observationOptions.map(([v, labelText]) => (
+                          <option value={v} key={v}>{labelText}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={styles.observationCard}>
+                      <label htmlFor="offence-observation">
+                        {t(language, 'Offence visibility', 'अपराध दृश्यता')}
+                      </label>
+                      <select
+                        id="offence-observation"
+                        value={answers.offenceObservation}
+                        disabled={!answers.imageInspected}
+                        onChange={(e) => changeAnswers({
+                          ...answers,
+                          offenceObservation: e.target.value as OffenceObservation,
+                        })}
+                      >
+                        <option value="appears-visible">
+                          {t(language, 'Appears visible', 'दिखता है')}
+                        </option>
+                        <option value="not-visible">
+                          {t(language, 'Not visible', 'नहीं दिखता')}
+                        </option>
+                        <option value="not-assessable-from-still">
+                          {t(language, 'Not assessable from one still', 'एक तस्वीर से संभव नहीं')}
+                        </option>
+                        <option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option>
+                      </select>
+                    </div>
+                    <SelectField
+                      id="timestamp-status"
+                      label={t(language, 'Evidence timestamp', 'सबूत समय')}
+                      value={answers.timestampStatus}
+                      onChange={(v) => changeAnswers({
+                        ...answers,
+                        timestampStatus: v as CitizenChallanAnswers['timestampStatus'],
+                      })}
+                      options={[
+                        ['displayed', t(language, 'Displayed', 'दिखाया गया')],
+                        ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
+                        ['not-found', t(language, 'Not found', 'नहीं मिला')],
+                      ]}
+                    />
+                    <SelectField
+                      id="location-status"
+                      label={t(language, 'Evidence location', 'सबूत स्थान')}
+                      value={answers.locationStatus}
+                      onChange={(v) => changeAnswers({
+                        ...answers,
+                        locationStatus: v as CitizenChallanAnswers['locationStatus'],
+                      })}
+                      options={[
+                        ['displayed', t(language, 'Displayed', 'दिखाया गया')],
+                        ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
+                        ['not-found', t(language, 'Not found', 'नहीं मिला')],
+                      ]}
+                    />
+                  </div>
+                </details>
+
+                <details className={styles.disclosure}>
+                  <summary>{t(language, 'Dates and notice details', 'तारीख और नोटिस विवरण')}</summary>
+                  <div className={styles.formGrid}>
+                    <div className={styles.field}>
+                      <label htmlFor="offence">
+                        {t(language, 'Alleged offence category', 'आरोपित अपराध श्रेणी')}
+                      </label>
+                      <input
+                        id="offence"
+                        value={offence}
+                        autoComplete="off"
+                        onChange={(e) => changeOffence(e.target.value.slice(0, 80))}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label htmlFor="event-date">
+                        {t(language, 'Displayed event date', 'दिखाई घटना तारीख')}
+                      </label>
+                      <input
+                        id="event-date"
+                        type="date"
+                        value={eventDate}
+                        max={indiaDateNow()}
+                        onChange={(e) => changeEventDate(e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label htmlFor="official-deadline">
+                        {t(
+                          language,
+                          'Displayed official deadline',
+                          'दिखाई आधिकारिक अंतिम तारीख',
+                        )}
+                      </label>
+                      <input
+                        id="official-deadline"
+                        type="date"
+                        value={officialDeadline}
+                        onChange={(e) => changeOfficialDeadline(e.target.value)}
+                      />
+                    </div>
+                    <SelectField
+                      id="notice-copy"
+                      label={t(language, 'Official notice copy', 'आधिकारिक नोटिस कॉपी')}
+                      value={answers.noticeCopyAvailable}
+                      onChange={(v) => changeAnswers({
+                        ...answers,
+                        noticeCopyAvailable: v as RecordAvailability,
+                      })}
+                      options={recordOptions}
+                    />
+                  </div>
+                </details>
+
+                <details className={styles.disclosure}>
+                  <summary>{t(language, 'Other records', 'अन्य रिकॉर्ड')}</summary>
+                  <SelectField
+                    id="custody-record"
+                    label={t(language, 'Custody record (context only)', 'अभिरक्षा रिकॉर्ड')}
+                    value={answers.custodyRecordAvailable}
+                    onChange={(v) => changeAnswers({
+                      ...answers,
+                      custodyRecordAvailable: v as RecordAvailability,
+                    })}
+                    options={recordOptions}
+                  />
+                </details>
               </div>
-              <SelectField
-                id="timestamp-status"
-                label={t(language, 'Evidence timestamp', 'सबूत समय')}
-                value={answers.timestampStatus}
-                onChange={(v) => changeAnswers({
-                  ...answers,
-                  timestampStatus: v as CitizenChallanAnswers['timestampStatus'],
-                })}
-                options={[
-                  ['displayed', t(language, 'Displayed', 'दिखाया गया')],
-                  ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
-                  ['not-found', t(language, 'Not found', 'नहीं मिला')],
-                ]}
-              />
-              <SelectField
-                id="location-status"
-                label={t(language, 'Evidence location', 'सबूत स्थान')}
-                value={answers.locationStatus}
-                onChange={(v) => changeAnswers({
-                  ...answers,
-                  locationStatus: v as CitizenChallanAnswers['locationStatus'],
-                })}
-                options={[
-                  ['displayed', t(language, 'Displayed', 'दिखाया गया')],
-                  ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
-                  ['not-found', t(language, 'Not found', 'नहीं मिला')],
-                ]}
-              />
             </div>
-            <div className={styles.formGrid}>
-              <SelectField
-                id="own-record"
-                label={t(language, 'Vehicle comparison record', 'वाहन तुलना रिकॉर्ड')}
-                value={answers.ownRecordAvailable}
-                onChange={(v) => changeAnswers({
-                  ...answers,
-                  ownRecordAvailable: v as RecordAvailability,
-                })}
-                options={recordOptions}
-              />
-              <SelectField
-                id="notice-copy"
-                label={t(language, 'Official notice copy', 'आधिकारिक नोटिस कॉपी')}
-                value={answers.noticeCopyAvailable}
-                onChange={(v) => changeAnswers({
-                  ...answers,
-                  noticeCopyAvailable: v as RecordAvailability,
-                })}
-                options={recordOptions}
-              />
-              <SelectField
-                id="custody-record"
-                label={t(language, 'Custody record (context only)', 'अभिरक्षा रिकॉर्ड')}
-                value={answers.custodyRecordAvailable}
-                onChange={(v) => changeAnswers({
-                  ...answers,
-                  custodyRecordAvailable: v as RecordAvailability,
-                })}
-                options={recordOptions}
-              />
-            </div>
-          </div>
-        </div>
             <div className={styles.acknowledgements}>
               <label className={styles.check}>
                 <input
@@ -1448,15 +1465,13 @@ export default function CitizenReviewApp() {
               </div>
             )}
             {view && (
-              <section className={styles.evidenceTableSection}>
-                <h3>
-                  {t(language, 'Source-linked evidence view', 'स्रोत-जुड़ा सबूत दृश्य')}
-                </h3>
-                <p>
-                  {presentation.table.confidenceHelp}
-                </p>
-                <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
-              </section>
+              <details className={styles.disclosure}>
+                <summary>{t(language, 'Evidence details', 'सबूत विवरण')}</summary>
+                <section className={styles.evidenceTableSection}>
+                  <p>{presentation.table.confidenceHelp}</p>
+                  <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
+                </section>
+              </details>
             )}
             {error?.step === step && (
               <p className={styles.inlineError} role="alert">{error.message}</p>
@@ -1481,14 +1496,11 @@ export default function CitizenReviewApp() {
         )}
 
         {step === 'result' && (
-          <section className={styles.panel} aria-labelledby="result-title" data-print-result>
-            <div className={styles.sectionTitle}>
-              <div>
-                <h2 id="result-title">
-                  {presentation.stages.result.heading}
-                </h2>
-              </div>
-            </div>
+          <section
+            className={styles.panel}
+            aria-labelledby="challan-guided-step-title"
+            data-print-result
+          >
             <div className={styles.resultHero} data-tone={copy.tone}>
               <span className={styles.resultIcon} aria-hidden="true">
                 {copy.tone === 'good' ? '✓' : copy.tone === 'warn' ? '!' : 'i'}
@@ -1525,6 +1537,26 @@ export default function CitizenReviewApp() {
               </div>
             ) : (
                 <>
+                  <section className={styles.officialHandoff}>
+                    <div>
+                      <h3>{presentation.resultSections.officialRoute}</h3>
+                      <p>
+                        {t(
+                          language,
+                          'Nothing is transferred; enter identifiers only there.',
+                          'कुछ स्थानांतरित नहीं होता; पहचान केवल वहाँ दर्ज करें।',
+                        )}
+                      </p>
+                    </div>
+                    <a
+                      className={styles.button}
+                      href={route.href}
+                      target={route.external ? '_blank' : undefined}
+                      rel={route.external ? 'noreferrer' : undefined}
+                    >
+                      {route.label} →
+                    </a>
+                  </section>
                   <div className={styles.resultColumns}>
                     <section className={styles.listPanel}>
                       <h3>{presentation.resultSections.established}</h3>
@@ -1571,13 +1603,6 @@ export default function CitizenReviewApp() {
                       )}
                     </ul>
                   </section>
-                  <section className={styles.evidenceTableSection} data-print-evidence>
-                    <h3>{presentation.resultSections.evidence}</h3>
-                    <p>
-                      {presentation.table.confidenceHelp}
-                    </p>
-                    <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
-                  </section>
                   {deadline && deadline.status !== 'not-entered' && (
                     <div className={styles.deadline}>
                       <strong>
@@ -1592,41 +1617,28 @@ export default function CitizenReviewApp() {
                       </p>
                     </div>
                   )}
-                  <section className={styles.timeline} data-print-timeline>
-                    <h3>{presentation.timelineHeading}</h3>
-                    <ol>
-                      {timelineFor(summaryGenerated).map((item) => (
-                        <li key={item.id}>{item.label}</li>
-                      ))}
-                    </ol>
-                  </section>
-                  <section className={styles.officialHandoff}>
-                    <div>
-                      <h3>{presentation.resultSections.officialRoute}</h3>
-                      <p>
-                        {t(
-                          language,
-                          'Nothing is transferred; enter identifiers only there.',
-                          'कुछ स्थानांतरित नहीं होता; पहचान केवल वहाँ दर्ज करें।',
-                        )}
-                      </p>
-                    </div>
-                    <a
-                      className={styles.button}
-                      href={route.href}
-                      target={route.external ? '_blank' : undefined}
-                      rel={route.external ? 'noreferrer' : undefined}
-                    >
-                      {route.label} →
-                    </a>
-                  </section>
+                  <details className={styles.disclosure} data-print-evidence>
+                    <summary>{t(language, 'Evidence details', 'सबूत विवरण')}</summary>
+                    <section className={styles.evidenceTableSection}>
+                      <h3>{presentation.resultSections.evidence}</h3>
+                      <p>{presentation.table.confidenceHelp}</p>
+                      <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
+                    </section>
+                  </details>
+                  <details className={styles.disclosure} data-print-timeline>
+                    <summary>{t(language, 'Review history', 'समीक्षा इतिहास')}</summary>
+                    <section className={styles.timeline}>
+                      <h3>{presentation.timelineHeading}</h3>
+                      <ol>
+                        {timelineFor(summaryGenerated).map((item) => (
+                          <li key={item.id}>{item.label}</li>
+                        ))}
+                      </ol>
+                    </section>
+                  </details>
                   <section className={styles.artifact} data-print-artifact>
                     <h3>{presentation.summaryHeading}</h3>
                     <p>{presentation.summaryHelp}</p>
-                    <p className={styles.summaryDisclaimer}>
-                      <span lang="en">{DISCLAIMER}</span>
-                      <span lang="hi">{CITIZEN_DISCLAIMER_HI}</span>
-                    </p>
                     <p className={styles.artifactWarning}>
                       {device === 'shared'
                         ? t(
@@ -1640,7 +1652,12 @@ export default function CitizenReviewApp() {
                           'स्थानीय कार्रवाई से डिवाइस पर कॉपी रह सकती है।',
                         )}
                     </p>
-                    <pre>{summaryFor(summaryGenerated)}</pre>
+                    <details className={styles.disclosure}>
+                      <summary>
+                        {t(language, 'Preview local summary', 'स्थानीय सारांश का प्रीव्यू')}
+                      </summary>
+                      <pre>{summaryFor(summaryGenerated)}</pre>
+                    </details>
                     <div className={styles.summaryActions}>
                       <button
                         type="button"
@@ -1675,10 +1692,6 @@ export default function CitizenReviewApp() {
                   )}
                 </>
               )}
-            <p className={styles.summaryDisclaimer}>
-              <span lang="en">{DISCLAIMER}</span>
-              <span lang="hi">{CITIZEN_DISCLAIMER_HI}</span>
-            </p>
             <div className={styles.actions}>
               <button
                 type="button"

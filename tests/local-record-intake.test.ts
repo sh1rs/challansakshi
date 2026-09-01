@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { LocalRecordIntake } from '../components/public-beta/LocalRecordIntake';
 import { formatLocalRecordSize, validateLocalRecordFile } from '../lib/local-record-intake';
 
 const MiB = 1024 * 1024;
@@ -53,12 +56,29 @@ describe('local official-record intake', () => {
     );
   });
 
+  it('shows a compact local receipt and discloses the full processing mechanics', () => {
+    const html = renderToStaticMarkup(createElement(LocalRecordIntake, {
+      record: null,
+      photograph: null,
+      onRecordChange: () => undefined,
+      onPhotographChange: () => undefined,
+      language: 'en',
+    }));
+
+    expect(html).toContain('Local only · Not uploaded · Not saved');
+    expect(html).toContain('Challan copy');
+    expect(html).toContain('Photo from the challan');
+    expect(html).toContain('<summary>How local review works</summary>');
+    expect(html).toContain('No selected file or answer has been uploaded to ChallanSakshi or an authority');
+  });
+
   it('keeps local-intake guidance and controls at 16px on narrow screens', () => {
     const mobile = mediaBlock(intakeStyles, '(max-width: 420px)');
 
     for (const selector of [
       '.receipt strong',
-      '.receipt li',
+      '.mechanics summary',
+      '.mechanics li',
       '.rowCopy p:last-child',
       '.choose',
       '.actions button',

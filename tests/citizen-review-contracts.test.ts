@@ -10,6 +10,10 @@ const reviewSource = readFileSync(
   new URL('../components/public-beta/CitizenReviewApp.tsx', import.meta.url),
   'utf8',
 );
+const presentationSource = readFileSync(
+  new URL('../lib/citizen-review-presentation.ts', import.meta.url),
+  'utf8',
+);
 const publicStyles = readFileSync(
   new URL('../components/public-beta/PublicBeta.module.css', import.meta.url),
   'utf8',
@@ -143,10 +147,11 @@ describe('citizen review release contracts', () => {
   });
 
   it('keeps the short browser-local boundary visible and discloses the full privacy qualifications', () => {
-    const html = renderToStaticMarkup(createElement(SafetyBoundary, {
-      language: 'en',
-      children: createElement('p', undefined, 'Keep this decision-critical warning visible.'),
-    }));
+    const html = renderToStaticMarkup(createElement(
+      SafetyBoundary,
+      { language: 'en' },
+      createElement('p', undefined, 'Keep this decision-critical warning visible.'),
+    ));
 
     expect(html).toContain('Your files and answers stay in this browser. They are not uploaded.');
     expect(html).toContain('<summary>Privacy details</summary>');
@@ -154,6 +159,29 @@ describe('citizen review release contracts', () => {
     expect(html).toContain('Opening a PDF creates another browser-local tab');
     expect(html).toContain('Keep this decision-critical warning visible.');
     expect(html.indexOf('Keep this decision-critical warning visible.')).toBeGreaterThan(html.indexOf('</details>'));
+  });
+
+  it('makes the review route action-first while keeping named detail disclosures available', () => {
+    expect(reviewSource).toMatch(/step === 'safety'[\s\S]*?<section className=\{`\$\{styles\.hero\}/);
+    expect(reviewSource).toContain('Choose where to check');
+    expect(reviewSource).toContain('How did you get this record?');
+    expect(reviewSource).toContain('Add a record or enter facts');
+    expect(reviewSource).toContain('More photo details');
+    expect(reviewSource).toContain('Dates and notice details');
+    expect(reviewSource).toContain('Other records');
+    expect(reviewSource).toContain('Evidence details');
+    expect(reviewSource).toContain('Review history');
+    expect(reviewSource).toContain('Preview local summary');
+    expect(presentationSource.match(/Based only on answers you confirmed/g)).toHaveLength(1);
+  });
+
+  it('keeps the official result route ahead of optional audit detail', () => {
+    const result = reviewSource.slice(reviewSource.indexOf("{step === 'result' && ("));
+
+    expect(result.indexOf('styles.officialHandoff')).toBeGreaterThanOrEqual(0);
+    expect(result.indexOf('Evidence details')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
+    expect(result.indexOf('Review history')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
+    expect(result.indexOf('Preview local summary')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
   });
 
   it('keeps the /review credential warning outside the guide and privacy disclosures', () => {
@@ -300,7 +328,7 @@ describe('citizen review release contracts', () => {
       'यह नतीजा केवल आपके जाँचे उत्तर उपयोग करता है। ChallanSakshi ने रिकॉर्ड सत्यापित या केस तय नहीं किया।',
     );
     expect(getCitizenReviewPresentation('en', false).resultLimitation).toContain(
-      'confirmed structured answers',
+      'answers you confirmed',
     );
   });
 

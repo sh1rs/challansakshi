@@ -200,18 +200,18 @@ export function getCitizenReviewPresentation(language: Language, simpleMode: boo
         evidence: 'Your evidence notes',
         officialRoute: 'Where to go next',
       }
-    : language === 'hi'
+      : language === 'hi'
       ? {
-        established: 'क्या स्थापित है',
-        unclear: 'क्या अस्पष्ट है',
-        missing: 'अभी आवश्यक सबूत',
+        established: 'क्या साफ़ दिखता है',
+        unclear: 'क्या जाँचना है',
+        missing: 'कौन से रिकॉर्ड जोड़ने हैं',
         evidence: 'सबूत स्रोत और विश्वास',
         officialRoute: 'सटीक आधिकारिक रास्ता',
       }
       : {
-        established: 'What can be established',
-        unclear: 'What remains unclear',
-        missing: 'Evidence still needed',
+        established: 'What looks clear',
+        unclear: 'What to check',
+        missing: 'Records to add',
         evidence: 'Evidence sources and confidence',
         officialRoute: 'Exact official route',
       };
@@ -227,8 +227,8 @@ export function getCitizenReviewPresentation(language: Language, simpleMode: boo
         ? 'यह नतीजा केवल आपके जाँचे उत्तर उपयोग करता है। ChallanSakshi ने रिकॉर्ड सत्यापित या केस तय नहीं किया।'
         : 'This result uses only answers you checked. ChallanSakshi did not verify the records or decide the case.'
       : language === 'hi'
-        ? 'वर्गीकरण केवल पुष्ट उत्तरों से आता है; ChallanSakshi ने प्रमाणित या निर्णय नहीं किया।'
-        : 'Classification comes only from confirmed structured answers; ChallanSakshi did not authenticate or decide the case.',
+        ? 'केवल आपके पुष्ट उत्तरों पर आधारित। ChallanSakshi ने रिकॉर्ड प्रमाणित नहीं किए या मामले का निर्णय नहीं किया।'
+        : 'Based only on answers you confirmed. ChallanSakshi did not authenticate the records or decide the case.',
     guideLabels: guideLabels[language],
     progressLabel: language === 'hi' ? 'ई-चालान समीक्षा प्रगति' : 'e-Challan review progress',
     sharedInactivityNotice: language === 'hi'

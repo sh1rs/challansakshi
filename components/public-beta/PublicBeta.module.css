@@ -83,6 +83,7 @@
 
 .panel { padding: 30px; border: 1px solid #d4d9d3; border-radius: 16px; background: var(--pb-card); box-shadow: 0 12px 36px rgb(27 45 44 / 5%); }
 .panel + .panel { margin-top: 18px; }
+.decisionHeading { margin: 0 0 18px; font: 700 24px/1.2 Georgia, serif; letter-spacing: -.02em; }
 .sectionTitle { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 24px; margin-bottom: 28px; }
 .sectionTitle h1 { font-size: clamp(35px, 4vw, 50px); }
 .sectionTitle h2 { margin: 0; font: 700 31px/1.15 Georgia, serif; letter-spacing: -.025em; }
@@ -132,6 +133,13 @@
 .serviceGrid a { align-self: end; margin-top: 10px; color: var(--pb-teal-dark); font-size: 12px; font-weight: 780; }
 .manualActive { border-color: var(--pb-teal); background: #eef8f4; box-shadow: 0 0 0 2px rgb(8 122 116 / 10%); }
 .evidenceWorkspace { display: grid; grid-template-columns: minmax(270px, .8fr) minmax(0, 1.4fr); gap: 24px; align-items: start; }
+.observationControls { min-width: 0; }
+.deadlineCaveat { margin: 10px 0 18px; padding: 12px 14px; border-left: 3px solid #c88425; background: #fff8e9; color: #715f42; font-size: 12px; line-height: 1.55; }
+.disclosure { margin-top: 16px; border-top: 1px solid #d8ded9; }
+.disclosure summary { min-height: 48px; display: flex; align-items: center; color: var(--pb-teal-dark); font-size: 14px; font-weight: 820; cursor: pointer; }
+.disclosure summary:focus-visible { border-radius: 4px; outline: 3px solid rgb(8 122 116 / 20%); outline-offset: 3px; }
+.disclosure[open] > summary { margin-bottom: 14px; }
+.disclosure .formGrid, .disclosure .observationGrid { margin-bottom: 4px; }
 .previewColumn { display: grid; gap: 14px; position: sticky; top: 16px; }
 .previewColumn > p { margin: 0; padding: 18px; border: 1px solid #d4dcd7; background: #f7f9f7; color: var(--pb-muted); line-height: 1.6; }
 .localPreview { overflow: hidden; border: 1px solid #ccd6d1; border-radius: 12px; background: #fff; }
@@ -292,7 +300,7 @@
   .brand small { display: none; }
   .nav { width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .languages button { min-width: 48px; min-height: 48px; padding: 0 7px; }
-  .panel p, .panel label, .panel li, .boundary strong, .boundary p, .privacyDetails summary, .artifactWarning, .summaryDisclaimer { font-size: 16px; }
+  .panel p, .panel label, .panel li, .boundary strong, .boundary p, .privacyDetails summary, .disclosure summary, .artifactWarning, .summaryDisclaimer { font-size: 16px; }
   .button, .buttonSecondary, .buttonQuiet, .choice, .serviceGrid button, .serviceGrid a, input, select { min-height: 48px; }
   .hero h1 { font-size: 40px; }
   .heroCompact h1 { font-size: 28px; }
@@ -338,6 +346,8 @@
   [data-print-result] { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
   [data-print-result] > * { display: none !important; }
   [data-print-artifact], [data-print-evidence], [data-print-timeline] { display: block !important; break-inside: avoid; }
+  [data-print-artifact] details > *, [data-print-evidence] > *, [data-print-timeline] > * { display: block !important; }
+  [data-print-artifact] summary, [data-print-evidence] > summary, [data-print-timeline] > summary { display: none !important; }
   [data-print-artifact] > .artifactWarning, [data-print-artifact] > .summaryActions, .inlineStatus { display: none !important; }
   .app, .panel, .artifact pre, .evidenceTable { background: white !important; box-shadow: none !important; }
   .artifact pre { max-height: none; overflow: visible; border: 0; padding: 0; color: #000; font-size: 11pt; }

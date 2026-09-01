@@ -21,9 +21,8 @@ type Language = 'en' | 'hi';
 
 const copy = {
   en: {
-    heading: 'Bring the record back',
-    introduction: 'Choose a downloaded challan print, receipt, screenshot, or supplied photograph. The selected file stays in this browser memory.',
-    receiptHeading: 'Local-processing receipt',
+    receiptHeading: 'Local only · Not uploaded · Not saved',
+    mechanicsHeading: 'How local review works',
     nothingLeft: 'No selected file or answer has been uploaded to ChallanSakshi or an authority',
     login: 'Government login information · never collected',
     recordPending: 'Selected record · not yet chosen',
@@ -32,12 +31,12 @@ const copy = {
     photoReady: 'Selected photograph · ready for local review',
     upload: 'Server upload: off',
     saved: 'Saved case: off',
-    recordTitle: 'Official record',
+    recordTitle: 'Challan copy',
     recordHelp: 'Choose the challan print, receipt, or screenshot you obtained yourself.',
-    photoTitle: 'Supplied photograph',
+    photoTitle: 'Photo from the challan',
     photoHelp: 'Add the photograph you want to inspect beside the record.',
-    chooseRecord: 'Choose official record',
-    choosePhoto: 'Choose supplied photograph',
+    chooseRecord: 'Choose challan copy',
+    choosePhoto: 'Choose photo from the challan',
     replace: 'Replace',
     remove: 'Remove',
     memory: 'Memory only',
@@ -56,9 +55,8 @@ const copy = {
     },
   },
   hi: {
-    heading: 'रिकॉर्ड वापस लाएँ',
-    introduction: 'अपने द्वारा डाउनलोड किया हुआ चालान प्रिंट, रसीद, स्क्रीनशॉट या दी गई तस्वीर चुनें। चुनी गई फ़ाइल केवल इस ब्राउज़र की मेमोरी में रहती है।',
-    receiptHeading: 'स्थानीय-प्रोसेसिंग रसीद',
+    receiptHeading: 'केवल स्थानीय · अपलोड नहीं · सेव नहीं',
+    mechanicsHeading: 'स्थानीय समीक्षा कैसे काम करती है',
     nothingLeft: 'कोई चुनी हुई फ़ाइल या उत्तर ChallanSakshi या किसी प्राधिकरण पर अपलोड नहीं हुआ है',
     login: 'सरकारी लॉगिन जानकारी · कभी एकत्र नहीं की जाती',
     recordPending: 'चुना गया रिकॉर्ड · अभी नहीं चुना गया',
@@ -67,12 +65,12 @@ const copy = {
     photoReady: 'चुनी गई तस्वीर · स्थानीय समीक्षा के लिए तैयार',
     upload: 'सर्वर अपलोड: बंद',
     saved: 'सेव किया गया केस: बंद',
-    recordTitle: 'आधिकारिक रिकॉर्ड',
+    recordTitle: 'चालान की कॉपी',
     recordHelp: 'चालान प्रिंट, रसीद या स्क्रीनशॉट चुनें जो आपने स्वयं प्राप्त किया है।',
-    photoTitle: 'दी गई तस्वीर',
+    photoTitle: 'चालान की तस्वीर',
     photoHelp: 'वह तस्वीर जोड़ें जिसे आप रिकॉर्ड के साथ देखना चाहते हैं।',
-    chooseRecord: 'आधिकारिक रिकॉर्ड चुनें',
-    choosePhoto: 'दी गई तस्वीर चुनें',
+    chooseRecord: 'चालान की कॉपी चुनें',
+    choosePhoto: 'चालान की तस्वीर चुनें',
     replace: 'बदलें',
     remove: 'हटाएँ',
     memory: 'केवल मेमोरी में',
@@ -217,14 +215,13 @@ export function LocalRecordIntake(props: {
   const disabled = props.disabled ?? false;
 
   return (
-    <section className={styles.intake} aria-labelledby="local-record-intake-heading">
-      <header className={styles.header}>
-        <h2 id="local-record-intake-heading">{text.heading}</h2>
-        <p>{text.introduction}</p>
-      </header>
-
+    <div className={styles.intake}>
       <aside className={styles.receipt} aria-label={text.receiptHeading}>
         <strong>{text.receiptHeading}</strong>
+      </aside>
+
+      <details className={styles.mechanics}>
+        <summary>{text.mechanicsHeading}</summary>
         <ul>
           <li>{text.nothingLeft}</li>
           <li>{text.login}</li>
@@ -233,7 +230,7 @@ export function LocalRecordIntake(props: {
           <li>{text.upload}</li>
           <li>{text.saved}</li>
         </ul>
-      </aside>
+      </details>
 
       <div className={styles.rows}>
         <IntakeRow
@@ -253,6 +250,6 @@ export function LocalRecordIntake(props: {
           language={props.language}
         />
       </div>
-    </section>
+    </div>
   );
 }
