@@ -1,10 +1,16 @@
 import { createElement } from 'react';
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { GuidedStepHeader } from '../components/guided/GuidedStepHeader';
 
+const source = readFileSync(
+  new URL('../components/guided/GuidedStepHeader.tsx', import.meta.url),
+  'utf8',
+);
+
 describe('GuidedStepHeader', () => {
-  it('renders one accessible instruction, reason, live status, next action, and explicit progress states', () => {
+  it('keeps one accessible instruction and live status visible while disclosing supporting guide detail', () => {
     const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
       currentLabel: 'Step 2 of 4 · Verify the source',
       instruction: 'Open the official record yourself.',
@@ -32,8 +38,13 @@ describe('GuidedStepHeader', () => {
     expect(html).toContain('Upcoming: Compare the evidence');
     expect(html).toContain('<ol class=');
     expect(html).toContain('aria-label="e-Challan review steps"');
-    expect(html).not.toContain('<details');
-    expect(html).not.toContain('<summary');
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary>Why this matters</summary>');
+    expect(source).toContain('<details');
+    expect(source).toContain('<summary>{copy.why}</summary>');
+    expect(source).toContain('role="status"');
+    expect(source).toContain('aria-live="polite"');
+    expect(source).not.toContain('className={styles.guideDetails}');
   });
 
   it('does not present a safe-stopped journey as 100 percent complete', () => {

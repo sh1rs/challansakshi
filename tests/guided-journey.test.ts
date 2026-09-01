@@ -34,7 +34,7 @@ describe('guided journey progress', () => {
     ]);
   });
 
-  it('guides the citizen to obtain the official record before confirming facts', () => {
+  it('uses compact source guidance before evidence comparison', () => {
     expect(getChallanGuideContent({
       step: 'source',
       safetyReady: true,
@@ -45,9 +45,9 @@ describe('guided journey progress', () => {
       exportAllowed: true,
     })).toMatchObject({
       currentLabel: 'Step 2 of 4 · Get the official record',
-      instruction: 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
-      status: 'Official source and record still needed',
-      next: 'Confirm every fact you enter before comparing evidence.',
+      instruction: 'Open the official record, then add its facts or a supplied record.',
+      status: 'Official source and record needed',
+      next: 'Confirm entered facts before comparing evidence.',
     });
   });
 
@@ -62,8 +62,8 @@ describe('guided journey progress', () => {
       resultAvailable: false,
       exportAllowed: true,
     })).toMatchObject({
-      status: 'You recorded the source and chose how to review the record',
-      next: 'Confirm every fact you enter before comparing evidence.',
+      status: 'Source and review method recorded',
+      next: 'Confirm entered facts before comparing evidence.',
     });
   });
 
@@ -147,7 +147,7 @@ describe('guided journey progress', () => {
     });
   });
 
-  it('tells a FASTag user exactly when the final event confirmation is still missing', () => {
+  it('uses compact FASTag guidance when final event confirmation is still missing', () => {
     expect(getTollGuideContent({
       step: 'records',
       startReady: true,
@@ -158,9 +158,10 @@ describe('guided journey progress', () => {
       exportAllowed: true,
     })).toMatchObject({
       currentLabel: 'Step 2 of 4 · Record one transaction',
-      status: 'Final same-transaction confirmation still needed',
+      instruction: 'Use one official debit and record facts from that event.',
+      status: 'Final event confirmation still needed',
       statusTone: 'needs-action',
-      next: 'Confirm the combined record after your last edit, then map agreements and conflicts.',
+      next: 'Confirm the combined record after your last edit, then map it.',
     });
   });
 

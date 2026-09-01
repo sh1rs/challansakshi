@@ -3,7 +3,7 @@ import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { LocalRecordIntake, type LocalRecordSelection } from '../components/public-beta/LocalRecordIntake';
-import { PublicBetaShell } from '../components/public-beta/PublicBetaShell';
+import { PublicBetaShell, SafetyBoundary } from '../components/public-beta/PublicBetaShell';
 import { getCitizenReviewPresentation } from '../lib/citizen-review-presentation';
 
 const reviewSource = readFileSync(
@@ -142,6 +142,19 @@ describe('citizen review release contracts', () => {
     expect(publicStyles).not.toMatch(/\.quickExit::(?:before|after)[^{]*\{[^}]*content\s*:/);
   });
 
+  it('keeps the short browser-local boundary visible and discloses the full privacy qualifications', () => {
+    const html = renderToStaticMarkup(createElement(SafetyBoundary, {
+      language: 'en',
+      children: createElement('p', undefined, 'Keep this decision-critical warning visible.'),
+    }));
+
+    expect(html).toContain('Your files and answers stay in this browser. They are not uploaded.');
+    expect(html).toContain('<summary>Privacy details</summary>');
+    expect(html).toContain('hosting provider still receives ordinary page-request metadata');
+    expect(html).toContain('Opening a PDF creates another browser-local tab');
+    expect(html).toContain('Keep this decision-critical warning visible.');
+  });
+
   it('opens a selected PDF locally without contradicting the object-src security policy', () => {
     const selection = {
       file: {} as File,
@@ -217,9 +230,11 @@ describe('citizen review release contracts', () => {
       '.guideTopline p',
       '.guideTopline span',
       '.primaryInstruction > span',
-      '.guideDetails > div > span',
-      '.guideDetails p',
-      '.guideDetails strong',
+      '.status',
+      '.guideDisclosure summary',
+      '.detailLabel',
+      '.detailsContent p',
+      '.stepList li',
     ]) {
       expectExplicitSixteenPixelRule(guideMobile, selector);
     }

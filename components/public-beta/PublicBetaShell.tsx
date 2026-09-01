@@ -58,8 +58,11 @@ export function SafetyBoundary({ language, children }: { language: Language; chi
     <aside className={styles.boundary} aria-label={t(language, 'Important product boundary', 'महत्वपूर्ण उत्पाद सीमा')}>
       <span aria-hidden="true">i</span>
       <div>
-        <strong>{t(language, 'Local record preview · no server upload', 'स्थानीय रिकॉर्ड प्रीव्यू · कोई सर्वर अपलोड नहीं')}</strong>
-        <p>{t(language, 'Selected records remain browser-local and answers remain in this app tab. They are not uploaded to a server or sent to an AI model, authority, bank, or toll operator. Opening a PDF creates another browser-local tab that Quick exit cannot close; close it yourself. The hosting provider still receives ordinary page-request metadata.', 'चुने रिकॉर्ड ब्राउज़र में स्थानीय रहते हैं और उत्तर इस ऐप टैब में रहते हैं। वे सर्वर पर अपलोड या AI मॉडल, प्राधिकरण, बैंक अथवा टोल ऑपरेटर को नहीं भेजे जाते। PDF खोलने पर दूसरा ब्राउज़र-स्थानीय टैब बनता है जिसे तुरंत बाहर निकलना बंद नहीं कर सकता; उसे स्वयं बंद करें। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
+        <strong>{t(language, 'Your files and answers stay in this browser. They are not uploaded.', 'आपकी फ़ाइलें और उत्तर इसी ब्राउज़र में रहते हैं। वे अपलोड नहीं होते।')}</strong>
+        <details className={styles.privacyDetails}>
+          <summary>{t(language, 'Privacy details', 'गोपनीयता विवरण')}</summary>
+          <p>{t(language, 'Selected records remain browser-local and answers remain in this app tab. They are not uploaded to a server or sent to an AI model, authority, bank, or toll operator. Opening a PDF creates another browser-local tab that Quick exit cannot close; close it yourself. The hosting provider still receives ordinary page-request metadata.', 'चुने रिकॉर्ड ब्राउज़र में स्थानीय रहते हैं और उत्तर इस ऐप टैब में रहते हैं। वे सर्वर पर अपलोड या AI मॉडल, प्राधिकरण, बैंक अथवा टोल ऑपरेटर को नहीं भेजे जाते। PDF खोलने पर दूसरा ब्राउज़र-स्थानीय टैब बनता है जिसे तुरंत बाहर निकलना बंद नहीं कर सकता; उसे स्वयं बंद करें। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
+        </details>
         {children}
       </div>
     </aside>

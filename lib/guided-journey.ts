@@ -184,12 +184,12 @@ export function getChallanGuideContent({
   if (step === 'safety') return {
     currentLabel: 'Step 1 of 4 · Start safely',
     instruction: simpleMode
-      ? 'Tell us who is checking and whether this device is yours or shared.'
-      : 'Choose who is reviewing and whether this device is private or shared.',
+      ? 'Who is checking? Is this device private or shared?'
+      : 'Choose the reviewer and device.',
     why: simpleMode
       ? 'This keeps your information and local copies safer.'
       : 'These choices control consent, downloads, and the shared-device exit.',
-    status: safetyReady ? 'Privacy and device choices confirmed' : 'Choose the reviewer, device, and every required confirmation',
+    status: safetyReady ? 'Privacy and device choices confirmed' : 'Choose the reviewer, device, and required confirmations',
     statusTone: safetyReady ? 'ready' : 'needs-action',
     next: 'Verify where the official record came from.',
   };
@@ -197,7 +197,7 @@ export function getChallanGuideContent({
   if (step === 'source') {
     if (sourceStatus === 'message-only') return {
       currentLabel: 'Step 2 of 4 · Get the official record',
-      instruction: 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
+      instruction: 'Open the official record, then add its facts or a supplied record.',
       why: 'A message or forwarded link alone does not verify the record.',
       status: 'Safe stop: verify the record before comparing evidence',
       statusTone: 'safe-stop',
@@ -208,21 +208,21 @@ export function getChallanGuideContent({
       currentLabel: 'Step 2 of 4 · Get the official record',
       instruction: simpleMode
         ? 'Open an official service, then choose a file here or type the facts yourself.'
-        : 'Open the official record yourself. Then bring back the challan print, receipt, screenshot, or supplied photograph.',
+        : 'Open the official record, then add its facts or a supplied record.',
       why: simpleMode
         ? 'A message link does not prove the record is official.'
         : 'A message or forwarded link alone does not verify the record. ChallanSakshi never needs your government password, CAPTCHA, OTP, Aadhaar details, or payment credentials.',
-      status: sourceReady ? 'You recorded the source and chose how to review the record' : 'Official source and record still needed',
+      status: sourceReady ? 'Source and review method recorded' : 'Official source and record needed',
       statusTone: sourceReady ? 'ready' : 'needs-action',
-      next: 'Confirm every fact you enter before comparing evidence.',
+      next: 'Confirm entered facts before comparing evidence.',
     };
   }
 
   if (step === 'observations') return {
     currentLabel: 'Step 3 of 4 · Check the evidence',
-    instruction: simpleMode
-      ? 'Check one fact at a time. Choose unclear when you cannot tell.'
-      : 'Compare one official image with one vehicle record, then record only visible facts.',
+      instruction: simpleMode
+        ? 'Check one fact at a time. Choose unclear when you cannot tell.'
+      : 'Compare one official image with one vehicle record. Record visible facts.',
     why: simpleMode
       ? 'The result uses only answers you confirmed.'
       : 'The review can use only facts you personally confirmed.',
@@ -238,7 +238,7 @@ export function getChallanGuideContent({
       ? 'Verify the record through an official service before comparing or contesting anything.'
       : simpleMode
         ? 'Read the result, missing records, and the official next step.'
-        : 'Read the finding, check what remains missing, then use only the official route shown.',
+        : 'Read the finding, check what is missing, then use the official route.',
     why: safeStop
       ? 'A message-only source cannot support a reliable evidence comparison.'
       : simpleMode
@@ -292,7 +292,7 @@ export function getTollGuideContent({
 }): GuidedStepContent {
   if (step === 'start') return {
     currentLabel: 'Step 1 of 4 · Choose how to review',
-    instruction: 'Choose a real manual review or fictional example, then identify this device.',
+    instruction: 'Choose manual review or a fictional example, then identify this device.',
     why: 'This controls which privacy boundary and export rules apply.',
     status: startReady ? 'Review mode and device confirmed' : 'Choose the review mode, device, and required safety confirmations',
     statusTone: startReady ? 'ready' : 'needs-action',
@@ -305,23 +305,23 @@ export function getTollGuideContent({
       : !recordsReady
         ? 'Complete the applicable transaction facts—or mark them unknown'
         : !finalConfirmationReady
-          ? 'Final same-transaction confirmation still needed'
+          ? 'Final event confirmation still needed'
           : 'Transaction record is ready to map';
     return {
       currentLabel: 'Step 2 of 4 · Record one transaction',
-      instruction: 'Use one official debit and record only facts that belong to that same event.',
+      instruction: 'Use one official debit and record facts from that event.',
       why: 'Mixing reader time, debit-post time, SMS time, or two crossings can create a false conflict.',
       status,
       statusTone: sourceReady && recordsReady && finalConfirmationReady ? 'ready' : 'needs-action',
       next: !finalConfirmationReady && sourceReady && recordsReady
-        ? 'Confirm the combined record after your last edit, then map agreements and conflicts.'
+        ? 'Confirm the combined record after your last edit, then map it.'
         : 'Map where the entered records agree, conflict, or remain unknown.',
     };
   }
 
   if (step === 'reconcile') return {
     currentLabel: 'Step 3 of 4 · Check what agrees',
-    instruction: 'Review where the entered records agree, conflict, or remain unknown.',
+    instruction: 'Review where records agree, conflict, or remain unknown.',
     why: 'This is a question map, not a bank or toll decision.',
     status: 'Map ready to review',
     statusTone: 'ready',
@@ -330,7 +330,7 @@ export function getTollGuideContent({
 
   return {
     currentLabel: 'Step 4 of 4 · Prepare the next action',
-    instruction: 'Check missing evidence, then follow only the official route shown.',
+    instruction: 'Check missing evidence, then use the official route shown.',
     why: 'The account provider or responsible authority remains the decision-maker.',
     status: packetAvailable && !exportAllowed
       ? 'Preparation note ready to review; copy and download are disabled on this shared device'

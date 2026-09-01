@@ -55,6 +55,7 @@ export function GuidedStepHeader({
     why: labels.why ?? 'Why this matters',
     status: labels.status ?? 'Status',
     next: labels.next ?? 'Next',
+    allSteps: labels.allSteps ?? 'All steps',
   };
   const stateLabels: Record<GuidedStepState, string> = {
     complete: labels.stateComplete ?? defaultStateLabels.complete,
@@ -84,25 +85,30 @@ export function GuidedStepHeader({
         <h2 id={headingId} ref={headingRef} tabIndex={-1}>{instruction}</h2>
       </div>
 
-      <div className={styles.guideDetails}>
-        <div><span>{copy.why}</span><p>{why}</p></div>
-        <div className={styles.status} role="status" aria-live="polite" data-tone={statusTone}><span>{copy.status}</span><strong>{status}</strong></div>
-        <div><span>{copy.next}</span><p>{next}</p></div>
-      </div>
+      <div className={styles.status} role="status" aria-live="polite" data-tone={statusTone}><span>{copy.status}</span><strong>{status}</strong></div>
 
-      <ol className={styles.stepList} aria-label={progressLabel}>
-        {steps.map((step, index) => (
-          <li
-            key={step.id}
-            data-state={step.state}
-            aria-current={step.state === 'current' ? 'step' : undefined}
-            aria-label={`${stateLabels[step.state]}: ${step.label}`}
-          >
-            <span aria-hidden="true">{step.state === 'complete' ? '✓' : step.state === 'skipped' || step.state === 'safe-stop' ? '—' : index + 1}</span>
-            <small><b className={styles.visuallyHidden}>{stateLabels[step.state]}: </b>{step.label}</small>
-          </li>
-        ))}
-      </ol>
+      <details className={styles.guideDisclosure}>
+        <summary>{copy.why}</summary>
+        <div className={styles.detailsContent}>
+          <p>{why}</p>
+          <span className={styles.detailLabel}>{copy.next}</span>
+          <p>{next}</p>
+          <span className={styles.detailLabel}>{copy.allSteps}</span>
+          <ol className={styles.stepList} aria-label={progressLabel}>
+            {steps.map((step, index) => (
+              <li
+                key={step.id}
+                data-state={step.state}
+                aria-current={step.state === 'current' ? 'step' : undefined}
+                aria-label={`${stateLabels[step.state]}: ${step.label}`}
+              >
+                <span aria-hidden="true">{step.state === 'complete' ? '✓' : step.state === 'skipped' || step.state === 'safe-stop' ? '—' : index + 1}</span>
+                <small><b className={styles.visuallyHidden}>{stateLabels[step.state]}: </b>{step.label}</small>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </details>
     </section>
   );
 }
