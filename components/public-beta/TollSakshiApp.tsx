@@ -448,7 +448,7 @@ export default function TollSakshiApp() {
             <div className={styles.journeyMap} role="table" aria-label={t(language, 'Complete transaction check map', 'पूरा लेन-देन जाँच नक्शा')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{mapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{row.status}</span></div>)}</div>
           </details>
           <div className={styles.listPanel}><h3>{t(language, 'What this does not conclude', 'यह क्या निष्कर्ष नहीं देता')}</h3><ul>{assessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></div>
-          <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('records')}>← {t(language, 'Edit records', 'रिकॉर्ड बदलें')}</button><button type="button" className={styles.button} onClick={() => setStep('packet')}>{t(language, 'Check evidence and official route', 'सबूत और आधिकारिक रास्ता देखें')} →</button></div>
+          <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('records')}>← {t(language, 'Edit records', 'रिकॉर्ड बदलें')}</button><button type="button" className={styles.button} onClick={() => setStep('packet')}>{t(language, guide.ctaLabel ?? 'Check evidence and official route', isNoDisputeOutcome ? 'परिणाम और सबूत सूची देखें' : 'सबूत और आधिकारिक रास्ता देखें')} →</button></div>
         </section>}
 
         {step === 'packet' && <section className={styles.panel} aria-labelledby="packet-title">

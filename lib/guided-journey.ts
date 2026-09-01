@@ -26,6 +26,7 @@ export type GuidedStepContent = {
   status: string;
   statusTone: GuidedStatusTone;
   next: string;
+  ctaLabel?: string;
 };
 
 export function buildGuidedProgress<Id extends string>(
@@ -325,14 +326,22 @@ export function getTollGuideContent({
     };
   }
 
-  if (step === 'reconcile') return {
-    currentLabel: 'Step 3 of 4 · Check what agrees',
-    instruction: 'Review where records agree, conflict, or remain unknown.',
-    why: 'This is a question map, not a bank or toll decision.',
-    status: 'Map ready to review',
-    statusTone: 'ready',
-    next: 'Check the evidence list and the independently verified official route.',
-  };
+  if (step === 'reconcile') {
+    const noDisputeOutcome = route === 'no-dispute';
+    return {
+      currentLabel: 'Step 3 of 4 · Check what agrees',
+      instruction: 'Review where records agree, conflict, or remain unknown.',
+      why: 'This is a question map, not a bank or toll decision.',
+      status: 'Map ready to review',
+      statusTone: 'ready',
+      next: noDisputeOutcome
+        ? 'Review outcome and evidence checklist.'
+        : 'Check the evidence list and the independently verified official route.',
+      ctaLabel: noDisputeOutcome
+        ? 'Review outcome and evidence checklist'
+        : 'Check evidence and official route',
+    };
+  }
 
   if (route === 'no-dispute') {
     if (finding === 'already-corrected') return {

@@ -239,6 +239,27 @@ describe('guided journey progress', () => {
     });
   });
 
+  it.each(noDisputeAssessments)('keeps the $label reconcile step free of official-route guidance', ({ assessment }) => {
+    const guide = getTollGuideContent({
+      step: 'reconcile',
+      startReady: true,
+      sourceReady: true,
+      recordsReady: true,
+      finalConfirmationReady: true,
+      packetAvailable: assessment.shouldPrepareIssuerNote,
+      exportAllowed: true,
+      route: assessment.route,
+      finding: assessment.finding,
+    });
+
+    expect(assessment).toMatchObject({ route: 'no-dispute', shouldPrepareIssuerNote: false });
+    expect(guide).toMatchObject({
+      next: 'Review outcome and evidence checklist.',
+      ctaLabel: 'Review outcome and evidence checklist',
+    });
+    expect(Object.values(guide).join(' ')).not.toMatch(/official route/i);
+  });
+
   it.each(noDisputeAssessments)('ends the $label FASTag journey truthfully without action-route guidance', ({ assessment, instruction, status }) => {
     const guide = getTollGuideContent({
       step: 'packet',

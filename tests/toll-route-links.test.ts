@@ -32,6 +32,17 @@ describe('TollSakshi official route links', () => {
     expect(reconcile.slice(allChecks)).toContain('mapRows.map');
   });
 
+  it('uses the route-aware reconcile CTA instead of a fixed official-route promise', () => {
+    const reconcile = tollSource.slice(
+      tollSource.indexOf("{step === 'reconcile' &&"),
+      tollSource.indexOf("{step === 'packet' &&"),
+    );
+
+    expect(reconcile).toContain('guide.ctaLabel');
+    expect(reconcile).toContain("isNoDisputeOutcome ? 'परिणाम और सबूत सूची देखें'");
+    expect(reconcile).not.toContain("t(language, 'Check evidence and official route', 'सबूत और आधिकारिक रास्ता देखें')");
+  });
+
   it('orders the FASTag packet route first and audit detail last', () => {
     const packet = tollSource.slice(tollSource.indexOf("{step === 'packet' &&"));
     const route = packet.indexOf('{displayedRoute}');
