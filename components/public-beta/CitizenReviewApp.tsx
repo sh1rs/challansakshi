@@ -884,7 +884,13 @@ export default function CitizenReviewApp() {
             </p>
           </div>
         </section>
-        <SafetyBoundary language={language} />
+        <SafetyBoundary language={language}>
+          <p>{t(
+            language,
+            'Never enter a government password, CAPTCHA, OTP, Aadhaar, or payment credentials here.',
+            'सरकारी पासवर्ड, CAPTCHA, OTP, Aadhaar या भुगतान क्रेडेंशियल यहाँ कभी दर्ज न करें।',
+          )}</p>
+        </SafetyBoundary>
 
         {step === 'safety' && (
           <section className={styles.panel} aria-labelledby="safety-title">

@@ -292,7 +292,7 @@
   .brand small { display: none; }
   .nav { width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .languages button { min-width: 48px; min-height: 48px; padding: 0 7px; }
-  .panel p, .panel label, .panel li, .boundary p, .privacyDetails summary, .artifactWarning, .summaryDisclaimer { font-size: 16px; }
+  .panel p, .panel label, .panel li, .boundary strong, .boundary p, .privacyDetails summary, .artifactWarning, .summaryDisclaimer { font-size: 16px; }
   .button, .buttonSecondary, .buttonQuiet, .choice, .serviceGrid button, .serviceGrid a, input, select { min-height: 48px; }
   .hero h1 { font-size: 40px; }
   .heroCompact h1 { font-size: 28px; }

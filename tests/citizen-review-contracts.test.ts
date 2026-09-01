@@ -153,6 +153,20 @@ describe('citizen review release contracts', () => {
     expect(html).toContain('hosting provider still receives ordinary page-request metadata');
     expect(html).toContain('Opening a PDF creates another browser-local tab');
     expect(html).toContain('Keep this decision-critical warning visible.');
+    expect(html.indexOf('Keep this decision-critical warning visible.')).toBeGreaterThan(html.indexOf('</details>'));
+  });
+
+  it('keeps the /review credential warning outside the guide and privacy disclosures', () => {
+    const reviewBoundary = reviewSource.match(/<SafetyBoundary\s+language=\{language\}>[\s\S]*?<\/SafetyBoundary>/)?.[0] ?? '';
+
+    expect(reviewBoundary).toContain('Never enter a government password, CAPTCHA, OTP, Aadhaar, or payment credentials here.');
+    expect(reviewBoundary).toContain('सरकारी पासवर्ड, CAPTCHA, OTP, Aadhaar या भुगतान क्रेडेंशियल यहाँ कभी दर्ज न करें।');
+    expect(reviewBoundary.indexOf('Never enter a government password')).toBeGreaterThan(
+      reviewBoundary.indexOf('<SafetyBoundary'),
+    );
+    expect(reviewBoundary.indexOf('Never enter a government password')).toBeGreaterThan(
+      reviewBoundary.indexOf('>'),
+    );
   });
 
   it('opens a selected PDF locally without contradicting the object-src security policy', () => {
@@ -219,6 +233,7 @@ describe('citizen review release contracts', () => {
       '.artifact pre',
       '.panel small',
       '.passport em',
+      '.boundary strong',
     ]) {
       expectExplicitSixteenPixelRule(publicMobile, selector);
     }
