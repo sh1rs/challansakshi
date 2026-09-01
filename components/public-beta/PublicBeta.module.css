@@ -126,6 +126,17 @@
 .recordSectionHeading p { margin: 5px 0 0; color: var(--pb-muted); font-size: 11px; line-height: 1.5; }
 .recordSection .acknowledgements { margin-top: 0; }
 .recordSectionNote { margin: 0; padding: 14px 16px; border-left: 3px solid #91aaa1; background: #f0f4f1; color: #53665e; font-size: 12px; line-height: 1.55; }
+.recordDisclosure { padding: 0; }
+.recordDisclosure > summary { min-height: 72px; margin: 0; padding: 20px 22px; grid-template-columns: auto 1fr auto; cursor: pointer; list-style: none; }
+.recordDisclosure > summary::-webkit-details-marker { display: none; }
+.recordDisclosure > summary::after { content: '+'; align-self: center; color: var(--pb-teal-dark); font-size: 22px; font-weight: 700; }
+.recordDisclosure[open] > summary { border-bottom: 1px solid #d8ddd8; }
+.recordDisclosure[open] > summary::after { content: '−'; }
+.recordDisclosure > summary:focus-visible { outline: 3px solid rgb(8 122 116 / 20%); outline-offset: 3px; }
+.recordDisclosure > summary strong, .recordDisclosure > summary small { display: block; }
+.recordDisclosure > summary strong { margin-top: 2px; font: 700 19px/1.25 Georgia, serif; }
+.recordDisclosure > summary small { margin-top: 5px; color: var(--pb-muted); font-size: 11px; line-height: 1.5; }
+.recordDisclosureBody { padding: 20px 22px 22px; }
 .serviceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
 .serviceGrid article { display: grid; min-height: 118px; padding: 16px; border: 1px solid #cdd7d2; border-radius: 11px; background: #fff; }
 .serviceGrid article.serviceActive { border-color: var(--pb-teal); background: #eef8f4; box-shadow: 0 0 0 2px rgb(8 122 116 / 10%); }
@@ -198,6 +209,11 @@
 .deadline { margin-top: 18px; padding: 18px; border: 1px solid #dcc080; border-radius: 11px; background: #fff8e9; }
 .deadline strong { display: block; color: #77511a; }
 .deadline p { margin: 6px 0 0; color: #715f42; font-size: 12px; line-height: 1.55; }
+.officialRoute, .preparationStatus { margin-top: 18px; padding: 22px; border: 1px solid #d1dad5; border-radius: 12px; background: #f8faf8; }
+.officialRoute h3, .preparationStatus h3 { margin: 0; font: 700 22px/1.3 Georgia, serif; }
+.officialRoute > p:not(.eyebrow), .preparationStatus > p { margin: 8px 0 0; color: var(--pb-muted); font-size: 12px; line-height: 1.55; }
+.officialRoute .sourceGrid { margin-top: 14px; }
+.noteActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .artifact { margin-top: 20px; }
 .artifact pre { max-height: 390px; overflow: auto; margin: 12px 0 0; padding: 20px; border: 1px solid #d4d9d5; border-radius: 10px; background: #f8f8f4; color: #344d43; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .artifactWarning { margin: 12px 0 0; color: #7d5521; font-size: 11px; line-height: 1.5; }
@@ -220,7 +236,7 @@
 .journeyRow strong { font: 700 13px Georgia, serif; }
 .mapStatus { width: fit-content; padding: 5px 8px; border-radius: 999px; background: #eef3ef; color: #566c63; font-size: 8px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .sourceGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 13px; margin-top: 18px; }
-.sourceGrid a { padding: 18px; border: 1px solid #d1dad5; border-radius: 11px; background: white; color: var(--pb-ink); text-decoration: none; }
+.sourceGrid a { min-height: 48px; display: flex; flex-direction: column; justify-content: center; padding: 18px; border: 1px solid #d1dad5; border-radius: 11px; background: white; color: var(--pb-ink); text-decoration: none; }
 .sourceGrid a strong, .sourceGrid a small { display: block; }
 .sourceGrid a strong { font: 700 16px Georgia, serif; }
 .sourceGrid a small { margin-top: 7px; color: var(--pb-muted); font-size: 10px; line-height: 1.5; }
@@ -274,6 +290,11 @@
   .passport em { grid-column: 2; justify-self: start; white-space: normal; }
   .fieldWide { grid-column: auto; }
   .recordSection { padding: 18px; }
+  .recordDisclosure { padding: 0; }
+  .recordDisclosure > summary { padding: 18px; }
+  .recordDisclosureBody { padding: 18px; }
+  .noteActions { flex-direction: column; }
+  .noteActions .button, .noteActions .buttonSecondary { width: 100%; }
   .actions { align-items: stretch; flex-direction: column; }
   .actions .button, .actions .buttonSecondary, .actions .buttonQuiet, .actions a { width: 100%; }
   .journeyMap { overflow-x: auto; }

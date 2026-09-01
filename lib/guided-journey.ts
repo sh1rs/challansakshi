@@ -330,15 +330,15 @@ export function getTollGuideContent({
 
   return {
     currentLabel: 'Step 4 of 4 · Prepare the next action',
-    instruction: 'Check missing evidence, then use the official route shown.',
+    instruction: 'Open the verified official route first, then review missing evidence.',
     why: 'The account provider or responsible authority remains the decision-maker.',
     status: packetAvailable && !exportAllowed
       ? 'Preparation note ready to review; copy and download are disabled on this shared device'
       : packetAvailable
-        ? 'Local preparation note is available'
-        : 'Preparation note withheld; verify the missing records officially',
+        ? 'Official route and local preparation note ready'
+        : 'Official route ready; preparation note withheld until missing records are verified',
     statusTone: packetAvailable ? 'complete' : 'safe-stop',
-    next: 'Use the verified destination below; ChallanSakshi does not raise a chargeback or submit a complaint.',
+    next: 'Use the official destination before opening optional audit detail.',
   };
 }
 

@@ -65,6 +65,17 @@ describe('TollSakshi deterministic review', () => {
     expect(result.shouldPrepareIssuerNote).toBe(false);
   });
 
+  it('keeps every fictional walkthrough on its established deterministic route', () => {
+    expect(tollFixtures.map(({ answers }) => {
+      const result = assessTollReview(answers);
+      return [result.finding, result.route, result.shouldPrepareIssuerNote];
+    })).toEqual([
+      ['possible-vehicle-mismatch', 'issuer', true],
+      ['possible-duplicate-pattern', 'issuer', true],
+      ['records-align', 'no-dispute', false],
+    ]);
+  });
+
   it('does not call partial aligned vehicle fields a reconciled toll event', () => {
     const result = assessTollReview({ ...tollFixtures[2].answers, transactionSuffixRecorded: false });
     expect(result.finding).toBe('insufficient');

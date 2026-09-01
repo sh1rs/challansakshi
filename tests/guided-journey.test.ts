@@ -194,4 +194,20 @@ describe('guided journey progress', () => {
       statusTone: 'complete',
     });
   });
+
+  it('makes the verified official route the first action in the FASTag packet', () => {
+    expect(getTollGuideContent({
+      step: 'packet',
+      startReady: true,
+      sourceReady: true,
+      recordsReady: true,
+      finalConfirmationReady: true,
+      packetAvailable: true,
+      exportAllowed: true,
+    })).toMatchObject({
+      instruction: 'Open the verified official route first, then review missing evidence.',
+      status: 'Official route and local preparation note ready',
+      next: 'Use the official destination before opening optional audit detail.',
+    });
+  });
 });

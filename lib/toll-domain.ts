@@ -237,20 +237,20 @@ export function assessTollReview(answers: TollReviewAnswers): TollAssessment {
 export function buildTollPassport(answers: TollReviewAnswers, refs: { tagSuffix: string; vehicleSuffix: string; transactionSuffix: string; plaza: string }): TollPassportItem[] {
   const entered = (value: string): TollRecordStatus => value.trim() ? 'readable' : 'not-supplied';
   return [
-    { id: 'TP1', label: 'Official account transaction record', status: answers.sourceVerified && answers.officialSourceSelected ? 'readable' : 'not-supplied', why: 'Confirms the debit exists in an independently opened bank/issuer service or, for an NHAI FASTag, IHMCL portal.' },
-    { id: 'TP2', label: 'Transaction reference suffix', status: entered(refs.transactionSuffix), why: 'Helps distinguish nearby debits without exposing a full reference.' },
-    { id: 'TP3', label: 'Timestamp meaning', status: answers.timestampType === 'unknown' ? 'unclear' : 'readable', why: 'Reader, posting, and SMS times must not be treated as interchangeable.' },
-    { id: 'TP4', label: 'Plaza / direction', status: refs.plaza.trim() && answers.directionKnown ? 'readable' : refs.plaza.trim() ? 'unclear' : 'not-supplied', why: 'Anchors the claimed toll event.' },
-    { id: 'TP5', label: 'FASTag suffix', status: entered(refs.tagSuffix), why: 'Minimised tag reference for the citizen’s own worksheet.' },
-    { id: 'TP6', label: 'Official tag-mapping vehicle suffix', status: answers.tagMappingVerified ? entered(refs.vehicleSuffix) : 'official-verification', why: 'Anchors a limited tag-to-passing-image comparison.' },
-    { id: 'TP7', label: 'Citizen-recorded vehicle-class comparison', status: answers.vehicleClassObservation === 'not-supplied' ? 'not-supplied' : answers.vehicleClassObservation === 'unclear' ? 'unclear' : 'official-verification', why: 'Records only the citizen’s comparison; TollSakshi did not inspect an RC, issuer class record, or passing image.' },
-    { id: 'TP8', label: 'Citizen front vehicle / tag photo', status: 'not-supplied', why: 'Citizen keeps this privately; TollSakshi does not receive it.' },
-    { id: 'TP9', label: 'Toll passing image', status: answers.passingImageStatus, why: 'Issuer or plaza evidence may show vehicle, plate, and event timestamp.' },
-    { id: 'TP10', label: 'Citizen-reported second debit entry', status: answers.concern === 'duplicate' ? (answers.secondDebitPresent ? 'official-verification' : 'not-supplied') : 'not-applicable', why: 'The second full reference and amount must be supplied only through the verified official account channel.' },
-    { id: 'TP11', label: 'Credit adjustment check', status: answers.concern === 'duplicate' ? (answers.creditAdjustment === 'not-checked' ? 'unclear' : 'readable') : 'not-applicable', why: 'Prevents requesting correction where a credit already resolves the debit.' },
-    { id: 'TP12', label: 'Alternate payment receipt', status: answers.concern === 'paid-another-way' ? answers.alternateReceipt : 'not-applicable', why: 'Supports a paid-by-other-means comparison.' },
-    { id: 'TP13', label: 'Date-effective tariff / pass comparison', status: answers.concern === 'fare-or-class' || answers.concern === 'pass-or-discount' ? (answers.tariffOrPassConflictConfirmed ? answers.tariffOrPassRecord : 'unclear') : 'not-applicable', why: 'The record must apply to the entered event and actually conflict; current rates cannot be retrofitted to earlier events.' },
-    { id: 'TP14', label: 'Issuer acknowledgement', status: answers.acknowledgement, why: 'Supports manual follow-up and response tracking.' },
+    { id: 'TP1', label: 'Official account transaction record', status: answers.sourceVerified && answers.officialSourceSelected ? 'readable' : 'not-supplied', why: 'Shows the debit in an independently opened official account service.' },
+    { id: 'TP2', label: 'Transaction reference suffix', status: entered(refs.transactionSuffix), why: 'Distinguishes nearby debits without exposing the full reference.' },
+    { id: 'TP3', label: 'Timestamp meaning', status: answers.timestampType === 'unknown' ? 'unclear' : 'readable', why: 'Keeps reader, posting, and SMS times distinct.' },
+    { id: 'TP4', label: 'Plaza / direction', status: refs.plaza.trim() && answers.directionKnown ? 'readable' : refs.plaza.trim() ? 'unclear' : 'not-supplied', why: 'Anchors the toll event.' },
+    { id: 'TP5', label: 'FASTag suffix', status: entered(refs.tagSuffix), why: 'Keeps the tag reference minimised.' },
+    { id: 'TP6', label: 'Official tag-mapping vehicle suffix', status: answers.tagMappingVerified ? entered(refs.vehicleSuffix) : 'official-verification', why: 'Anchors the tag-to-image comparison.' },
+    { id: 'TP7', label: 'Citizen-recorded vehicle-class comparison', status: answers.vehicleClassObservation === 'not-supplied' ? 'not-supplied' : answers.vehicleClassObservation === 'unclear' ? 'unclear' : 'official-verification', why: 'Records your comparison; TollSakshi inspected no vehicle or image.' },
+    { id: 'TP8', label: 'Citizen front vehicle / tag photo', status: 'not-supplied', why: 'Kept privately by the citizen, not received here.' },
+    { id: 'TP9', label: 'Toll passing image', status: answers.passingImageStatus, why: 'May show the vehicle, plate, and event time.' },
+    { id: 'TP10', label: 'Citizen-reported second debit entry', status: answers.concern === 'duplicate' ? (answers.secondDebitPresent ? 'official-verification' : 'not-supplied') : 'not-applicable', why: 'Share the full second reference only through the official account channel.' },
+    { id: 'TP11', label: 'Credit adjustment check', status: answers.concern === 'duplicate' ? (answers.creditAdjustment === 'not-checked' ? 'unclear' : 'readable') : 'not-applicable', why: 'Checks whether a credit already resolves the debit.' },
+    { id: 'TP12', label: 'Alternate payment receipt', status: answers.concern === 'paid-another-way' ? answers.alternateReceipt : 'not-applicable', why: 'Supports a paid-another-way comparison.' },
+    { id: 'TP13', label: 'Date-effective tariff / pass comparison', status: answers.concern === 'fare-or-class' || answers.concern === 'pass-or-discount' ? (answers.tariffOrPassConflictConfirmed ? answers.tariffOrPassRecord : 'unclear') : 'not-applicable', why: 'Must apply to this event; current rates cannot prove an earlier conflict.' },
+    { id: 'TP14', label: 'Issuer acknowledgement', status: answers.acknowledgement, why: 'Supports follow-up and response tracking.' },
   ];
 }
 
