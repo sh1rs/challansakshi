@@ -29,15 +29,15 @@
 .hero > h1 { margin: 0; font: 760 clamp(39px, 4.1vw, 58px)/1.04 Georgia, "Times New Roman", serif; letter-spacing: -.042em; text-align: center; }
 .hero > p { max-width: 820px; margin: 14px auto 24px; color: var(--muted); font-size: 17px; line-height: 1.5; text-align: center; }
 .actionList { display: grid; gap: 4px; }
-.actionRow { min-height: 82px; display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(232px, 278px); align-items: center; gap: 16px; padding: 9px 16px; border: 1px solid transparent; border-radius: 9px; color: inherit; text-decoration: none; cursor: pointer; }
+.actionRow { min-height: 82px; display: grid; grid-template-columns: 72px minmax(0, 1fr) 56px; align-items: center; gap: 16px; padding: 9px 16px; border: 1px solid transparent; border-radius: 9px; color: inherit; text-decoration: none; cursor: pointer; }
 .actionRow:nth-child(2) { border-color: var(--gold); background: var(--gold-soft); }
 .actionRow:hover { border-color: #8faaa7; background: #f3faf8; }
 .actionRow:focus-visible { outline: 3px solid var(--teal-deep); outline-offset: 2px; }
 .actionRow:nth-child(2):hover { border-color: #cd8100; background: #ffedc2; }
-.goalIcon, .journeyIcon, .fastagIcon { display: grid; place-items: center; border-radius: 50%; }
+.goalIcon, .fastagIcon { display: grid; place-items: center; border-radius: 50%; }
 .goalIcon { width: 62px; height: 62px; background: var(--teal-soft); color: var(--teal-deep); }
 .actionRow:nth-child(2) .goalIcon, .fastagIcon { background: #ffe6a9; color: #b57200; }
-.goalIcon svg, .journeyIcon svg, .fastagIcon svg, .privacyLead svg, .situationRail svg, .actionCta svg, .fastagCta svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.goalIcon svg, .fastagIcon svg, .privacyLead svg, .situationDisclosure svg, .actionCta svg, .fastagCta svg, .privacyLink svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
 .actionCopy h2, .actionCopy p { margin: 0; }
 .actionCopy h2 { color: var(--teal-deep); font-size: 24px; letter-spacing: -.035em; }
 .actionRow:nth-child(2) .actionCopy h2 { color: #c07a00; }
@@ -46,36 +46,26 @@
 .actionCta svg, .fastagCta svg { width: 20px; height: 20px; }
 .actionRow:nth-child(2) .actionCta { border-color: #cd8100; background: #e99100; color: white; }
 
-.situationRail { display: grid; grid-template-columns: 160px 1fr; align-items: stretch; margin-top: 24px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.situationRail > strong { display: grid; align-content: center; padding: 14px 18px; font-size: 14px; line-height: 1.25; }
-.situationRail > div { display: grid; grid-template-columns: repeat(5, 1fr); }
-.situationRail a { min-height: 66px; display: grid; grid-template-columns: 28px 1fr 16px; align-items: center; gap: 7px; padding: 8px 12px; border-left: 1px solid var(--line); color: #0b428e; font-size: 12px; font-weight: 650; line-height: 1.25; text-decoration: none; }
-.situationRail a:hover, .situationRail a:focus-visible { background: #f2f7ff; text-decoration: underline; text-underline-offset: 3px; }
-.situationRail a svg { width: 24px; height: 24px; color: var(--ink); }
-.situationRail a svg:last-child { width: 16px; height: 16px; color: #0b428e; }
+.situationDisclosure { margin-top: 20px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.situationDisclosure summary { min-height: 54px; display: flex; align-items: center; padding: 11px 18px; color: var(--teal-deep); font-size: 14px; font-weight: 760; cursor: pointer; }
+.situationDisclosure nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.situationDisclosure a { min-height: 66px; display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; align-items: center; gap: 7px; padding: 8px 12px; border-right: 1px solid var(--line); color: #0b428e; font-size: 12px; font-weight: 650; line-height: 1.25; text-decoration: none; }
+.situationDisclosure a:last-child { border-right: 0; }
+.situationDisclosure a:hover, .situationDisclosure a:focus-visible { background: #f2f7ff; text-decoration: underline; text-underline-offset: 3px; }
+.situationDisclosure a svg { width: 24px; height: 24px; color: var(--ink); }
+.situationDisclosure a svg:last-child { width: 16px; height: 16px; color: #0b428e; }
 
-.journey { margin-top: 16px; padding: 28px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.journey > h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.journey ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin: 0; padding: 0; list-style: none; }
-.journey li { position: relative; display: grid; grid-template-columns: 34px 58px 1fr; align-items: center; gap: 12px; }
-.journey li:not(:last-child)::after { content: ''; position: absolute; top: 50%; right: -12px; width: 24px; border-top: 1px solid #98a1b3; }
-.stepNumber { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: white; font-size: 12px; font-weight: 800; }
-.journeyIcon { width: 58px; height: 58px; background: #e9f3ff; color: var(--ink); }
-.journeyIcon svg { width: 29px; height: 29px; }
-.journey h3, .journey p { margin: 0; }
-.journey h3 { font-size: 17px; letter-spacing: -.025em; }
-.journey p { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.42; }
-
-.privacyBand { display: grid; grid-template-columns: 1.1fr repeat(3, 1fr); gap: 20px; align-items: stretch; margin-top: 24px; padding: 22px 24px; border: 1px solid #6ea79f; border-radius: 8px; background: #fbfefd; }
+.privacyBand { display: grid; grid-template-columns: minmax(190px, .75fr) minmax(0, 1.8fr) auto; gap: 22px; align-items: center; margin-top: 20px; padding: 20px 22px; border: 1px solid #6ea79f; border-radius: 8px; background: #fbfefd; }
 .privacyLead { display: flex; align-items: center; gap: 15px; padding-right: 16px; }
 .privacyLead > span { width: 58px; height: 58px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--teal-deep); color: white; }
 .privacyLead svg { width: 30px; height: 30px; }
 .privacyLead h2 { margin: 0; color: var(--teal-deep); font-size: 19px; line-height: 1.15; }
-.privacyGroup { padding-left: 20px; border-left: 1px solid #c8d9d7; }
-.privacyGroup h3 { margin: 0; font-size: 13px; }
-.privacyGroup ul { display: grid; gap: 7px; margin: 10px 0 0; padding: 0; list-style: none; }
-.privacyGroup li { color: #354359; font-size: 12px; line-height: 1.35; }
-.privacyGroup li::before { content: '✓'; margin-right: 8px; color: var(--teal-deep); font-weight: 900; }
+.privacyBand > ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.privacyBand li { color: #354359; font-size: 12px; line-height: 1.4; }
+.privacyBand li::before { content: '✓'; margin-right: 7px; color: var(--teal-deep); font-weight: 900; }
+.privacyLink { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--teal-deep); border-radius: 7px; color: var(--teal-deep); font-size: 13px; font-weight: 760; text-decoration: none; }
+.privacyLink:hover, .privacyLink:focus-visible { background: var(--teal-soft); text-decoration: underline; text-underline-offset: 3px; }
+.privacyLink svg { width: 18px; height: 18px; flex: 0 0 auto; }
 
 .fastagDoorwayShell { margin-top: 20px; }
 .fastagDoorway { display: grid; grid-template-columns: 78px minmax(0, 1fr) 235px; align-items: center; gap: 18px; padding: 14px 22px; border: 1px solid var(--gold); border-radius: 8px; background: #fff9ec; color: inherit; text-decoration: none; cursor: pointer; }
@@ -95,14 +85,11 @@
 @media (max-width: 980px) {
   .headerActions { gap: 10px; }
   .headerActions a, .simpleToggle { font-size: 12px; }
-  .situationRail { grid-template-columns: 145px 1fr; }
-  .situationRail > div { grid-template-columns: repeat(3, 1fr); }
-  .situationRail a:nth-child(n + 4) { border-top: 1px solid var(--line); }
-  .journey li { grid-template-columns: 30px 50px 1fr; gap: 9px; }
-  .journeyIcon { width: 50px; height: 50px; }
-  .privacyBand { grid-template-columns: 1fr 1fr; }
-  .privacyLead { grid-column: 1 / -1; padding: 0 0 12px; border-bottom: 1px solid #c8d9d7; }
-  .privacyGroup:first-of-type { padding-left: 0; border-left: 0; }
+  .situationDisclosure nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .situationDisclosure a:nth-child(3n) { border-right: 0; }
+  .situationDisclosure a:nth-child(n + 4) { border-top: 1px solid var(--line); }
+  .privacyBand { grid-template-columns: minmax(190px, .7fr) minmax(0, 1.3fr); }
+  .privacyLink { grid-column: 1 / -1; justify-self: end; }
 }
 
 @media (max-width: 700px) {
@@ -122,24 +109,20 @@
   .actionRow:nth-child(2) .goalIcon { border-color: var(--gold); background: transparent; }
   .actionCopy h2 { color: var(--ink); font-size: 24px; }
   .actionRow:nth-child(2) .actionCopy h2 { color: var(--ink); }
-  .actionCopy p { margin-top: 3px; font-size: 14px; }
+  .actionCopy p { margin-top: 3px; font-size: 16px; }
   .actionCta { min-width: 48px; min-height: 72px; padding: 0; border: 0; color: var(--ink); }
-  .actionCta > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .actionCta svg { width: 28px; height: 28px; }
   .actionRow:nth-child(2) .actionCta { background: transparent; color: var(--ink); }
-  .situationRail { display: block; margin-top: 18px; border: 0; border-radius: 0; }
-  .situationRail > strong { display: none; }
-  .situationRail > div { display: block; }
-  .situationRail a { min-height: 58px; grid-template-columns: 32px 1fr 20px; padding: 9px 0; border: 0; border-bottom: 1px solid var(--line); font-size: 14px; }
-  .situationRail a:nth-child(n + 4) { border-top: 0; }
-  .journey { margin-top: 20px; padding: 22px 0; }
-  .journey ol { grid-template-columns: 1fr; gap: 18px; }
-  .journey li { grid-template-columns: 31px 52px 1fr; }
-  .journey li:not(:last-child)::after { display: none; }
-  .journey h3 { font-size: 16px; }
+  .situationDisclosure { margin-top: 18px; }
+  .situationDisclosure summary { min-height: 48px; padding: 9px 12px; font-size: 16px; }
+  .situationDisclosure nav { display: block; }
+  .situationDisclosure a { min-height: 58px; grid-template-columns: 32px minmax(0, 1fr) 20px; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .situationDisclosure a:last-child { border-bottom: 0; }
   .privacyBand { grid-template-columns: 1fr; gap: 16px; margin-top: 18px; padding: 18px; }
-  .privacyLead { padding-bottom: 14px; }
-  .privacyGroup { padding: 0; border: 0; }
+  .privacyLead { padding: 0 0 14px; border-bottom: 1px solid #c8d9d7; }
+  .privacyBand > ul { grid-template-columns: 1fr; }
+  .privacyBand li { font-size: 16px; }
+  .privacyLink { grid-column: auto; width: 100%; justify-self: stretch; font-size: 16px; }
   .fastagDoorway { grid-template-columns: 56px 1fr; gap: 12px; padding: 16px; }
   .fastagIcon { width: 52px; height: 52px; }
   .fastagCta { grid-column: 1 / -1; width: 100%; min-height: 50px; }
@@ -150,10 +133,10 @@
   .simpleToggle,
   .languageToggle button,
   .actionCopy p,
-  .situationRail a,
-  .journey p,
-  .privacyGroup h3,
-  .privacyGroup li,
+  .situationDisclosure summary,
+  .situationDisclosure a,
+  .privacyBand li,
+  .privacyLink,
   .fastagDoorway p,
   .footer a,
   .footer p { font-size: 16px; }

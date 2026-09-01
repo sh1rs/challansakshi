@@ -48,9 +48,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
   align-items: center;
-  gap: clamp(36px, 7vw, 100px);
-  min-height: 390px;
-  padding: 36px clamp(0px, 2vw, 24px) 58px;
+  gap: clamp(32px, 6vw, 76px);
+  min-height: 330px;
+  padding: 28px clamp(0px, 2vw, 24px) 42px;
 }
 .hero h1,
 .suiteHeading h2,
@@ -95,7 +95,7 @@
 .heroProof b { display: block; color: var(--ink); font: 700 35px Georgia, serif; }
 
 .boundaryStrip { display: grid; grid-template-columns: repeat(3, 1fr); border-block: 1px solid var(--line); background: #edf4f0; }
-.boundaryStrip p { min-height: 92px; margin: 0; padding: 22px 28px; border-right: 1px solid var(--line); }
+.boundaryStrip p { min-height: 74px; margin: 0; padding: 16px 24px; border-right: 1px solid var(--line); }
 .boundaryStrip p:last-child { border: 0; }
 .boundaryStrip b,
 .boundaryStrip span { display: block; }
@@ -125,7 +125,7 @@
 .workbenchGrid { display: grid; grid-template-columns: minmax(270px, 350px) minmax(0, 1fr); align-items: start; gap: 22px; margin-top: 22px; }
 .selectedWorkbench { min-width: 0; scroll-margin-top: 16px; }
 .caseList { position: sticky; top: 16px; display: grid; gap: 8px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 4px; }
-.caseButton { width: 100%; min-height: 98px; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(104px, 124px); align-items: center; gap: 12px; padding: 14px; border: 1px solid #cbd4cf; border-radius: 11px; background: #fff; color: inherit; text-align: left; }
+.caseButton { width: 100%; min-height: 76px; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(104px, 124px); align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid #cbd4cf; border-radius: 11px; background: #fff; color: inherit; text-align: left; }
 .caseButton:hover { border-color: var(--teal); }
 .caseButton > span { color: var(--teal-dark); font: 850 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .caseButton div { min-width: 0; }

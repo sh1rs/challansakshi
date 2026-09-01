@@ -103,10 +103,10 @@ describe('shared citizen product chrome', () => {
     const html = renderToStaticMarkup(createElement(ChallanSakshiApp));
 
     expect(html).toContain('Demo boundary · use fictional or synthetic test data only');
-    expect(html).toContain('fictional data only');
+    expect(html).toContain('Fictional data only');
     expect(html).toContain('no government connection');
     expect(landmarkFrom(html, 'footer')).toContain('Use synthetic test data only');
-    expect(html).toContain('Does the challan photo show');
+    expect(html).toContain('Does the photo show your vehicle?');
   });
 
   it('keeps active shared-header labels readable at 320px', () => {

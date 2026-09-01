@@ -343,13 +343,6 @@ const limitationCopy: Record<string, Pair> = {
   'offence-not-assessable': { en: 'The alleged offence cannot be assessed reliably from the supplied image.', hi: 'दी गई फ़ोटो से बताए गए उल्लंघन की भरोसेमंद जाँच नहीं हो सकती।' },
 };
 
-const resolutionStageCopy: Record<(typeof resolutionIssues)[number]['stage'], Pair> = {
-  evidence: { en: 'Evidence', hi: 'सबूत' },
-  authority: { en: 'Authority', hi: 'प्राधिकरण' },
-  court: { en: 'Court', hi: 'अदालत' },
-  payment: { en: 'Payment', hi: 'भुगतान' },
-};
-
 function local(pair: LocalizedText | Pair, language: Language): string {
   return pair[language];
 }
@@ -584,21 +577,20 @@ function EvidenceCard({ card, fixture, language, textFirst, imageRevealed, onRev
   );
 }
 
-function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageRevealed, onRevealImage }: { language: Language; onStart: () => void; onOpenDesk: () => void; onOpenRoute: (issueId: ResolutionIssueId) => void; textFirst: boolean; imageRevealed: boolean; onRevealImage: () => void }) {
+function Landing({ language, onStart, textFirst, imageRevealed, onRevealImage }: { language: Language; onStart: () => void; textFirst: boolean; imageRevealed: boolean; onRevealImage: () => void }) {
   return (
     <main tabIndex={-1}>
       <section className="hero shell" id="landing">
         <div className="hero-copy">
           <p className="eyebrow"><span />{local(copy.evidenceBefore, language)}</p>
-          <h1>{language === 'hi' ? <>क्या चालान की फ़ोटो में <em>आपका</em> ही वाहन है?</> : <>Does the challan photo show <em>your</em> vehicle?</>}</h1>
-          <p className="hero-lede">{local(copy.landingLead, language)}</p>
+          <h1>{language === 'hi' ? 'क्या फ़ोटो में आपका वाहन है?' : 'Does the photo show your vehicle?'}</h1>
+          <p className="hero-lede">{language === 'hi' ? 'एक काल्पनिक वाहन रिकॉर्ड को सिंथेटिक प्रवर्तन फ़ोटो से मिलाएँ, जो दिखता है उसकी पुष्टि करें, फिर नियम नतीजा निकालेंगे।' : 'Compare one fictional vehicle record with a synthetic enforcement photo, confirm what you see, and let deterministic rules produce the result.'}</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/review">{language === 'hi' ? 'अपने असली चालान की सुरक्षित समीक्षा करें' : 'Review my real challan safely'} <span aria-hidden="true">→</span></a>
-            <Button variant="secondary" type="button" onClick={onStart}>{local(copy.tryDemo, language)}</Button>
-            <a className="button button-secondary" href="/demo/test-lab">{language === 'hi' ? '10-केस टेस्ट लैब खोलें' : 'Open the 10-case Test Lab'}</a>
-            <Button variant="quiet" type="button" onClick={onOpenDesk}>{language === 'hi' ? 'काल्पनिक समस्या डेस्क' : 'Explore fictional issue routes'}</Button>
+            <Button type="button" onClick={onStart}>{language === 'hi' ? 'काल्पनिक डेमो शुरू करें' : 'Start fictional demo'}</Button>
+            <a className="button button-secondary" href="/review">{language === 'hi' ? 'असली चालान की समीक्षा करें' : 'Review a real challan'}</a>
+            <a className="button button-quiet" href="/demo/test-lab">{language === 'hi' ? 'टेस्ट लैब खोलें' : 'Open Test Lab'}</a>
           </div>
-          <p className="microcopy"><span aria-hidden="true">◉</span>{local(copy.noSignup, language)}</p>
+          <p className="microcopy"><span aria-hidden="true">◉</span>{language === 'hi' ? 'केवल काल्पनिक डेटा · कोई अपलोड या सरकारी कनेक्शन नहीं' : 'Fictional data only · no uploads or government connection'}</p>
         </div>
         <div className="evidence-scene" aria-label="Synthetic evidence comparison preview">
           <div className="case-meta"><span>DEMO CASE · ASHA</span><span>{language === 'hi' ? '45 दिन की अवधि का 8वाँ दिन' : 'Day 8 of 45'}</span></div>
@@ -613,48 +605,16 @@ function Landing({ language, onStart, onOpenDesk, onOpenRoute, textFirst, imageR
         </div>
       </section>
 
-      <section className="trust-strip" aria-label="Product safeguards">
-        <div className="shell trust-items">
-          <p><strong>{local(copy.evidenceLinked, language)}</strong><span>{local(copy.evidenceLinkedSub, language)}</span></p>
-          <p><strong>{local(copy.deadlineAware, language)}</strong><span>{local(copy.deadlineAwareSub, language)}</span></p>
-          <p><strong>{local(copy.honest, language)}</strong><span>{local(copy.honestSub, language)}</span></p>
-        </div>
+      <section className="trust-line" aria-label="Product safeguards">
+        <p className="shell">{language === 'hi' ? 'स्रोत से जुड़े साक्ष्य · अस्पष्ट तथ्य अधूरे रहते हैं · तुलना से पहले लोग पुष्टि करते हैं' : 'Source-linked evidence · unclear facts stay inconclusive · people confirm before rules compare'}</p>
       </section>
 
-      <section className="public-service-bridge shell" aria-labelledby="public-services-title">
-        <div className="public-service-heading">
-          <p className="eyebrow"><span />{language === 'hi' ? 'डेमो से सुरक्षित नागरिक उपयोग तक' : 'From demo to safe citizen use'}</p>
-          <h2 id="public-services-title">{language === 'hi' ? 'एक सबूत प्रणाली, दो असली सड़क-संबंधी समस्याएँ।' : 'One evidence system, two real mobility problems.'}</h2>
-          <p>{language === 'hi' ? 'असली-मामला टूल दस्तावेज़ अपलोड या AI के बिना केवल आपके संरचित, मास्क किए गए अवलोकन उपयोग करते हैं।' : 'The real-case tools use only your structured, masked observations—without document uploads or AI analysis.'}</p>
-        </div>
-        <div className="public-service-grid">
-          <a href="/review"><span className="service-code">01 · e-CHALLAN</span><strong>{language === 'hi' ? 'मैन्युअल चालान स्वयं-समीक्षा' : 'Manual challan self-review'}</strong><p>{language === 'hi' ? 'आधिकारिक तस्वीर खुद देखें, अंतर या अस्पष्टता दर्ज करें और निष्पक्ष वर्कशीट बनाएँ।' : 'Inspect the official image yourself, record conflicts or uncertainty, and prepare a neutral worksheet.'}</p><b>{language === 'hi' ? 'सुरक्षित समीक्षा शुरू करें' : 'Start safe review'} →</b></a>
-          <a href="/fastag"><span className="service-code">02 · FASTag</span><strong>TollSakshi</strong><p>{language === 'hi' ? 'डेबिट को वाहन, प्लाज़ा, समय, दूसरी कटौती और क्रेडिट रिकॉर्ड से मिलाएँ।' : 'Reconcile a debit with vehicle, plaza, timestamp, second-debit, and credit-adjustment records.'}</p><b>{language === 'hi' ? 'FASTag जाँच खोलें' : 'Open FASTag check'} →</b></a>
-        </div>
-        <p className="public-service-boundary"><span aria-hidden="true">i</span>{language === 'hi' ? 'रियल मोड स्वतंत्र अर्ली एक्सेस है: कोई फाइलिंग, भुगतान, सरकारी/बैंक डेटा कनेक्शन या नतीजे की गारंटी नहीं।' : 'Real mode is independent early access: no filing, payment, government/bank data connection, or outcome guarantee.'} <a href="/privacy">{language === 'hi' ? 'गोपनीयता और सीमाएँ पढ़ें' : 'Read privacy and limits'} →</a></p>
-      </section>
-
-      <NoticePreflight language={language} onContinue={onStart} />
-
-      <section className="breadth-section shell" id="resolution-coverage">
-        <div className="breadth-heading">
-          <div><p className="eyebrow"><span />{language === 'hi' ? 'एक सबूत प्रणाली · सात मुश्किल पड़ाव' : 'One evidence system · seven difficult moments'}</p><h2>{language === 'hi' ? 'पहली सूचना से नतीजे, कोर्ट हैंडऑफ़ या भुगतान-स्थिति तक साफ़ अगला कदम।' : 'A clear next step through outcome, court handoff, or payment-status recovery.'}</h2></div>
-          <div><p>{language === 'hi' ? 'गलत या धुंधली फ़ोटो, अस्वीकार आपत्ति, वर्चुअल कोर्ट, पेंडिंग भुगतान और रसीद/फ़ोन की समस्या—हर रास्ता स्रोत, सीमा और आधिकारिक हैंडऑफ़ दिखाता है।' : 'Wrong or unclear evidence, a rejected grievance, Virtual Court, a pending payment, or access trouble—every route shows sources, limits, and an official handoff.'}</p><button type="button" onClick={onOpenDesk}>{language === 'hi' ? 'पूरा रिज़ॉल्यूशन डेस्क खोलें' : 'Explore the full resolution desk'} <span aria-hidden="true">→</span></button></div>
-        </div>
-        <div className="breadth-grid">
-          {resolutionIssues.map((issue) => <button type="button" key={issue.id} onClick={() => issue.id === 'wrong-evidence' ? onStart() : onOpenRoute(issue.id)}><span aria-hidden="true">{issue.icon}</span><div><small>{local(resolutionStageCopy[issue.stage], language).toUpperCase()}</small><strong>{local(issue.title, language)}</strong><p>{local(issue.resultLabel, language)}</p></div><b aria-hidden="true">→</b></button>)}
-        </div>
-      </section>
-
-      <section className="how shell" id="how-it-works">
-        <p className="eyebrow"><span />{local(copy.howEyebrow, language)}</p>
-        <h2>{local(copy.howTitle, language)}</h2>
-        <div className="how-grid">
-          <article><b>01</b><h3>{local(copy.how1, language)}</h3><p>{local(copy.how1p, language)}</p></article>
-          <article><b>02</b><h3>{local(copy.how2, language)}</h3><p>{local(copy.how2p, language)}</p></article>
-          <article><b>03</b><h3>{local(copy.how3, language)}</h3><p>{local(copy.how3p, language)}</p></article>
-        </div>
-        <div className="independence-note"><strong>{local(copy.independence, language)}</strong><p>{local(copy.disclaimer, language)}</p></div>
+      <section className="real-help-band shell" aria-label={language === 'hi' ? 'असली रिकॉर्ड सहायता' : 'Help with a real record'}>
+        <div><strong>{language === 'hi' ? 'असली रिकॉर्ड पर काम कर रहे हैं?' : 'Working with a real record?'}</strong><p>{language === 'hi' ? 'ब्राउज़र-स्थानीय नागरिक टूल इस्तेमाल करें। यहाँ कुछ फाइल, भुगतान या प्रमाणित नहीं होता।' : 'Use the browser-local citizen tools. Nothing is filed, paid, authenticated, or sent to a government or bank system.'}</p></div>
+        <nav aria-label={language === 'hi' ? 'असली रिकॉर्ड टूल' : 'Real record tools'}>
+          <a href="/review">{language === 'hi' ? 'ई-चालान स्वयं-समीक्षा' : 'e-Challan self-review'}</a>
+          <a href="/fastag">{language === 'hi' ? 'FASTag जाँच' : 'FASTag check'}</a>
+        </nav>
       </section>
       <Footer language={language} />
     </main>
@@ -1718,9 +1678,9 @@ export default function ChallanSakshiApp() {
       />
       {easyRead && <EasyReadSummary step={renderStep} language={language} assessment={activeCaseAssessment} />}
 
-      {renderStep === 'landing' && <Landing language={language} onStart={() => startResolutionEvidence('wrong-evidence')} onOpenDesk={() => go('desk')} onOpenRoute={openResolutionRoute} textFirst={textFirst} imageRevealed={revealedImages.includes('mismatch-enforcement')} onRevealImage={() => revealImage('mismatch-enforcement')} />}
+      {renderStep === 'landing' && <Landing language={language} onStart={() => startResolutionEvidence('wrong-evidence')} textFirst={textFirst} imageRevealed={revealedImages.includes('mismatch-enforcement')} onRevealImage={() => revealImage('mismatch-enforcement')} />}
 
-      {renderStep === 'desk' && <><ResolutionDesk language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} /><Footer language={language} /></>}
+      {renderStep === 'desk' && <><ResolutionDesk language={language} onBack={() => go('landing')} onOpenRoute={openResolutionRoute} onStartEvidence={startResolutionEvidence} /><details className="desk-preflight-disclosure shell"><summary>{language === 'hi' ? 'काल्पनिक नोटिस के चेतावनी संकेत जाँचें' : 'Check a fictional notice for warning signs'}</summary><NoticePreflight language={language} onContinue={() => startResolutionEvidence('wrong-evidence')} /></details><Footer language={language} /></>}
 
       {renderStep === 'route' && <><ResolutionRouteView language={language} issueId={resolutionIssue} onBack={() => go(orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? 'order-map' : 'desk')} onStartEvidence={startResolutionEvidence} postRejectionContext={orderWorkflowComplete && resolutionIssue === 'grievance-rejected' ? { orderDate: postRejectionClock.orderDate, referenceDate: postRejectionClock.referenceDate } : undefined} /><Footer language={language} /></>}
 

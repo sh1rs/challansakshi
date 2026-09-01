@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import SyntheticTestLabApp from '../components/test-lab/SyntheticTestLabApp';
+import { syntheticEvaluationCases } from '../lib/synthetic-evidence-corpus';
 
 const componentSource = readFileSync(
   new URL('../components/test-lab/SyntheticTestLabApp.tsx', import.meta.url),
@@ -16,6 +17,11 @@ const demoSource = readFileSync(
   new URL('../components/ChallanSakshiApp.tsx', import.meta.url),
   'utf8',
 );
+const expectedOutcomeLabels = {
+  'potential-evidence-discrepancy': 'Potential discrepancy',
+  'appears-consistent': 'Appears consistent',
+  inconclusive: 'Inconclusive',
+} as const;
 
 function mediaBlock(source: string, query: string) {
   const marker = `@media ${query}`;
@@ -37,6 +43,11 @@ function ruleFor(source: string, selector: string) {
     .at(-1)?.[2] ?? '';
 }
 
+function caseButton(html: string, caseId: string) {
+  const escapedId = caseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return html.match(new RegExp(`<button\\b[^>]*data-test-case="${escapedId}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0] ?? '';
+}
+
 describe('synthetic Test Lab product contract', () => {
   it('renders ten fully clickable fictional cases inside the shared demo boundary', () => {
     const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
@@ -48,6 +59,23 @@ describe('synthetic Test Lab product contract', () => {
     expect(html).toContain('Run all 10 cases');
     expect(html).toContain('English-only safety beta');
     expect(html).toContain('Nothing is filed, paid, authenticated, or sent to a government system');
+  });
+
+  it('keeps long descriptions out of unselected case cards and reveals the selected description in the workbench', () => {
+    const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
+    const selectedId = 'case-02-registration-conflict';
+
+    for (const testCase of syntheticEvaluationCases) {
+      const card = caseButton(html, testCase.id);
+      expect(card, testCase.id).not.toBe('');
+      expect(card, testCase.id).toContain(testCase.title);
+      expect(card, testCase.id).toContain(`Expected: ${expectedOutcomeLabels[testCase.expectedOverall]}`);
+      if (testCase.id !== selectedId) expect(card, testCase.id).not.toContain(testCase.description);
+    }
+
+    const selected = syntheticEvaluationCases.find((testCase) => testCase.id === selectedId);
+    expect(selected).toBeDefined();
+    expect(html).toContain(selected?.description);
   });
 
   it('makes the Evidence → Explain → Verify → Act sequence explicit without a tall guided header', () => {

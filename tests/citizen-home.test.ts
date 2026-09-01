@@ -35,11 +35,11 @@ function accessibleName(link: string) {
 
 describe('citizen homepage routing', () => {
   it('exposes the four approved citizen goals in order', () => {
-    expect(HOME_ACTIONS.map((item) => [item.goal, item.title, item.cta])).toEqual([
-      ['verify', 'Verify', 'Find the official record'],
-      ['understand', 'Understand', 'Explain my situation'],
-      ['evidence', 'Check evidence', 'Compare the evidence'],
-      ['resolve', 'Resolve', 'Show my next step'],
+    expect(HOME_ACTIONS.map((item) => [item.goal, item.title, item.description])).toEqual([
+      ['verify', 'Check if it’s yours', 'Find the official record and check the vehicle details.'],
+      ['understand', 'Understand the notice', 'See what the notice, status, or Virtual Court update means.'],
+      ['evidence', 'Compare the photo', 'Compare the visible vehicle details with your record.'],
+      ['resolve', 'Find the next step', 'Use the right official route for your situation.'],
     ]);
   });
 
@@ -68,10 +68,10 @@ describe('citizen homepage routing', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
 
     const expectedCards = [
-      ['/review?goal=verify', 'Verify Is this challan actually connected to you or your vehicle? Find the official record'],
-      ['/review?goal=understand', 'Understand What does this notice, status, or Virtual Court update mean? Explain my situation'],
-      ['/review?goal=evidence', 'Check evidence Does the supplied evidence agree with the record and your vehicle? Compare the evidence'],
-      ['/review?goal=resolve', 'Resolve What is the safest official next step? Show my next step'],
+      ['/review?goal=verify', 'Check if it’s yours Find the official record and check the vehicle details.'],
+      ['/review?goal=understand', 'Understand the notice See what the notice, status, or Virtual Court update means.'],
+      ['/review?goal=evidence', 'Compare the photo Compare the visible vehicle details with your record.'],
+      ['/review?goal=resolve', 'Find the next step Use the right official route for your situation.'],
     ] as const;
 
     for (const [href, name] of expectedCards) {
@@ -80,6 +80,17 @@ describe('citizen homepage routing', () => {
       expect(accessibleName(link), href).toBe(name);
       expect(link.replace(/^<a\b[^>]*>/, '').replace(/<\/a>$/, ''), href).not.toMatch(/<(?:a|button)\b/i);
     }
+  });
+
+  it('keeps the five situation shortcuts in one named native disclosure', () => {
+    const html = renderToStaticMarkup(createElement(CitizenHome));
+    const disclosure = html.match(/<details\b[\s\S]*?<\/details>/)?.[0] ?? '';
+
+    expect(disclosure).toContain('<summary>Not sure? Choose your situation</summary>');
+    for (const situation of SITUATION_LINKS) {
+      expect(disclosure).toContain(`href="${situation.href}"`);
+    }
+    expect(disclosure.match(/<a\b/g)).toHaveLength(5);
   });
 
   it('makes the FASTag doorway one complete semantic link', () => {
@@ -98,8 +109,13 @@ describe('citizen homepage routing', () => {
   it('describes the browser-local file boundary without implying optional upload', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
 
-    expect(html).toContain('Selected files stay browser-local');
-    expect(html).toContain('No file is uploaded to ChallanSakshi, AI, or an authority');
+    const privacyBand = html.match(/<section\b[^>]*aria-label="Your privacy is built in"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(privacyBand).toContain('Files stay in this browser');
+    expect(privacyBand).toContain('Nothing is uploaded to ChallanSakshi, AI, or an authority');
+    expect(privacyBand).toContain('Payments and submissions stay on official services');
+    expect(privacyBand.match(/<li\b/g)).toHaveLength(3);
+    expect(privacyBand).toContain('href="/privacy"');
+    expect(privacyBand).toContain('Read full privacy details');
     expect(html).not.toContain('Selected files stay in this browser tab');
     expect(html).not.toContain('processed locally by default');
     expect(html).not.toContain('future product decision');
@@ -116,10 +132,10 @@ describe('citizen homepage routing', () => {
 
     for (const selector of [
       '.actionCopy p',
-      '.situationRail a',
-      '.journey p',
-      '.privacyGroup h3',
-      '.privacyGroup li',
+      '.situationDisclosure summary',
+      '.situationDisclosure a',
+      '.privacyBand li',
+      '.privacyLink',
       '.fastagDoorway p',
     ]) {
       expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);

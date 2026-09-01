@@ -18,14 +18,13 @@ type Copy = {
   heading: string;
   supporting: string;
   simpleSupporting: string;
-  actions: Record<CitizenGoal, { title: string; question: string; simpleQuestion: string; cta: string }>;
+  actions: Record<CitizenGoal, { title: string; description: string; simpleDescription: string }>;
   situationsHeading: string;
   commonSituations: string;
   situations: readonly string[];
-  journeyHeading: string;
-  journey: readonly { title: string; body: string }[];
   privacyHeading: string;
-  privacyGroups: readonly { title: string; items: readonly string[] }[];
+  privacyStatements: readonly string[];
+  privacyLink: string;
   fastagHeading: string;
   fastagBody: string;
   fastagAction: string;
@@ -48,12 +47,12 @@ const copy: Record<Language, Copy> = {
     supporting: 'Verify the record, understand the notice, check the evidence, and continue through the correct official service.',
     simpleSupporting: 'Check what the official record says. Compare only what you can see. Then use the official service.',
     actions: {
-      verify: { title: 'Verify', question: 'Is this challan actually connected to you or your vehicle?', simpleQuestion: 'Check whether the official record is about your vehicle.', cta: 'Find the official record' },
-      understand: { title: 'Understand', question: 'What does this notice, status, or Virtual Court update mean?', simpleQuestion: 'See what the notice or status means.', cta: 'Explain my situation' },
-      evidence: { title: 'Check evidence', question: 'Does the supplied evidence agree with the record and your vehicle?', simpleQuestion: 'Check whether the photo and record agree.', cta: 'Compare the evidence' },
-      resolve: { title: 'Resolve', question: 'What is the safest official next step?', simpleQuestion: 'See the next official step.', cta: 'Show my next step' },
+      verify: { title: 'Check if it’s yours', description: 'Find the official record and check the vehicle details.', simpleDescription: 'Check whether the official record is about your vehicle.' },
+      understand: { title: 'Understand the notice', description: 'See what the notice, status, or Virtual Court update means.', simpleDescription: 'See what the notice or status means.' },
+      evidence: { title: 'Compare the photo', description: 'Compare the visible vehicle details with your record.', simpleDescription: 'Check whether the photo and record agree.' },
+      resolve: { title: 'Find the next step', description: 'Use the right official route for your situation.', simpleDescription: 'See the next official step.' },
     },
-    situationsHeading: 'Your situation might be:',
+    situationsHeading: 'Not sure? Choose your situation',
     commonSituations: 'Common challan situations',
     situations: [
       'I do not recognise this challan',
@@ -62,18 +61,13 @@ const copy: Record<Language, Copy> = {
       'My grievance was rejected',
       'My case moved to Virtual Court',
     ],
-    journeyHeading: 'How ChallanSakshi works',
-    journey: [
-      { title: 'Open the official service', body: 'You will go to the official portal or app to search or sign in.' },
-      { title: 'Bring back your record', body: 'Return here to review what you can see on your device.' },
-      { title: 'Review before acting', body: 'Understand, check the evidence, and choose the correct next step.' },
-    ],
     privacyHeading: 'Your privacy is built in',
-    privacyGroups: [
-      { title: 'We never ask for', items: ['Government passwords', 'CAPTCHA or OTP', 'Aadhaar details', 'Payment credentials'] },
-      { title: 'Your documents stay on your device', items: ['Selected files stay browser-local', 'No file is uploaded to ChallanSakshi, AI, or an authority', 'Opening a PDF creates a separate local tab; close it yourself', 'You choose what to save or share'] },
-      { title: 'Official services, always', items: ['Payments happen on official services', 'Submissions happen on official services', 'We do not collect or process payments'] },
+    privacyStatements: [
+      'Files stay in this browser',
+      'Nothing is uploaded to ChallanSakshi, AI, or an authority',
+      'Payments and submissions stay on official services',
     ],
+    privacyLink: 'Read full privacy details',
     fastagHeading: 'Have a FASTag transaction problem instead?',
     fastagBody: 'Compare the plaza record, issuer transaction, debit status, and the appropriate official escalation route.',
     fastagAction: 'Go to FASTag help',
@@ -94,12 +88,12 @@ const copy: Record<Language, Copy> = {
     supporting: 'रिकॉर्ड जाँचें, नोटिस समझें, साक्ष्य देखें और सही आधिकारिक सेवा के माध्यम से आगे बढ़ें।',
     simpleSupporting: 'देखें कि आधिकारिक रिकॉर्ड क्या कहता है। केवल वही तुलना करें जो आप देख सकते हैं। फिर आधिकारिक सेवा इस्तेमाल करें।',
     actions: {
-      verify: { title: 'जाँचें', question: 'क्या यह चालान वास्तव में आप या आपके वाहन से जुड़ा है?', simpleQuestion: 'जाँचें कि आधिकारिक रिकॉर्ड आपके वाहन के बारे में है या नहीं।', cta: 'आधिकारिक रिकॉर्ड खोजें' },
-      understand: { title: 'समझें', question: 'इस नोटिस, स्थिति या वर्चुअल कोर्ट अपडेट का क्या अर्थ है?', simpleQuestion: 'देखें कि नोटिस या स्थिति का क्या अर्थ है।', cta: 'मेरी स्थिति समझाएँ' },
-      evidence: { title: 'साक्ष्य जाँचें', question: 'क्या दिए गए साक्ष्य रिकॉर्ड और आपके वाहन से मेल खाते हैं?', simpleQuestion: 'जाँचें कि फोटो और रिकॉर्ड मेल खाते हैं या नहीं।', cta: 'साक्ष्य की तुलना करें' },
-      resolve: { title: 'आगे बढ़ें', question: 'सबसे सुरक्षित आधिकारिक अगला कदम क्या है?', simpleQuestion: 'आधिकारिक अगला कदम देखें।', cta: 'मेरा अगला कदम दिखाएँ' },
+      verify: { title: 'जाँचें कि यह आपका है', description: 'आधिकारिक रिकॉर्ड खोजें और वाहन की जानकारी जाँचें।', simpleDescription: 'जाँचें कि आधिकारिक रिकॉर्ड आपके वाहन के बारे में है या नहीं।' },
+      understand: { title: 'नोटिस समझें', description: 'नोटिस, स्थिति या वर्चुअल कोर्ट अपडेट का अर्थ देखें।', simpleDescription: 'देखें कि नोटिस या स्थिति का क्या अर्थ है।' },
+      evidence: { title: 'फ़ोटो की तुलना करें', description: 'दिखाई देने वाली वाहन जानकारी को अपने रिकॉर्ड से मिलाएँ।', simpleDescription: 'जाँचें कि फोटो और रिकॉर्ड मेल खाते हैं या नहीं।' },
+      resolve: { title: 'अगला कदम खोजें', description: 'अपनी स्थिति के लिए सही आधिकारिक रास्ता चुनें।', simpleDescription: 'आधिकारिक अगला कदम देखें।' },
     },
-    situationsHeading: 'आपकी स्थिति यह हो सकती है:',
+    situationsHeading: 'पक्का नहीं? अपनी स्थिति चुनें',
     commonSituations: 'चालान की सामान्य स्थितियाँ',
     situations: [
       'मैं इस चालान को नहीं पहचानता/पहचानती',
@@ -108,18 +102,13 @@ const copy: Record<Language, Copy> = {
       'मेरी शिकायत अस्वीकार हो गई',
       'मेरा मामला वर्चुअल कोर्ट चला गया',
     ],
-    journeyHeading: 'ChallanSakshi कैसे काम करता है',
-    journey: [
-      { title: 'आधिकारिक सेवा खोलें', body: 'खोजने या साइन इन करने के लिए आप आधिकारिक पोर्टल या ऐप पर जाएँगे।' },
-      { title: 'अपना रिकॉर्ड वापस लाएँ', body: 'अपने डिवाइस पर जो आप देख सकते हैं उसकी समीक्षा के लिए यहाँ लौटें।' },
-      { title: 'कार्रवाई से पहले समीक्षा करें', body: 'समझें, साक्ष्य जाँचें और सही अगला कदम चुनें।' },
-    ],
     privacyHeading: 'आपकी गोपनीयता इसमें शामिल है',
-    privacyGroups: [
-      { title: 'हम कभी नहीं माँगते', items: ['सरकारी पासवर्ड', 'CAPTCHA या OTP', 'आधार विवरण', 'भुगतान क्रेडेंशियल'] },
-      { title: 'आपके दस्तावेज़ आपके डिवाइस पर रहते हैं', items: ['चुनी फ़ाइलें ब्राउज़र में स्थानीय रहती हैं', 'कोई फ़ाइल ChallanSakshi, AI या किसी प्राधिकरण पर अपलोड नहीं होती', 'PDF अलग स्थानीय टैब में खुलती है; उसे स्वयं बंद करें', 'आप चुनते हैं कि क्या सेव या साझा करना है'] },
-      { title: 'हमेशा आधिकारिक सेवाएँ', items: ['भुगतान आधिकारिक सेवाओं पर होते हैं', 'सबमिशन आधिकारिक सेवाओं पर होते हैं', 'हम भुगतान नहीं लेते या प्रोसेस नहीं करते'] },
+    privacyStatements: [
+      'फ़ाइलें इसी ब्राउज़र में रहती हैं',
+      'ChallanSakshi, AI या किसी प्राधिकरण पर कुछ अपलोड नहीं होता',
+      'भुगतान और सबमिशन आधिकारिक सेवाओं पर ही होते हैं',
     ],
+    privacyLink: 'पूरी गोपनीयता जानकारी पढ़ें',
     fastagHeading: 'क्या आपको FASTag लेन-देन की समस्या है?',
     fastagBody: 'प्लाज़ा रिकॉर्ड, जारीकर्ता लेन-देन, डेबिट स्थिति और सही आधिकारिक एस्केलेशन मार्ग की तुलना करें।',
     fastagAction: 'FASTag सहायता पर जाएँ',
@@ -147,12 +136,6 @@ function SituationIcon({ index }: { index: number }) {
   if (index === 2) return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5c.4-1 1.3-1.5 2.5-1.5 1.4 0 2.5.8 2.5 2 0 3-4.6 1.5-4.6 4.2 0 1 .9 1.8 2.1 1.8 1.2 0 2.1-.7 2.4-1.7M12 6v12" /></svg>;
   if (index === 3) return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m9 9 6 6m0-6-6 6" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 20 4M7 16l-3 1 1-3 2-1 3 3-1 2-2-2M11 12l3 3-2 2-3-3zM15 8l2-3 1 3-3 2-2-2z" /></svg>;
-}
-
-function JourneyIcon({ index }: { index: number }) {
-  if (index === 0) return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M11 6H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6" /></svg>;
-  if (index === 1) return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 16v4h16v-4" /></svg>;
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4.5h6v-2H9zM8.5 13l2.2 2.2 4.8-5" /></svg>;
 }
 
 function PrivacyIcon() {
@@ -190,21 +173,18 @@ export default function CitizenHome() {
                   <div className={styles.goalIcon}><GoalIcon goal={action.goal} /></div>
                   <div className={styles.actionCopy}>
                     <h2>{actionCopy.title}</h2>
-                    <p>{simpleMode ? actionCopy.simpleQuestion : actionCopy.question}</p>
+                    <p>{simpleMode ? actionCopy.simpleDescription : actionCopy.description}</p>
                   </div>
-                  <span className={styles.actionCta}>
-                    <span>{actionCopy.cta}</span>
-                    <ArrowIcon />
-                  </span>
+                  <span className={styles.actionCta}><ArrowIcon /></span>
                 </a>
               );
             })}
           </div>
         </section>
 
-        <nav className={styles.situationRail} aria-label={text.commonSituations}>
-          <strong>{text.situationsHeading}</strong>
-          <div>
+        <details className={styles.situationDisclosure}>
+          <summary>{text.situationsHeading}</summary>
+          <nav aria-label={text.commonSituations}>
             {SITUATION_LINKS.map((situation, index) => (
               <a href={situation.href} key={situation.href + index}>
                 <SituationIcon index={index} />
@@ -212,25 +192,13 @@ export default function CitizenHome() {
                 <ArrowIcon />
               </a>
             ))}
-          </div>
-        </nav>
-
-        <section className={styles.journey} aria-label={text.journeyHeading}>
-          <h2>{text.journeyHeading}</h2>
-          <ol>
-            {text.journey.map((step, index) => (
-              <li key={step.title}>
-                <span className={styles.stepNumber}>{index + 1}</span>
-                <span className={styles.journeyIcon}><JourneyIcon index={index} /></span>
-                <div><h3>{step.title}</h3><p>{step.body}</p></div>
-              </li>
-            ))}
-          </ol>
-        </section>
+          </nav>
+        </details>
 
         <section className={styles.privacyBand} aria-label={text.privacyHeading}>
           <div className={styles.privacyLead}><span><PrivacyIcon /></span><h2>{text.privacyHeading}</h2></div>
-          {text.privacyGroups.map((group) => <div className={styles.privacyGroup} key={group.title}><h3>{group.title}</h3><ul>{group.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
+          <ul>{text.privacyStatements.map((statement) => <li key={statement}>{statement}</li>)}</ul>
+          <a className={styles.privacyLink} href="/privacy">{text.privacyLink}<ArrowIcon /></a>
         </section>
 
         <aside className={styles.fastagDoorwayShell} aria-labelledby="fastag-doorway-title">

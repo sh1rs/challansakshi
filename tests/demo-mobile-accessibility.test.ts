@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import ChallanSakshiApp from '../components/ChallanSakshiApp';
 
 const globalStyles = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
@@ -32,6 +35,20 @@ function ruleFor(source: string, selector: string) {
 }
 
 describe('synthetic demo mobile accessibility', () => {
+  it('keeps the landing focused on one fictional comparison and three actions', () => {
+    const html = renderToStaticMarkup(createElement(ChallanSakshiApp));
+
+    expect(html).toContain('<h1>Does the photo show your vehicle?</h1>');
+    expect(html).toContain('>Start fictional demo<');
+    expect(html).toContain('>Review a real challan<');
+    expect(html).toContain('>Open Test Lab<');
+    expect(html).toContain('Fictional data only');
+    expect(html).toContain('no uploads or government connection');
+    expect(html).not.toContain('id="resolution-coverage"');
+    expect(html).not.toContain('id="notice-preflight-title"');
+    expect(html).not.toContain('Explore fictional issue routes');
+  });
+
   it('keeps every audited landing action at least 48px tall at 320px', () => {
     const mobile = mediaBlock(globalStyles, '(max-width: 480px)');
 
@@ -41,8 +58,7 @@ describe('synthetic demo mobile accessibility', () => {
       '.language-switch button',
       '.evidence-photo-placeholder .button',
       '.text-skip-button',
-      '.public-service-boundary a',
-      '.breadth-heading > div:last-child > button',
+      '.real-help-band a',
       '.site-footer p a',
     ]) {
       expect(ruleFor(mobile, selector), selector).toMatch(/min-height:\s*48px/);
@@ -57,8 +73,7 @@ describe('synthetic demo mobile accessibility', () => {
       '.language-switch button',
       '.evidence-photo-placeholder .button',
       '.text-skip-button',
-      '.public-service-boundary a',
-      '.breadth-heading > div:last-child > button',
+      '.real-help-band a',
       '.site-footer p a',
     ]) {
       expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);

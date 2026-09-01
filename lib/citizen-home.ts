@@ -3,15 +3,14 @@ export type CitizenGoal = 'verify' | 'understand' | 'evidence' | 'resolve';
 export type CitizenHomeAction = {
   goal: CitizenGoal;
   title: string;
-  question: string;
-  cta: string;
+  description: string;
 };
 
 export const HOME_ACTIONS: readonly CitizenHomeAction[] = [
-  { goal: 'verify', title: 'Verify', question: 'Is this challan actually connected to you or your vehicle?', cta: 'Find the official record' },
-  { goal: 'understand', title: 'Understand', question: 'What does this notice, status, or Virtual Court update mean?', cta: 'Explain my situation' },
-  { goal: 'evidence', title: 'Check evidence', question: 'Does the supplied evidence agree with the record and your vehicle?', cta: 'Compare the evidence' },
-  { goal: 'resolve', title: 'Resolve', question: 'What is the safest official next step?', cta: 'Show my next step' },
+  { goal: 'verify', title: 'Check if it’s yours', description: 'Find the official record and check the vehicle details.' },
+  { goal: 'understand', title: 'Understand the notice', description: 'See what the notice, status, or Virtual Court update means.' },
+  { goal: 'evidence', title: 'Compare the photo', description: 'Compare the visible vehicle details with your record.' },
+  { goal: 'resolve', title: 'Find the next step', description: 'Use the right official route for your situation.' },
 ] as const;
 
 export const SITUATION_LINKS = [

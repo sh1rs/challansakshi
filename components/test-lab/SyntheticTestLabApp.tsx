@@ -514,9 +514,9 @@ export default function SyntheticTestLabApp() {
       <main id="test-lab-main" className={styles.main}>
         <section className={styles.hero}>
           <div>
-            <p className={styles.kicker}>SYNTHETIC TEST LAB · SAME ENGINE · TEN INPUTS</p>
+            <p className={styles.kicker}>SYNTHETIC TEST LAB · 10 FICTIONAL CASES</p>
             <h1>Synthetic Evidence Test Lab</h1>
-            <p className={styles.heroLead}>Run ten fictional evidence relationships through one conservative comparison engine. Then edit a fact and watch the result change—without a case ID choosing the answer.</p>
+            <p className={styles.heroLead}>Run 10 fictional cases, then edit any observation to see the deterministic result update.</p>
             <div className={styles.heroActions}>
               <button className={styles.primaryButton} type="button" onClick={runSuite}>Run all 10 cases</button>
               <a className={styles.secondaryButton} href="/demo">Open flagship walkthrough</a>
@@ -531,9 +531,9 @@ export default function SyntheticTestLabApp() {
         </section>
 
         <section className={styles.boundaryStrip} aria-label="Test Lab boundaries">
-          <p><b>AI may extract.</b><span>It cannot choose the finding or legal outcome.</span></p>
-          <p><b>Rules compare.</b><span>Unclear evidence stays inconclusive.</span></p>
-          <p><b>People verify.</b><span>Any edit clears the previous result.</span></p>
+          <p><b>Fictional only.</b><span>No real records or public image analysis.</span></p>
+          <p><b>Rules decide findings.</b><span>AI never chooses the result or legal outcome.</span></p>
+          <p><b>Edits clear results.</b><span>Changed facts require fresh human confirmation.</span></p>
         </section>
 
         <section className={styles.suiteSection} aria-labelledby="suite-heading">
@@ -566,7 +566,7 @@ export default function SyntheticTestLabApp() {
                     onClick={() => chooseCase(testCase.id)}
                   >
                     <span>{testCase.id.replace(/^case-(\d+).*$/, 'TL-$1')}</span>
-                    <div><strong>{testCase.title}</strong><small>{testCase.description}</small></div>
+                    <div><strong>{testCase.title}</strong></div>
                     <b className={outcomeClass(result?.actualOverall ?? testCase.expectedOverall)}>
                       {result ? (
                         <>
