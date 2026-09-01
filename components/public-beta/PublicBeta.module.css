@@ -209,10 +209,11 @@
 .deadline { margin-top: 18px; padding: 18px; border: 1px solid #dcc080; border-radius: 11px; background: #fff8e9; }
 .deadline strong { display: block; color: #77511a; }
 .deadline p { margin: 6px 0 0; color: #715f42; font-size: 12px; line-height: 1.55; }
-.officialRoute, .preparationStatus { margin-top: 18px; padding: 22px; border: 1px solid #d1dad5; border-radius: 12px; background: #f8faf8; }
-.officialRoute h3, .preparationStatus h3 { margin: 0; font: 700 22px/1.3 Georgia, serif; }
-.officialRoute > p:not(.eyebrow), .preparationStatus > p { margin: 8px 0 0; color: var(--pb-muted); font-size: 12px; line-height: 1.55; }
+.officialRoute, .preparationStatus, .terminalOutcome { margin-top: 18px; padding: 22px; border: 1px solid #d1dad5; border-radius: 12px; background: #f8faf8; }
+.officialRoute h3, .preparationStatus h3, .terminalOutcome h3 { margin: 0; font: 700 22px/1.3 Georgia, serif; }
+.officialRoute > p:not(.eyebrow), .preparationStatus > p, .terminalOutcome > p:not(.eyebrow) { margin: 8px 0 0; color: var(--pb-muted); font-size: 12px; line-height: 1.55; }
 .officialRoute .sourceGrid { margin-top: 14px; }
+.terminalOutcome .stopCard { margin-top: 18px; }
 .noteActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .artifact { margin-top: 20px; }
 .artifact pre { max-height: 390px; overflow: auto; margin: 12px 0 0; padding: 20px; border: 1px solid #d4d9d5; border-radius: 10px; background: #f8f8f4; color: #344d43; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }

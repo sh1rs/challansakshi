@@ -56,12 +56,14 @@ describe('TollSakshi deterministic review', () => {
   it('refuses to create a dispute where a corresponding credit is visible', () => {
     const result = assessTollReview({ ...tollFixtures[1].answers, creditAdjustment: 'visible' });
     expect(result.finding).toBe('already-corrected');
+    expect(result.route).toBe('no-dispute');
     expect(result.shouldPrepareIssuerNote).toBe(false);
   });
 
   it('keeps an aligned refusal path', () => {
     const result = assessTollReview(tollFixtures[2].answers);
     expect(result.finding).toBe('records-align');
+    expect(result.route).toBe('no-dispute');
     expect(result.shouldPrepareIssuerNote).toBe(false);
   });
 

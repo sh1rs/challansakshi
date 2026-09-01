@@ -1,3 +1,5 @@
+import type { TollAssessmentKind, TollRoute } from './toll-domain';
+
 export type GuidedStepState =
   | 'complete'
   | 'current'
@@ -281,6 +283,8 @@ export function getTollGuideContent({
   finalConfirmationReady,
   packetAvailable,
   exportAllowed,
+  route,
+  finding,
 }: {
   step: TollGuidedStep;
   startReady: boolean;
@@ -289,6 +293,8 @@ export function getTollGuideContent({
   finalConfirmationReady: boolean;
   packetAvailable: boolean;
   exportAllowed: boolean;
+  route: TollRoute;
+  finding: TollAssessmentKind;
 }): GuidedStepContent {
   if (step === 'start') return {
     currentLabel: 'Step 1 of 4 · Choose how to review',
@@ -327,6 +333,26 @@ export function getTollGuideContent({
     statusTone: 'ready',
     next: 'Check the evidence list and the independently verified official route.',
   };
+
+  if (route === 'no-dispute') {
+    if (finding === 'already-corrected') return {
+      currentLabel: 'Step 4 of 4 · Review the outcome',
+      instruction: 'A corresponding credit is visible. Confirm that it reconciles this debit.',
+      why: 'This limited review does not suggest an issuer dispute route.',
+      status: 'Credit recorded; no issuer note prepared',
+      statusTone: 'complete',
+      next: 'Keep the evidence checklist for your records.',
+    };
+
+    return {
+      currentLabel: 'Step 4 of 4 · Review the outcome',
+      instruction: 'The entered toll records appear consistent. No dispute route is suggested.',
+      why: 'This limited review does not prove liability or who drove.',
+      status: 'Records appear consistent; no issuer note prepared',
+      statusTone: 'complete',
+      next: 'Keep the evidence checklist for your records.',
+    };
+  }
 
   return {
     currentLabel: 'Step 4 of 4 · Prepare the next action',

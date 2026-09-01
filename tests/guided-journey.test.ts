@@ -6,6 +6,28 @@ import {
   getTollGuideContent,
   type GuidedProgressStep,
 } from '../lib/guided-journey';
+import { assessTollReview, type TollAssessment } from '../lib/toll-domain';
+import { tollFixtures } from '../lib/toll-fixtures';
+
+const noDisputeAssessments: Array<{
+  label: string;
+  assessment: TollAssessment;
+  instruction: string;
+  status: string;
+}> = [
+  {
+    label: 'records-align',
+    assessment: assessTollReview(tollFixtures[2].answers),
+    instruction: 'The entered toll records appear consistent. No dispute route is suggested.',
+    status: 'Records appear consistent; no issuer note prepared',
+  },
+  {
+    label: 'already-corrected',
+    assessment: assessTollReview({ ...tollFixtures[1].answers, creditAdjustment: 'visible' }),
+    instruction: 'A corresponding credit is visible. Confirm that it reconciles this debit.',
+    status: 'Credit recorded; no issuer note prepared',
+  },
+];
 
 describe('guided journey progress', () => {
   it('marks earlier work complete, the active task current, and later work upcoming', () => {
@@ -156,6 +178,8 @@ describe('guided journey progress', () => {
       finalConfirmationReady: false,
       packetAvailable: false,
       exportAllowed: true,
+      route: 'verify-records',
+      finding: 'insufficient',
     })).toMatchObject({
       currentLabel: 'Step 2 of 4 · Record one transaction',
       instruction: 'Use one official debit and record facts from that event.',
@@ -189,6 +213,8 @@ describe('guided journey progress', () => {
       finalConfirmationReady: true,
       packetAvailable: true,
       exportAllowed: false,
+      route: 'issuer',
+      finding: 'possible-duplicate-pattern',
     })).toMatchObject({
       status: 'Preparation note ready to review; copy and download are disabled on this shared device',
       statusTone: 'complete',
@@ -204,10 +230,35 @@ describe('guided journey progress', () => {
       finalConfirmationReady: true,
       packetAvailable: true,
       exportAllowed: true,
+      route: 'issuer',
+      finding: 'possible-vehicle-mismatch',
     })).toMatchObject({
       instruction: 'Open the verified official route first, then review missing evidence.',
       status: 'Official route and local preparation note ready',
       next: 'Use the official destination before opening optional audit detail.',
     });
+  });
+
+  it.each(noDisputeAssessments)('ends the $label FASTag journey truthfully without action-route guidance', ({ assessment, instruction, status }) => {
+    const guide = getTollGuideContent({
+      step: 'packet',
+      startReady: true,
+      sourceReady: true,
+      recordsReady: true,
+      finalConfirmationReady: true,
+      packetAvailable: assessment.shouldPrepareIssuerNote,
+      exportAllowed: true,
+      route: assessment.route,
+      finding: assessment.finding,
+    });
+
+    expect(assessment).toMatchObject({ route: 'no-dispute', shouldPrepareIssuerNote: false });
+    expect(guide).toMatchObject({
+      instruction,
+      status,
+      statusTone: 'complete',
+      next: 'Keep the evidence checklist for your records.',
+    });
+    expect(Object.values(guide).join(' ')).not.toMatch(/primary official route|open (?:the )?destination|missing (?:records|evidence)/i);
   });
 });

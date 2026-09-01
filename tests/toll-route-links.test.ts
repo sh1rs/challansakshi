@@ -51,6 +51,23 @@ describe('TollSakshi official route links', () => {
     expect(secondarySources).toBeGreaterThan(notePreview);
   });
 
+  it('keeps no-dispute outcomes terminal while retaining the optional evidence passport', () => {
+    const packet = tollSource.slice(tollSource.indexOf("{step === 'packet' &&"));
+    const terminalOutcome = packet.indexOf('{isNoDisputeOutcome ?');
+    const officialRoute = packet.indexOf('Primary official route');
+    const passport = packet.indexOf('View all 14 evidence checks');
+
+    expect(tollSource).toContain("const isNoDisputeOutcome = assessment.route === 'no-dispute';");
+    expect(terminalOutcome).toBeGreaterThanOrEqual(0);
+    expect(packet.slice(terminalOutcome, officialRoute)).toContain("assessment.finding === 'already-corrected'");
+    expect(packet.slice(terminalOutcome, officialRoute)).toContain('A corresponding credit is already visible');
+    expect(packet.slice(terminalOutcome, officialRoute)).toContain('The entered records appear consistent');
+    expect(packet.slice(terminalOutcome, officialRoute)).toContain('No issuer dispute note prepared');
+    expect(packet.slice(terminalOutcome, officialRoute)).not.toMatch(/primary official route|open the destination|preparation note|unresolved evidence/i);
+    expect(officialRoute).toBeGreaterThan(terminalOutcome);
+    expect(passport).toBeGreaterThan(officialRoute);
+  });
+
   it('keeps note export controls outside the optional plaintext preview', () => {
     const packet = tollSource.slice(tollSource.indexOf("{step === 'packet' &&"));
     const copy = packet.indexOf('Copy note');

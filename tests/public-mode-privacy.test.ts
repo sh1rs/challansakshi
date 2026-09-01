@@ -164,6 +164,8 @@ describe('real-mode privacy isolation', () => {
     expect(tollApp).toContain('Confirm one transaction');
     expect(tollApp).toMatch(/const showExtraCheck\s*=\s*\[[^\]]+\]\.includes\(answers\.concern\)/);
     expect(tollApp).toMatch(/\{showExtraCheck && <details[\s\S]*?Extra check for this issue/);
+    expect(tollApp).toContain('<span>{showExtraCheck ? 5 : 4}</span>');
+    expect(tollApp).not.toContain('<span>5</span><div><strong id="record-confirm-title"');
   });
 
   it('reopens the native disclosure that contains each transaction validation error', () => {

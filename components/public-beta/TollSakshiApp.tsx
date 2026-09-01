@@ -150,14 +150,21 @@ export default function TollSakshiApp() {
     finalConfirmationReady,
     packetAvailable: assessment.shouldPrepareIssuerNote,
     exportAllowed: device !== 'shared',
+    route: assessment.route,
+    finding: assessment.finding,
   });
   const guideProgress = buildTollGuidedProgress(step);
   const isNhaiFastagSource = refs.issuerLabel === 'IHMCL portal — NHAI FASTag only';
+  const isNoDisputeOutcome = assessment.route === 'no-dispute';
   const displayedRoute = assessment.route === 'issuer'
     ? (isNhaiFastagSource ? 'verified IHMCL portal or 1033' : 'issuing bank / official account provider')
     : assessment.route === 'issuer-and-1033'
       ? (isNhaiFastagSource ? 'verified IHMCL portal or 1033' : 'issuing bank plus 1033 for the NHAI plaza issue')
-      : assessment.route.replaceAll('-', ' ');
+      : assessment.route === '1033'
+        ? '1033'
+        : assessment.route === 'verify-records'
+          ? 'verify records'
+          : '';
 
   const reset = () => {
     setStep('start'); setMode('real'); setDevice(null); setConsent({ manual: false, minimum: false }); setAnswers(defaultAnswers);
@@ -420,7 +427,7 @@ export default function TollSakshiApp() {
           </details>}
 
           <details className={`${styles.recordSection} ${styles.recordDisclosure}`} ref={(node) => { recordGroupRefs.current.confirm = node; }}>
-          <summary className={styles.recordSectionHeading}><span>5</span><div><strong id="record-confirm-title">{t(language, 'Confirm one transaction', 'एक लेन-देन की पुष्टि करें')}</strong><small>{t(language, 'Confirm after your last edit; any changed fact makes it stale.', 'अंतिम बदलाव के बाद पुष्टि करें; कोई तथ्य बदलने पर यह पुरानी हो जाती है।')}</small></div></summary>
+          <summary className={styles.recordSectionHeading}><span>{showExtraCheck ? 5 : 4}</span><div><strong id="record-confirm-title">{t(language, 'Confirm one transaction', 'एक लेन-देन की पुष्टि करें')}</strong><small>{t(language, 'Confirm after your last edit; any changed fact makes it stale.', 'अंतिम बदलाव के बाद पुष्टि करें; कोई तथ्य बदलने पर यह पुरानी हो जाती है।')}</small></div></summary>
           <div className={styles.recordDisclosureBody}>
           {mode === 'real'
             ? <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={reconciliationConfirmed} onChange={(event) => setReconciliationSignature(event.target.checked ? currentReconciliationSignature : '')} />{t(language, 'I reviewed these final entries against the same official transaction. The source, identifiers, event, passing-image observations, and any comparison above belong to that one record. Any later edit requires confirmation again.', 'मैंने इन अंतिम प्रविष्टियों को उसी आधिकारिक लेन-देन से मिलाया। स्रोत, पहचान, घटना, पासिंग-तस्वीर अवलोकन और ऊपर की तुलना उसी रिकॉर्ड से जुड़ी हैं। बाद का कोई भी बदलाव फिर पुष्टि माँगेगा।')}</label></div>
@@ -445,8 +452,26 @@ export default function TollSakshiApp() {
         </section>}
 
         {step === 'packet' && <section className={styles.panel} aria-labelledby="packet-title">
-          <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Next action', 'अगला कदम')}</p><h2 id="packet-title">{t(language, 'Use the official route, then review what remains', 'आधिकारिक रास्ता उपयोग करें, फिर बची जाँच देखें')}</h2><p>{t(language, 'The account provider or responsible authority remains the decision-maker.', 'खाता प्रदाता या जिम्मेदार प्राधिकरण ही निर्णयकर्ता रहता है।')}</p></div></div>
+          <div className={styles.sectionTitle}><div>{isNoDisputeOutcome ? <>
+            <p className={styles.eyebrow}>{t(language, 'Review complete', 'समीक्षा पूरी')}</p>
+            <h2 id="packet-title">{t(language, 'Keep the outcome with your evidence checklist', 'परिणाम को अपनी सबूत सूची के साथ रखें')}</h2>
+            <p>{t(language, 'This is a limited self-review based on your confirmed entries.', 'यह आपकी पुष्टि की गई प्रविष्टियों पर आधारित सीमित स्वयं-समीक्षा है।')}</p>
+          </> : <>
+            <p className={styles.eyebrow}>{t(language, 'Next action', 'अगला कदम')}</p>
+            <h2 id="packet-title">{t(language, 'Use the official route, then review what remains', 'आधिकारिक रास्ता उपयोग करें, फिर बची जाँच देखें')}</h2>
+            <p>{t(language, 'The account provider or responsible authority remains the decision-maker.', 'खाता प्रदाता या जिम्मेदार प्राधिकरण ही निर्णयकर्ता रहता है।')}</p>
+          </>}</div></div>
 
+          {isNoDisputeOutcome ? <section className={styles.terminalOutcome} aria-labelledby="terminal-outcome-title">
+            <p className={styles.eyebrow}>{t(language, 'No dispute route suggested', 'कोई विवाद रास्ता सुझाया नहीं गया')}</p>
+            <h3 id="terminal-outcome-title">{assessment.finding === 'already-corrected'
+              ? t(language, 'A corresponding credit is already visible', 'संबंधित क्रेडिट पहले से दिख रहा है')
+              : t(language, 'The entered records appear consistent', 'दर्ज रिकॉर्ड मेल खाते दिखते हैं')}</h3>
+            <p>{assessment.finding === 'already-corrected'
+              ? t(language, 'Reconcile the visible credit with this debit in your own records. This limited review does not suggest an issuer dispute.', 'दिख रहे क्रेडिट को अपने रिकॉर्ड में इस डेबिट से मिलाएँ। यह सीमित समीक्षा जारीकर्ता विवाद का सुझाव नहीं देती।')
+              : t(language, 'The limited checklist found no recorded conflict in your confirmed entries. It does not authenticate records or decide liability.', 'सीमित सूची को आपकी पुष्टि की गई प्रविष्टियों में कोई दर्ज अंतर नहीं मिला। यह रिकॉर्ड प्रमाणित या जिम्मेदारी तय नहीं करती।')}</p>
+            <div className={styles.stopCard}><h3>{t(language, 'No issuer dispute note prepared', 'कोई जारीकर्ता विवाद नोट तैयार नहीं किया गया')}</h3><p>{t(language, 'Keep the optional evidence passport below if it is useful for your records.', 'यदि उपयोगी हो तो नीचे का वैकल्पिक सबूत पासपोर्ट अपने रिकॉर्ड के लिए रखें।')}</p></div>
+          </section> : <>
           <section className={styles.officialRoute} aria-labelledby="official-route-title">
             <p className={styles.eyebrow}>{t(language, 'Primary official route', 'मुख्य आधिकारिक रास्ता')}</p>
             <h3 id="official-route-title">{displayedRoute}</h3>
@@ -472,6 +497,7 @@ export default function TollSakshiApp() {
             <h3 id="unresolved-evidence-title">{t(language, 'Unresolved evidence', 'अनसुलझा सबूत')}</h3>
             {unresolvedPassport.length ? <ul>{unresolvedPassport.map((item) => <li key={item.id}><strong>{item.id} · {item.label}:</strong> {statusLabel(item.status, language)}</li>)}</ul> : <p>{t(language, 'No unresolved item appears in this limited checklist.', 'इस सीमित सूची में कोई अनसुलझा आइटम नहीं दिखता।')}</p>}
           </section>
+          </>}
 
           <details className={styles.disclosure}>
             <summary>{t(language, 'View all 14 evidence checks', 'सभी 14 सबूत जाँच देखें')}</summary>
