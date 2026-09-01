@@ -37,6 +37,18 @@ import styles from './SyntheticTestLabApp.module.css';
 
 type FilterId = 'all' | SyntheticOverallFinding;
 
+export type TestLabSelectionState = {
+  filter: FilterId;
+  selectedId: string;
+  selectionRequest: number;
+  focusTargetId: string | null;
+  announcement: string;
+};
+
+export type TestLabSelectionAction =
+  | { type: 'filter'; filter: FilterId }
+  | { type: 'case'; caseId: string };
+
 const fieldLabels = {
   registration: 'Registration',
   vehicle_category: 'Vehicle type',
@@ -58,6 +70,54 @@ const outcomeLabels: Record<SyntheticOverallFinding, string> = {
   'appears-consistent': 'Appears consistent',
   inconclusive: 'Inconclusive',
 };
+
+const filterOptions: Array<[FilterId, string]> = [
+  ['all', 'All 10'],
+  ['potential-evidence-discrepancy', 'Potential discrepancy'],
+  ['appears-consistent', 'Appears consistent'],
+  ['inconclusive', 'Inconclusive'],
+];
+
+function shortCaseId(caseId: string) {
+  return caseId.replace(/^case-(\d+).*$/, 'TL-$1');
+}
+
+export function transitionTestLabSelection(
+  state: TestLabSelectionState,
+  action: TestLabSelectionAction,
+): TestLabSelectionState {
+  if (action.type === 'case') {
+    if (!syntheticEvaluationCases.some((item) => item.id === action.caseId)) return state;
+    return {
+      ...state,
+      selectedId: action.caseId,
+      selectionRequest: state.selectionRequest + 1,
+      focusTargetId: action.caseId,
+      announcement: '',
+    };
+  }
+
+  const matchingCases = syntheticEvaluationCases.filter((item) => (
+    action.filter === 'all' || item.expectedOverall === action.filter
+  ));
+  const currentMatch = matchingCases.find((item) => item.id === state.selectedId);
+  const nextSelected = currentMatch ?? matchingCases[0];
+  const filterLabel = action.filter === 'all' ? 'All cases' : outcomeLabels[action.filter];
+  const countLabel = `${matchingCases.length} matching ${matchingCases.length === 1 ? 'case' : 'cases'}.`;
+  const selectionLabel = !nextSelected
+    ? 'No case selected.'
+    : currentMatch
+      ? `${shortCaseId(nextSelected.id)}: ${nextSelected.title} remains selected.`
+      : `Selected ${shortCaseId(nextSelected.id)}: ${nextSelected.title}.`;
+
+  return {
+    ...state,
+    filter: action.filter,
+    selectedId: nextSelected?.id ?? state.selectedId,
+    focusTargetId: null,
+    announcement: `${filterLabel} filter applied. ${countLabel} ${selectionLabel}`,
+  };
+}
 
 const stateLabels: Record<SyntheticComparisonResult['rows'][number]['state'], string> = {
   'potential-mismatch': 'Potential mismatch',
@@ -470,6 +530,7 @@ export default function SyntheticTestLabApp() {
   const [filter, setFilter] = useState<FilterId>('all');
   const [selectedId, setSelectedId] = useState('case-02-registration-conflict');
   const [selectionRequest, setSelectionRequest] = useState(0);
+  const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
   const [selectionAnnouncement, setSelectionAnnouncement] = useState('');
   const selectedWorkbenchRef = useRef<HTMLDivElement>(null);
   const selected = syntheticEvaluationCases.find((item) => item.id === selectedId) ?? syntheticEvaluationCases[0];
@@ -481,31 +542,37 @@ export default function SyntheticTestLabApp() {
   }), []);
 
   useEffect(() => {
-    if (selectionRequest === 0) return;
+    if (selectionRequest === 0 || !focusTargetId) return;
+    const focusTarget = syntheticEvaluationCases.find((item) => item.id === focusTargetId);
+    if (!focusTarget) return;
     const frame = requestAnimationFrame(() => {
       const heading = selectedWorkbenchRef.current?.querySelector<HTMLHeadingElement>('h2');
       heading?.focus({ preventScroll: true });
       if (window.matchMedia('(max-width: 980px)').matches) {
         selectedWorkbenchRef.current?.scrollIntoView({ block: 'start' });
       }
-      setSelectionAnnouncement(`Selected ${selected.title}. Evidence workbench ready.`);
+      setSelectionAnnouncement(`Selected ${focusTarget.title}. Evidence workbench ready.`);
     });
     return () => cancelAnimationFrame(frame);
-  }, [selected.title, selectionRequest]);
+  }, [focusTargetId, selectionRequest]);
 
   const runSuite = () => setSuiteReport(runSyntheticEvaluationCorpus());
-  const chooseFilter = (nextFilter: FilterId) => {
-    setFilter(nextFilter);
-    if (nextFilter !== 'all' && selected.expectedOverall !== nextFilter) {
-      const firstMatching = syntheticEvaluationCases.find((item) => item.expectedOverall === nextFilter);
-      if (firstMatching) setSelectedId(firstMatching.id);
-    }
+  const applySelectionAction = (action: TestLabSelectionAction) => {
+    const next = transitionTestLabSelection({
+      filter,
+      selectedId,
+      selectionRequest,
+      focusTargetId,
+      announcement: selectionAnnouncement,
+    }, action);
+    setFilter(next.filter);
+    setSelectedId(next.selectedId);
+    setSelectionRequest(next.selectionRequest);
+    setFocusTargetId(next.focusTargetId);
+    setSelectionAnnouncement(next.announcement);
   };
-  const chooseCase = (caseId: string) => {
-    setSelectionAnnouncement('');
-    setSelectedId(caseId);
-    setSelectionRequest((value) => value + 1);
-  };
+  const chooseFilter = (nextFilter: FilterId) => applySelectionAction({ type: 'filter', filter: nextFilter });
+  const chooseCase = (caseId: string) => applySelectionAction({ type: 'case', caseId });
 
   return (
     <div className={styles.page}>
@@ -543,14 +610,9 @@ export default function SyntheticTestLabApp() {
           </div>
           <p className={styles.liveRegion} aria-live="polite">{suiteReport ? `${suiteReport.total} cases complete: ${suiteReport.passed} passed, ${suiteReport.failed} failed.` : ''}</p>
           <div className={styles.filters} role="group" aria-label="Filter Test Lab cases">
-            {([
-              ['all', 'All 10'],
-              ['potential-evidence-discrepancy', 'Potential discrepancy'],
-              ['appears-consistent', 'Appears consistent'],
-              ['inconclusive', 'Inconclusive'],
-            ] as Array<[FilterId, string]>).map(([id, label]) => <button className={styles.filterButton} type="button" key={id} aria-pressed={filter === id} onClick={() => chooseFilter(id)}>{label}</button>)}
+            {filterOptions.map(([id, label]) => <button className={styles.filterButton} type="button" key={id} aria-pressed={filter === id} onClick={() => chooseFilter(id)}>{label}</button>)}
           </div>
-          <p className={styles.selectionStatus} role="status">{selectionAnnouncement}</p>
+          <p className={styles.selectionStatus} role="status" aria-live="polite">{selectionAnnouncement}</p>
           <div className={styles.workbenchGrid}>
             <div className={styles.caseList} aria-label="Synthetic test cases">
               {filteredCases.map((testCase) => {
@@ -565,7 +627,7 @@ export default function SyntheticTestLabApp() {
                     aria-pressed={active}
                     onClick={() => chooseCase(testCase.id)}
                   >
-                    <span>{testCase.id.replace(/^case-(\d+).*$/, 'TL-$1')}</span>
+                    <span>{shortCaseId(testCase.id)}</span>
                     <div><strong>{testCase.title}</strong></div>
                     <b className={outcomeClass(result?.actualOverall ?? testCase.expectedOverall)}>
                       {result ? (

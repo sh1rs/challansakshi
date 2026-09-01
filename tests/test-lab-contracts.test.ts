@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import SyntheticTestLabApp from '../components/test-lab/SyntheticTestLabApp';
+import SyntheticTestLabApp, * as TestLabModule from '../components/test-lab/SyntheticTestLabApp';
 import { syntheticEvaluationCases } from '../lib/synthetic-evidence-corpus';
 
 const componentSource = readFileSync(
@@ -48,6 +48,23 @@ function caseButton(html: string, caseId: string) {
   return html.match(new RegExp(`<button\\b[^>]*data-test-case="${escapedId}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0] ?? '';
 }
 
+type SelectionState = {
+  filter: 'all' | 'potential-evidence-discrepancy' | 'appears-consistent' | 'inconclusive';
+  selectedId: string;
+  selectionRequest: number;
+  focusTargetId: string | null;
+  announcement: string;
+};
+
+type SelectionTransition = (
+  state: SelectionState,
+  action: { type: 'filter'; filter: SelectionState['filter'] } | { type: 'case'; caseId: string },
+) => SelectionState;
+
+function selectionTransition() {
+  return Reflect.get(TestLabModule, 'transitionTestLabSelection') as SelectionTransition | undefined;
+}
+
 describe('synthetic Test Lab product contract', () => {
   it('renders ten fully clickable fictional cases inside the shared demo boundary', () => {
     const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
@@ -59,6 +76,7 @@ describe('synthetic Test Lab product contract', () => {
     expect(html).toContain('Run all 10 cases');
     expect(html).toContain('English-only safety beta');
     expect(html).toContain('Nothing is filed, paid, authenticated, or sent to a government system');
+    expect(html).toMatch(/<p class="[^"]*selectionStatus[^"]*" role="status" aria-live="polite">/);
   });
 
   it('keeps long descriptions out of unselected case cards and reveals the selected description in the workbench', () => {
@@ -76,6 +94,48 @@ describe('synthetic Test Lab product contract', () => {
     const selected = syntheticEvaluationCases.find((testCase) => testCase.id === selectedId);
     expect(selected).toBeDefined();
     expect(html).toContain(selected?.description);
+  });
+
+  it('announces an excluding filter and auto-selected case without requesting workbench focus', () => {
+    const transition = selectionTransition();
+
+    expect(transition).toBeTypeOf('function');
+    if (!transition) return;
+
+    expect(transition({
+      filter: 'all',
+      selectedId: 'case-02-registration-conflict',
+      selectionRequest: 4,
+      focusTargetId: null,
+      announcement: '',
+    }, { type: 'filter', filter: 'inconclusive' })).toEqual({
+      filter: 'inconclusive',
+      selectedId: 'case-05-unclear-evidence',
+      selectionRequest: 4,
+      focusTargetId: null,
+      announcement: 'Inconclusive filter applied. 3 matching cases. Selected TL-05: Plate and alleged offence are unclear.',
+    });
+  });
+
+  it('requests workbench focus only for direct case-card activation', () => {
+    const transition = selectionTransition();
+
+    expect(transition).toBeTypeOf('function');
+    if (!transition) return;
+
+    expect(transition({
+      filter: 'all',
+      selectedId: 'case-02-registration-conflict',
+      selectionRequest: 4,
+      focusTargetId: null,
+      announcement: 'Previous announcement',
+    }, { type: 'case', caseId: 'case-01-all-align' })).toEqual({
+      filter: 'all',
+      selectedId: 'case-01-all-align',
+      selectionRequest: 5,
+      focusTargetId: 'case-01-all-align',
+      announcement: '',
+    });
   });
 
   it('makes the Evidence → Explain → Verify → Act sequence explicit without a tall guided header', () => {

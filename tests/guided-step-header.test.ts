@@ -47,6 +47,34 @@ describe('GuidedStepHeader', () => {
     expect(source).not.toContain('className={styles.guideDetails}');
   });
 
+  it('keeps status visible before the disclosure and nests rationale, next step, and progress list inside it', () => {
+    const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
+      currentLabel: 'Step 2 of 4 · Verify the source',
+      instruction: 'Open the official record yourself.',
+      why: 'A forwarded link alone does not verify the record.',
+      status: 'Source and jurisdiction still needed',
+      statusTone: 'needs-action',
+      next: 'Compare the official evidence with your vehicle record.',
+      progressLabel: 'e-Challan review steps',
+      steps: [
+        { id: 'safety', label: 'Protect your information', state: 'complete' },
+        { id: 'source', label: 'Verify the source', state: 'current' },
+      ],
+    }));
+    const disclosureStart = html.indexOf('<details');
+    const disclosureEnd = html.indexOf('</details>', disclosureStart) + '</details>'.length;
+    const disclosure = html.slice(disclosureStart, disclosureEnd);
+    const statusStart = html.indexOf('role="status"');
+
+    expect(statusStart).toBeGreaterThanOrEqual(0);
+    expect(statusStart).toBeLessThan(disclosureStart);
+    expect(disclosure).not.toContain('role="status"');
+    expect(disclosure).toContain('A forwarded link alone does not verify the record.');
+    expect(disclosure).toContain('Compare the official evidence with your vehicle record.');
+    expect(disclosure).toContain('<ol');
+    expect(disclosure).toContain('aria-label="e-Challan review steps"');
+  });
+
   it('does not present a safe-stopped journey as 100 percent complete', () => {
     const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
       currentLabel: 'Step 4 of 4 · Official next step',
