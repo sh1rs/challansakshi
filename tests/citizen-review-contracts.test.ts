@@ -18,6 +18,7 @@ const publicStyles = readFileSync(
   new URL('../components/public-beta/PublicBeta.module.css', import.meta.url),
   'utf8',
 );
+const publicBaseStyles = publicStyles.slice(0, publicStyles.indexOf('@media'));
 const chromeStyles = readFileSync(
   new URL('../components/shared/CitizenChrome.module.css', import.meta.url),
   'utf8',
@@ -177,11 +178,28 @@ describe('citizen review release contracts', () => {
 
   it('keeps the official result route ahead of optional audit detail', () => {
     const result = reviewSource.slice(reviewSource.indexOf("{step === 'result' && ("));
+    const resultHero = result.indexOf('styles.resultHero');
+    const officialRoute = result.indexOf('styles.officialHandoff');
+    const visibleSections = result.indexOf('styles.resultColumns');
+    const missingRecords = result.indexOf('presentation.resultSections.missing');
+    const evidenceDetails = result.indexOf('Evidence details');
 
-    expect(result.indexOf('styles.officialHandoff')).toBeGreaterThanOrEqual(0);
-    expect(result.indexOf('Evidence details')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
-    expect(result.indexOf('Review history')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
-    expect(result.indexOf('Preview local summary')).toBeGreaterThan(result.indexOf('styles.officialHandoff'));
+    expect(resultHero).toBeGreaterThanOrEqual(0);
+    expect(officialRoute).toBeGreaterThan(resultHero);
+    expect(visibleSections).toBeGreaterThan(officialRoute);
+    expect(missingRecords).toBeGreaterThan(visibleSections);
+    expect(evidenceDetails).toBeGreaterThan(missingRecords);
+    expect(result.indexOf('Review history')).toBeGreaterThan(evidenceDetails);
+    expect(result.indexOf('Preview local summary')).toBeGreaterThan(evidenceDetails);
+  });
+
+  it('keeps review select and official-service link targets at least 48px at base layouts', () => {
+    expect(publicBaseStyles).toMatch(
+      /\.observationCard select\s*\{[^}]*min-height:\s*48px/,
+    );
+    expect(publicBaseStyles).toMatch(
+      /\.serviceGrid a\s*\{[^}]*min-height:\s*48px[^}]*display:\s*(?:inline-)?flex/,
+    );
   });
 
   it('keeps the /review credential warning outside the guide and privacy disclosures', () => {

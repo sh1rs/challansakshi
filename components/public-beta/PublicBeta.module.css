@@ -117,7 +117,7 @@
 .observationCard { padding: 16px; border: 1px solid #d4dad5; border-radius: 11px; background: #f9f9f5; }
 .observationCard label { display: block; margin-bottom: 11px; font: 700 14px/1.3 Georgia, serif; }
 .observationCard label span { display: block; margin-bottom: 4px; color: var(--pb-teal-dark); font: 850 9px/1.2 ui-sans-serif, sans-serif; letter-spacing: .09em; }
-.observationCard select { width: 100%; min-height: 44px; padding: 0 9px; border: 1px solid #c8d1cc; border-radius: 8px; background: white; color: var(--pb-ink); font-size: 12px; }
+.observationCard select { width: 100%; min-height: 48px; padding: 0 9px; border: 1px solid #c8d1cc; border-radius: 8px; background: white; color: var(--pb-ink); font-size: 12px; }
 .recordSections { display: grid; gap: 16px; }
 .recordSection { padding: 22px; border: 1px solid #d8ddd8; border-radius: 13px; background: #fbfcf8; }
 .recordSectionHeading { display: grid; grid-template-columns: auto 1fr; gap: 13px; align-items: start; margin-bottom: 20px; }
@@ -130,7 +130,7 @@
 .serviceGrid article { display: grid; min-height: 118px; padding: 16px; border: 1px solid #cdd7d2; border-radius: 11px; background: #fff; }
 .serviceGrid article.serviceActive { border-color: var(--pb-teal); background: #eef8f4; box-shadow: 0 0 0 2px rgb(8 122 116 / 10%); }
 .serviceGrid button { min-height: 48px; padding: 0; border: 0; background: transparent; color: var(--pb-ink); font: 700 17px/1.3 Georgia, serif; text-align: left; cursor: pointer; }
-.serviceGrid a { align-self: end; margin-top: 10px; color: var(--pb-teal-dark); font-size: 12px; font-weight: 780; }
+.serviceGrid a { min-height: 48px; display: flex; align-items: center; align-self: end; margin-top: 10px; color: var(--pb-teal-dark); font-size: 12px; font-weight: 780; }
 .manualActive { border-color: var(--pb-teal); background: #eef8f4; box-shadow: 0 0 0 2px rgb(8 122 116 / 10%); }
 .evidenceWorkspace { display: grid; grid-template-columns: minmax(270px, .8fr) minmax(0, 1.4fr); gap: 24px; align-items: start; }
 .observationControls { min-width: 0; }
@@ -164,7 +164,6 @@
 .timeline li { padding: 5px 0; color: #52645c; font-size: 12px; }
 .officialHandoff { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-top: 18px; padding: 22px; border: 1px solid #cdd8d3; background: #fff; }
 .officialHandoff p { margin: 7px 0 0; color: var(--pb-muted); font-size: 12px; }
-.summaryDisclaimer { margin: 16px 0; padding: 13px 15px; border-left: 3px solid var(--pb-navy); background: #f3f5f6; color: var(--pb-ink); font-size: 12px; font-weight: 760; line-height: 1.55; }
 .summaryActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .inlineStatus { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: #edf8f3; color: #17614e; font-size: 12px; font-weight: 720; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 22px; border-top: 1px solid #e0e3de; }
@@ -300,7 +299,7 @@
   .brand small { display: none; }
   .nav { width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .languages button { min-width: 48px; min-height: 48px; padding: 0 7px; }
-  .panel p, .panel label, .panel li, .boundary strong, .boundary p, .privacyDetails summary, .disclosure summary, .artifactWarning, .summaryDisclaimer { font-size: 16px; }
+  .panel p, .panel label, .panel li, .boundary strong, .boundary p, .privacyDetails summary, .disclosure summary, .artifactWarning { font-size: 16px; }
   .button, .buttonSecondary, .buttonQuiet, .choice, .serviceGrid button, .serviceGrid a, input, select { min-height: 48px; }
   .hero h1 { font-size: 40px; }
   .heroCompact h1 { font-size: 28px; }
@@ -351,7 +350,6 @@
   [data-print-artifact] > .artifactWarning, [data-print-artifact] > .summaryActions, .inlineStatus { display: none !important; }
   .app, .panel, .artifact pre, .evidenceTable { background: white !important; box-shadow: none !important; }
   .artifact pre { max-height: none; overflow: visible; border: 0; padding: 0; color: #000; font-size: 11pt; }
-  .summaryDisclaimer span { display: block; }
   [data-device-context='shared'] [data-print-result] { display: none !important; }
   [data-device-context='shared'] [data-shared-print-warning] { display: block !important; padding: 24pt; color: #000; }
 }
