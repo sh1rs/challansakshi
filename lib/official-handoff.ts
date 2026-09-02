@@ -1,9 +1,12 @@
 import {
+  OFFICIAL_DESTINATIONS,
   OFFICIAL_ROUTE_REGISTRY_VERSION,
   isActionReadyOfficialDestination,
+  isVerifiedOfficialDestinationShape,
   type JurisdictionConfirmation,
   type OfficialDestination,
 } from './official-destinations';
+import { sha256Hex } from './local-sha256';
 import type {
   ActionReadyReviewFacts,
   ActionReadySupportedSignal,
@@ -15,6 +18,18 @@ import type {
 export const OFFICIAL_HANDOFF_SCHEMA = 'challansakshi.official-handoff/v1' as const;
 export const SYNTHETIC_HANDOFF_SCHEMA = 'challansakshi.synthetic-handoff/v1' as const;
 export const MAX_REVIEWED_DESCRIPTION_CODE_POINTS = 500;
+export const OPAQUE_REVISION_ID_PATTERN = /^[0-9a-f]{32}$/;
+export const PACK_DIGEST_PATTERN = /^[0-9a-f]{64}$/;
+
+export const EXPORT_SAFE_NEUTRAL_LIMITATIONS = Object.freeze({
+  'official-record': 'Based only on the affected person’s review of the official record; ChallanSakshi did not authenticate it.',
+  'official-evidence-image': 'Based only on the affected person’s review of the supplied evidence image; image interpretation may be limited.',
+  'independent-vehicle-record': 'Based only on the affected person’s review of an independent readable vehicle record; ChallanSakshi did not authenticate it.',
+  'citizen-attestation': 'Based only on the affected person’s explicit report for this review; ChallanSakshi did not independently verify it.',
+} as const satisfies Record<ReviewFactSource, string>);
+
+const OFFICIAL_PACK_BRAND = Symbol('challansakshi.authentic-official-handoff-pack');
+const OFFICIAL_PACK_BRAND_VALUE = Object.freeze({ kind: 'builder-issued-official-pack' as const });
 
 export type ReviewRole = 'self' | 'present-helper';
 export type HandoffResultClass = 'possible-discrepancy';
@@ -119,6 +134,7 @@ export type OfficialHandoffPack = Readonly<{
   resultClass: HandoffResultClass;
   resultRevisionId: string;
   packRevisionId: string;
+  packDigest: string;
   issueFamily: 'wrong-photo-or-wrong-vehicle';
   routeRegistryVersion: typeof OFFICIAL_ROUTE_REGISTRY_VERSION;
   destination: Readonly<{
@@ -187,8 +203,10 @@ export type OfficialHandoffAbstentionReason =
   | 'result-revision-mismatch'
   | 'pack-confirmation-stale'
   | 'role-confirmation-incomplete'
+  | 'invalid-revision-id'
   | 'invalid-reviewed-facts'
   | 'invalid-description'
+  | 'description-not-export-safe'
   | 'invalid-timestamp';
 
 export type SyntheticHandoffAbstentionReason =
@@ -197,8 +215,10 @@ export type SyntheticHandoffAbstentionReason =
   | 'result-revision-mismatch'
   | 'pack-confirmation-stale'
   | 'role-confirmation-incomplete'
+  | 'invalid-revision-id'
   | 'invalid-reviewed-facts'
   | 'invalid-description'
+  | 'description-not-export-safe'
   | 'invalid-timestamp';
 
 export type OfficialHandoffBuildResult =
@@ -272,6 +292,121 @@ export function normalizeReviewedDescription(value: string): string {
   return normalized;
 }
 
+export type BoundedExportSafetyMatch =
+  | 'control-character'
+  | 'bidi-format'
+  | 'markup-or-script'
+  | 'url'
+  | 'email-or-upi'
+  | 'digit-like-identifier'
+  | 'pan-shaped'
+  | 'indian-registration'
+  | 'long-mixed-identifier'
+  | 'credential-or-payment-token'
+  | 'raw-filename'
+  | 'fabricated-official-status';
+
+function isAsciiAlphaNumeric(character: string | undefined): boolean {
+  return character !== undefined && /^[A-Za-z0-9]$/.test(character);
+}
+
+function containsAsciiBoundedMatch(value: string, pattern: RegExp): boolean {
+  for (const match of value.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    if (!isAsciiAlphaNumeric(value[start - 1]) && !isAsciiAlphaNumeric(value[end])) return true;
+  }
+  return false;
+}
+
+export function containsMarkupOrScriptSentinel(value: string): boolean {
+  return /[<>]/.test(value) || /(?:javascript:|vbscript:|data:text\/html)/i.test(value);
+}
+
+export function containsUrlLikeValue(value: string): boolean {
+  if (/(?:https?:\/\/|www\.)/i.test(value)) return true;
+  const domain = /(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}/g;
+  return containsAsciiBoundedMatch(value, domain);
+}
+
+export function containsEmailOrUpiHandle(value: string): boolean {
+  const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}/g;
+  const handle = /[A-Za-z0-9._-]{2,64}@[A-Za-z0-9._-]{2,64}/g;
+  return containsAsciiBoundedMatch(value, email) || containsAsciiBoundedMatch(value, handle);
+}
+
+export function containsDigitLikeIdentifier(value: string): boolean {
+  for (const match of value.matchAll(/[0-9 +().-]+/g)) {
+    const count = match[0].replace(/\D/g, '').length;
+    if (count >= 9 && count <= 19) return true;
+  }
+  return false;
+}
+
+export function containsPanShapedValue(value: string): boolean {
+  return containsAsciiBoundedMatch(value, /[A-Za-z]{5}[0-9]{4}[A-Za-z]/g);
+}
+
+export function containsIndianRegistration(value: string): boolean {
+  const conventional = /[A-Za-z]{2}[ -]?[0-9]{1,2}[ -]?[A-Za-z]{1,3}[ -]?[0-9]{4}/g;
+  const bharat = /[0-9]{2}[ -]?BH[ -]?[0-9]{4}[ -]?[A-Za-z]{1,2}/gi;
+  return containsAsciiBoundedMatch(value, conventional) || containsAsciiBoundedMatch(value, bharat);
+}
+
+export function containsLongMixedIdentifier(value: string): boolean {
+  for (const match of value.matchAll(/[A-Za-z0-9_-]+/g)) {
+    const compact = match[0].replace(/[_-]/g, '');
+    const letters = (compact.match(/[A-Za-z]/g) ?? []).length;
+    const digits = (compact.match(/[0-9]/g) ?? []).length;
+    if (compact.length >= 12 && letters >= 2 && digits >= 4) return true;
+  }
+  return false;
+}
+
+export function containsCredentialOrPaymentToken(value: string): boolean {
+  return /(?:password|passcode|credential|secret|api[ _-]?key|otp|captcha|cvv|upi[ _-]?pin|payment[ _-]?token|bank[ _-]?account|account[ _-]?number|card[ _-]?number|transaction[ _-]?id)\s*[:=]\s*\S+/i.test(value);
+}
+
+export function containsRawFilename(value: string): boolean {
+  return containsAsciiBoundedMatch(
+    value,
+    /[A-Za-z0-9_-](?:[A-Za-z0-9._ -]{0,126}[A-Za-z0-9_-])?\.(?:pdf|jpe?g|png|webp|heic|gif|tiff?|docx?|xlsx?|txt|csv)/gi,
+  );
+}
+
+export function containsFabricatedOfficialStatus(value: string): boolean {
+  return /(?:grievance|complaint|ticket|case)\s+(?:was\s+)?(?:submitted|filed|created|accepted|approved|acknowledged|cancelled|canceled|resolved)(?:\s+successfully)?|(?:submitted|filed|accepted|approved|acknowledged|cancelled|canceled|resolved)\s+by\s+(?:the\s+)?(?:authority|government|police)|(?:official|government)\s+(?:status|acknowledgement|confirmation)\s*:/i.test(value);
+}
+
+/** Shared bounded matcher used by the web pack and the extension envelope. */
+export function findBoundedExportSafetyMatches(value: string): readonly BoundedExportSafetyMatch[] {
+  const matches: BoundedExportSafetyMatch[] = [];
+  const add = (match: BoundedExportSafetyMatch, condition: boolean) => {
+    if (condition) matches.push(match);
+  };
+  add('control-character', /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/u.test(value));
+  add('bidi-format', /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value));
+  add('markup-or-script', containsMarkupOrScriptSentinel(value));
+  add('url', containsUrlLikeValue(value));
+  add('email-or-upi', containsEmailOrUpiHandle(value));
+  add('digit-like-identifier', containsDigitLikeIdentifier(value));
+  add('pan-shaped', containsPanShapedValue(value));
+  add('indian-registration', containsIndianRegistration(value));
+  add('long-mixed-identifier', containsLongMixedIdentifier(value));
+  add('credential-or-payment-token', containsCredentialOrPaymentToken(value));
+  add('raw-filename', containsRawFilename(value));
+  add('fabricated-official-status', containsFabricatedOfficialStatus(value));
+  return Object.freeze(matches);
+}
+
+export function validateExportSafeReviewedText(value: string): string {
+  const matches = findBoundedExportSafetyMatches(value);
+  if (matches.length > 0) {
+    throw new Error(`Reviewed text failed bounded export-safety checks: ${matches.join(', ')}.`);
+  }
+  return value;
+}
+
 function cloneFact<T>(candidate: unknown, revisionId: string): ReviewFact<T> | null {
   if (!isRecord(candidate)) return null;
   if (
@@ -286,7 +421,7 @@ function cloneFact<T>(candidate: unknown, revisionId: string): ReviewFact<T> | n
     value: candidate.value as T,
     source: candidate.source as ReviewFactSource,
     confidence: 'high' as const,
-    limitation: candidate.limitation.trim(),
+    limitation: EXPORT_SAFE_NEUTRAL_LIMITATIONS[candidate.source as ReviewFactSource],
     confirmation: 'citizen-confirmed' as const,
     reviewRevisionId: revisionId,
   });
@@ -299,7 +434,7 @@ function twoVersusFour(left: unknown, right: unknown): boolean {
 
 /** Rebuilds only the neutral, provenance-bearing fields approved by Task 1. */
 export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): ReviewedFactProjection {
-  if (!isRecord(facts) || !nonEmptyText(facts.reviewRevisionId) || !Array.isArray(facts.supportedSignals)) {
+  if (!isRecord(facts) || !OPAQUE_REVISION_ID_PATTERN.test(facts.reviewRevisionId) || !Array.isArray(facts.supportedSignals)) {
     throw new Error('Action-ready facts are invalid.');
   }
   const reviewRevisionId = facts.reviewRevisionId.trim();
@@ -349,7 +484,7 @@ export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): Revi
   }
   if (facts.wrongEvidenceBasis !== undefined) {
     const cloned = cloneFact<'different-vehicle' | 'unrelated-scene'>(facts.wrongEvidenceBasis, reviewRevisionId);
-    if (!cloned || cloned.source === 'official-evidence-image'
+    if (!cloned || cloned.source !== 'citizen-attestation'
       || !['different-vehicle', 'unrelated-scene'].includes(cloned.value)) {
       throw new Error('Wrong-evidence basis is invalid.');
     }
@@ -357,7 +492,7 @@ export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): Revi
   }
   if (facts.vehicleNumberEntryMismatchBasis !== undefined) {
     const cloned = cloneFact<'visible-entry-mismatch'>(facts.vehicleNumberEntryMismatchBasis, reviewRevisionId);
-    if (!cloned || cloned.source === 'official-evidence-image' || cloned.value !== 'visible-entry-mismatch') {
+    if (!cloned || cloned.source !== 'official-record' || cloned.value !== 'visible-entry-mismatch') {
       throw new Error('Vehicle-number entry-mismatch basis is invalid.');
     }
     projection.vehicleNumberEntryMismatchBasis = cloned;
@@ -401,53 +536,61 @@ export function mapLegacyIssue(facts: ActionReadyReviewFacts | ReviewedFactProje
     return null;
   }
 
-  if (
-    projection.supportedSignals.includes('vehicle-number-entry-mismatch')
-    && projection.vehicleNumberEntryMismatchBasis?.value === 'visible-entry-mismatch'
-  ) return Object.freeze({
-    issueCode: 'wrong-vehicle-number-entered-by-officer',
-    label: 'Wrong Vehicle Number Entered By Officer',
-    value: 'Wrong Vehicle Number Entered By Officer',
-  });
-
-  if (projection.supportedSignals.includes('vehicle-class-conflict')) {
-    if (
-      projection.citizenVehicleClass?.value === 'four-wheeler'
-      && projection.observedEvidenceVehicleClass?.value === 'two-wheeler'
-    ) return Object.freeze({
-      issueCode: 'two-wheeler-on-four-wheeler',
-      label: '2 Wheeler Challan On 4 Wheeler',
-      value: '2 Wheeler Challan On 4 Wheeler',
-    });
-    if (
-      projection.citizenVehicleClass?.value === 'two-wheeler'
-      && projection.observedEvidenceVehicleClass?.value === 'four-wheeler'
-    ) return Object.freeze({
-      issueCode: 'four-wheeler-on-two-wheeler',
-      label: '4 Wheeler Challan On 2 Wheeler',
-      value: '4 Wheeler Challan On 2 Wheeler',
-    });
-  }
-
-  if (
-    projection.supportedSignals.includes('duplicate-plate')
-    && projection.duplicatePlateIndependentBasis?.value === 'citizen-confirmed'
-  ) return Object.freeze({
-    issueCode: 'duplicate-number-plate',
-    label: 'Duplicate Number Plate',
-    value: 'Duplicate Number Plate',
-  });
-
+  const matches: LegacyIssueMapping[] = [];
   if (
     projection.supportedSignals.includes('wrong-evidence')
-    && projection.wrongEvidenceBasis
-  ) return Object.freeze({
+    && projection.wrongEvidenceBasis?.source === 'citizen-attestation'
+    && (projection.wrongEvidenceBasis.value === 'different-vehicle'
+      || projection.wrongEvidenceBasis.value === 'unrelated-scene')
+  ) matches.push(Object.freeze({
     issueCode: 'wrong-evidence-captured',
     label: 'Wrong Evidence Captured',
     value: 'Wrong Image',
-  });
+  }));
+  if (
+    projection.supportedSignals.includes('vehicle-number-entry-mismatch')
+    && projection.vehicleNumberEntryMismatchBasis?.source === 'official-record'
+    && projection.vehicleNumberEntryMismatchBasis.value === 'visible-entry-mismatch'
+  ) matches.push(Object.freeze({
+    issueCode: 'wrong-vehicle-number-entered-by-officer',
+    label: 'Wrong Vehicle Number Entered By Officer',
+    value: 'Wrong Vehicle Number Entered By Officer',
+  }));
+  if (
+    projection.supportedSignals.includes('vehicle-class-conflict')
+    && projection.citizenVehicleClass?.source === 'independent-vehicle-record'
+    && projection.citizenVehicleClass.value === 'four-wheeler'
+    && projection.observedEvidenceVehicleClass?.source === 'official-evidence-image'
+    && projection.observedEvidenceVehicleClass.value === 'two-wheeler'
+  ) matches.push(Object.freeze({
+    issueCode: 'two-wheeler-on-four-wheeler',
+    label: '2 Wheeler Challan On 4 Wheeler',
+    value: '2 Wheeler Challan On 4 Wheeler',
+  }));
+  if (
+    projection.supportedSignals.includes('vehicle-class-conflict')
+    && projection.citizenVehicleClass?.source === 'independent-vehicle-record'
+    && projection.citizenVehicleClass.value === 'two-wheeler'
+    && projection.observedEvidenceVehicleClass?.source === 'official-evidence-image'
+    && projection.observedEvidenceVehicleClass.value === 'four-wheeler'
+  ) matches.push(Object.freeze({
+    issueCode: 'four-wheeler-on-two-wheeler',
+    label: '4 Wheeler Challan On 2 Wheeler',
+    value: '4 Wheeler Challan On 2 Wheeler',
+  }));
+  if (
+    projection.supportedSignals.includes('duplicate-plate')
+    && projection.duplicatePlateIndependentBasis?.source === 'citizen-attestation'
+    && projection.duplicatePlateIndependentBasis.value === 'citizen-confirmed'
+    && projection.independentReadableVehicleRecord?.source === 'independent-vehicle-record'
+    && projection.independentReadableVehicleRecord.value === true
+  ) matches.push(Object.freeze({
+    issueCode: 'duplicate-number-plate',
+    label: 'Duplicate Number Plate',
+    value: 'Duplicate Number Plate',
+  }));
 
-  return null;
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function roleConfirmationIsComplete(value: unknown): value is PackRoleConfirmation {
@@ -469,7 +612,11 @@ function validateSharedInput(input: SharedHandoffBuildInput):
   if (input.resultClass !== 'possible-discrepancy') {
     return { ok: false, reason: 'result-not-action-ready' };
   }
-  if (!nonEmptyText(input.resultRevisionId) || input.facts?.reviewRevisionId !== input.resultRevisionId) {
+  if (
+    !OPAQUE_REVISION_ID_PATTERN.test(input.resultRevisionId)
+    || !OPAQUE_REVISION_ID_PATTERN.test(input.packRevisionId)
+  ) return { ok: false, reason: 'invalid-revision-id' };
+  if (input.facts?.reviewRevisionId !== input.resultRevisionId) {
     return { ok: false, reason: 'result-revision-mismatch' };
   }
   if (
@@ -494,6 +641,11 @@ function validateSharedInput(input: SharedHandoffBuildInput):
     description = normalizeReviewedDescription(input.reviewedDescription);
   } catch {
     return { ok: false, reason: 'invalid-description' };
+  }
+  try {
+    validateExportSafeReviewedText(description);
+  } catch {
+    return { ok: false, reason: 'description-not-export-safe' };
   }
   return {
     ok: true,
@@ -591,6 +743,134 @@ const syntheticChecklist = Object.freeze([
   'No government service is contacted and no official compatibility is asserted.',
 ] as const);
 
+type OfficialHandoffPackWithoutDigest = Omit<OfficialHandoffPack, 'packDigest'>;
+type MutableOfficialHandoffPack = { -readonly [Key in keyof OfficialHandoffPack]: OfficialHandoffPack[Key] };
+
+const officialPackKeys = [
+  'schema', 'kind', 'mode', 'sourceKind', 'reviewRole', 'resultClass', 'resultRevisionId',
+  'packRevisionId', 'packDigest', 'issueFamily', 'routeRegistryVersion', 'destination',
+  'evidenceAssessment', 'facts', 'factualBullets', 'evidenceSourceAndLimitations',
+  'legacyIssue', 'description', 'checklist', 'intentionallyBlankOfficialFields',
+  'nonLegalLimitation', 'fieldPackConfirmation', 'generatedAt',
+] as const;
+
+const issuedOfficialPacks = new WeakSet<object>();
+
+function sameOwnStringKeys(value: object, expected: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function deepFreeze<T>(value: T): T {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null || Object.isFrozen(value)) return value;
+  for (const key of Reflect.ownKeys(value)) deepFreeze((value as Record<PropertyKey, unknown>)[key]);
+  return Object.freeze(value);
+}
+
+function isDeepFrozen(value: unknown, seen = new Set<object>()): boolean {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return true;
+  if (seen.has(value)) return true;
+  seen.add(value);
+  if (!Object.isFrozen(value)) return false;
+  return Reflect.ownKeys(value).every((key) => isDeepFrozen((value as Record<PropertyKey, unknown>)[key], seen));
+}
+
+function canonicalPackDigestInput(pack: OfficialHandoffPackWithoutDigest): string {
+  return JSON.stringify({
+    schema: pack.schema,
+    kind: pack.kind,
+    mode: pack.mode,
+    sourceKind: pack.sourceKind,
+    reviewRole: pack.reviewRole,
+    resultClass: pack.resultClass,
+    resultRevisionId: pack.resultRevisionId,
+    packRevisionId: pack.packRevisionId,
+    issueFamily: pack.issueFamily,
+    routeRegistryVersion: pack.routeRegistryVersion,
+    destination: {
+      key: pack.destination.key,
+      serviceName: pack.destination.serviceName,
+      purpose: pack.destination.purpose,
+      domain: pack.destination.domain,
+      canonicalUrl: pack.destination.canonicalUrl,
+      routingRationale: pack.destination.routingRationale,
+      verifier: pack.destination.verifier,
+      evidenceRef: pack.destination.evidenceRef,
+      lastVerifiedAt: pack.destination.lastVerifiedAt,
+      expiresAt: pack.destination.expiresAt,
+    },
+    evidenceAssessment: pack.evidenceAssessment,
+    facts: pack.facts,
+    factualBullets: pack.factualBullets,
+    evidenceSourceAndLimitations: pack.evidenceSourceAndLimitations,
+    legacyIssue: pack.legacyIssue,
+    description: pack.description,
+    checklist: pack.checklist,
+    intentionallyBlankOfficialFields: pack.intentionallyBlankOfficialFields,
+    nonLegalLimitation: pack.nonLegalLimitation,
+    fieldPackConfirmation: pack.fieldPackConfirmation,
+    generatedAt: pack.generatedAt,
+  });
+}
+
+export function canonicalOfficialHandoffPackDigestInput(pack: OfficialHandoffPack): string {
+  if (!isAuthenticOfficialHandoffPack(pack)) throw new Error('An authentic official handoff pack is required.');
+  return canonicalPackDigestInput(pack);
+}
+
+function destinationMatchesCurrentRegistry(pack: OfficialHandoffPack): boolean {
+  if (pack.destination.key !== 'legacy' && pack.destination.key !== 'nextgen') return false;
+  const expected = OFFICIAL_DESTINATIONS[pack.destination.key];
+  return expected.releaseState === 'current'
+    && isVerifiedOfficialDestinationShape(expected, pack.generatedAt)
+    && pack.destination.serviceName === expected.serviceName
+    && pack.destination.purpose === 'official-grievance-service'
+    && pack.destination.domain === expected.domain
+    && pack.destination.canonicalUrl === expected.canonicalUrl
+    && pack.destination.routingRationale === expected.routingRationale
+    && pack.destination.verifier === expected.verifier
+    && pack.destination.evidenceRef === expected.evidenceRef
+    && pack.destination.lastVerifiedAt === expected.lastVerifiedAt
+    && pack.destination.expiresAt === expected.expiresAt;
+}
+
+/** Accepts only a live builder-issued real pack whose complete digest binding still matches. */
+export function isAuthenticOfficialHandoffPack(candidate: unknown): candidate is OfficialHandoffPack {
+  if (!isRecord(candidate) || Object.getPrototypeOf(candidate) !== Object.prototype) return false;
+  if (!issuedOfficialPacks.has(candidate) || !sameOwnStringKeys(candidate, officialPackKeys)) return false;
+  const brand = (candidate as Record<PropertyKey, unknown>)[OFFICIAL_PACK_BRAND];
+  if (!isRecord(brand) || brand.issuer !== OFFICIAL_PACK_BRAND_VALUE || brand.digest !== candidate.packDigest) return false;
+  if (
+    candidate.schema !== OFFICIAL_HANDOFF_SCHEMA
+    || candidate.kind !== 'official-handoff-pack'
+    || candidate.mode !== 'real'
+    || (candidate.sourceKind !== 'official-service' && candidate.sourceKind !== 'official-download')
+    || (candidate.reviewRole !== 'self' && candidate.reviewRole !== 'present-helper')
+    || candidate.resultClass !== 'possible-discrepancy'
+    || !OPAQUE_REVISION_ID_PATTERN.test(candidate.resultRevisionId as string)
+    || !OPAQUE_REVISION_ID_PATTERN.test(candidate.packRevisionId as string)
+    || !PACK_DIGEST_PATTERN.test(candidate.packDigest as string)
+    || candidate.routeRegistryVersion !== OFFICIAL_ROUTE_REGISTRY_VERSION
+    || candidate.issueFamily !== 'wrong-photo-or-wrong-vehicle'
+    || candidate.evidenceAssessment !== 'Possible discrepancy'
+    || !isCanonicalTimestamp(candidate.generatedAt)
+    || !isRecord(candidate.destination)
+    || !destinationMatchesCurrentRegistry(candidate as OfficialHandoffPack)
+    || !isRecord(candidate.fieldPackConfirmation)
+    || candidate.fieldPackConfirmation.status !== 'confirmed'
+    || candidate.fieldPackConfirmation.confirmedBy !== 'affected-person'
+    || candidate.fieldPackConfirmation.packRevisionId !== candidate.packRevisionId
+    || !isDeepFrozen(candidate)
+  ) return false;
+  try {
+    if (normalizeReviewedDescription(candidate.description as string) !== candidate.description) return false;
+    validateExportSafeReviewedText(candidate.description as string);
+    return sha256Hex(canonicalPackDigestInput(candidate as OfficialHandoffPack)) === candidate.packDigest;
+  } catch {
+    return false;
+  }
+}
+
 function isRealWrapperInput(input: unknown): input is RealHandoffBuildInput {
   return isRecord(input)
     && input.mode === 'real'
@@ -625,7 +905,7 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
   if (route.key === 'legacy' && !legacyIssue) {
     return { status: 'abstained', reason: 'invalid-reviewed-facts' };
   }
-  const pack: OfficialHandoffPack = Object.freeze({
+  const pack: MutableOfficialHandoffPack = {
     schema: OFFICIAL_HANDOFF_SCHEMA,
     kind: 'official-handoff-pack',
     mode: 'real',
@@ -634,6 +914,7 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
     resultClass: 'possible-discrepancy',
     resultRevisionId: input.resultRevisionId,
     packRevisionId: input.packRevisionId,
+    packDigest: '',
     issueFamily: 'wrong-photo-or-wrong-vehicle',
     routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
     destination: Object.freeze({
@@ -663,7 +944,16 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
       packRevisionId: input.packRevisionId,
     }),
     generatedAt: input.generatedAt,
+  };
+  pack.packDigest = sha256Hex(canonicalPackDigestInput(pack));
+  Object.defineProperty(pack, OFFICIAL_PACK_BRAND, {
+    value: Object.freeze({ issuer: OFFICIAL_PACK_BRAND_VALUE, digest: pack.packDigest }),
+    enumerable: false,
+    configurable: false,
+    writable: false,
   });
+  issuedOfficialPacks.add(pack);
+  deepFreeze(pack);
   return Object.freeze({ status: 'built', pack });
 }
 
