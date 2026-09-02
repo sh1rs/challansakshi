@@ -145,6 +145,7 @@ function eligibleDraft(
     eligibilityReason: 'action-ready',
     routeKey: 'nextgen',
     destination: destinationFor(pack),
+    fallback: OFFICIAL_DESTINATIONS.nextgen.fallback,
     mappedCategory: null,
     normalizedDescription: pack.description,
     descriptionCodePointCount: Array.from(pack.description).length,
@@ -169,6 +170,7 @@ const extensionCallbacks: ExtensionAssistCallbacks = {
 
 const callbacks: OfficialHandoffCallbacks = {
   onDescriptionChange: () => undefined,
+  onLookupValueChange: () => undefined,
   onAffectedPersonPresentChange: () => undefined,
   onAffectedPersonInspectedEvidenceChange: () => undefined,
   onAffectedPersonInspectedReadableRecordChange: () => undefined,
@@ -327,7 +329,7 @@ describe('controlled official handoff presentation', () => {
     expect(html).toContain(`href="${props.draft.destination.canonicalUrl}"`);
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noreferrer"');
-    expect(panelSource).toMatch(/onCopyField\('description',\s*draft\.normalizedDescription\)/);
+    expect(panelSource).toMatch(/onCopyField\('description'\)/);
     expect(panelSource).not.toMatch(/onCopyField[\s\S]{0,180}onOfficialLinkActivate/);
   });
 
@@ -384,7 +386,30 @@ describe('controlled official handoff presentation', () => {
     expect(retainedHtml.split(expected)).toHaveLength(2);
     expect(clearedHtml.split(expected)).toHaveLength(2);
     expect(clearedHtml).toMatch(/aria-label="Copy status"[^>]*role="status" aria-live="polite" aria-atomic="true">Challan number copied/);
-    expect(clearedHtml).not.toContain('Optional challan number aid');
+    expect(clearedHtml).toContain('Optional challan number aid');
+    expect(clearedHtml).toMatch(/<input[^>]*autoComplete="off"[^>]*value=""/);
+  });
+
+  it('renders the only controlled ephemeral lookup input on private devices', () => {
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps()));
+    expect(html).toMatch(/<input[^>]*autoComplete="off"[^>]*value="TEST-LOOKUP-42"/);
+    expect(panelSource).toMatch(/onLookupValueChange/);
+    expect(panelSource).toMatch(/onCopyField\('lookup'\)/);
+    expect(panelSource).not.toMatch(/onCopyField\('lookup',/);
+  });
+
+  it('renders only the original typed fallback after the citizen reports portal-unavailable', () => {
+    const pack = nextgenPack();
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      draft: eligibleDraft(pack, { fallback: OFFICIAL_DESTINATIONS.nextgen.fallback }),
+      confirmedPack: pack,
+      officialLinkStatus: 'activated',
+      returnDraft: { selectedReturnState: 'portal-unavailable', referenceLastFour: '' },
+    })));
+    expect(html).toContain('The original official service did not work for you.');
+    expect(html).toContain(OFFICIAL_DESTINATIONS.nextgen.canonicalUrl);
+    expect(html).toContain(OFFICIAL_DESTINATIONS.nextgen.fallback.canonicalUrl);
+    expect(html).not.toMatch(/government outage|service outage/i);
   });
 
   it('keeps the idle copy live region mounted without rendering a blank callout', () => {
@@ -504,7 +529,7 @@ describe('controlled official handoff presentation', () => {
 
     for (const label of [
       'I saw an acknowledgement on the official service',
-      'The official portal was unavailable',
+      'The official portal did not work for me',
       'I did not submit',
       'I need to correct my pack',
       'Last 4 characters of the official reference, recorded by you',
@@ -794,6 +819,7 @@ describe('controlled official handoff presentation', () => {
     const drafts = {
       manual: {
         ...common,
+        fallback: OFFICIAL_DESTINATIONS['delhi-manual'].fallback,
         status: 'manual',
         eligibilityReason: 'manual-route-only',
         routeKey: 'delhi-manual',
@@ -801,6 +827,7 @@ describe('controlled official handoff presentation', () => {
       } satisfies OfficialHandoffDraft,
       unresolved: {
         ...common,
+        fallback: OFFICIAL_DESTINATIONS.unresolved.fallback,
         status: 'unresolved',
         eligibilityReason: 'route-unresolved',
         routeKey: 'unresolved',
@@ -808,6 +835,7 @@ describe('controlled official handoff presentation', () => {
       } satisfies OfficialHandoffDraft,
       abstained: {
         ...common,
+        fallback: OFFICIAL_DESTINATIONS.nextgen.fallback,
         status: 'abstained',
         eligibilityReason: 'result-not-action-ready',
         routeKey: 'nextgen',
@@ -924,7 +952,7 @@ describe('English, Hindi, and Simple Mode safety copy', () => {
       selfRole: 'My case',
       helperRole: 'Helping someone present',
       helperSubmitBoundary: 'The affected person—not the helper—must independently authenticate, declare, and submit on the official service.',
-      returnStates: ['I saw an acknowledgement on the official service', 'The official portal was unavailable', 'I did not submit', 'I need to correct my pack'],
+      returnStates: ['I saw an acknowledgement on the official service', 'The official portal did not work for me', 'I did not submit', 'I need to correct my pack'],
       selfReturnBasis: 'Citizen-reported; not verified by ChallanSakshi.',
       helperReturnBasis: 'Affected-person-reported; entered with a present helper. Not verified by ChallanSakshi.',
       helperIndependence: 'The helper is optional. The complete field pack and official link work without it.',
@@ -944,7 +972,7 @@ describe('English, Hindi, and Simple Mode safety copy', () => {
       selfRole: 'मेरा मामला',
       helperRole: 'मौजूद व्यक्ति की मदद',
       helperSubmitBoundary: 'मददगार नहीं, प्रभावित व्यक्ति को आधिकारिक सेवा पर स्वयं प्रमाणीकरण, घोषणा और जमा करना होगा।',
-      returnStates: ['मुझे आधिकारिक सेवा पर पावती दिखी', 'आधिकारिक पोर्टल उपलब्ध नहीं था', 'मैंने जमा नहीं किया', 'मुझे अपने पैक में सुधार करना है'],
+      returnStates: ['मुझे आधिकारिक सेवा पर पावती दिखी', 'आधिकारिक पोर्टल मेरे लिए नहीं चला', 'मैंने जमा नहीं किया', 'मुझे अपने पैक में सुधार करना है'],
       selfReturnBasis: 'नागरिक द्वारा बताया गया; ChallanSakshi ने सत्यापित नहीं किया।',
       helperReturnBasis: 'प्रभावित व्यक्ति द्वारा बताया गया; मौजूद मददगार ने दर्ज किया। ChallanSakshi ने सत्यापित नहीं किया।',
       helperIndependence: 'मददगार वैकल्पिक है। पूरा फ़ील्ड पैक और आधिकारिक लिंक इसके बिना काम करते हैं।',
@@ -1004,6 +1032,19 @@ describe('English, Hindi, and Simple Mode safety copy', () => {
     collect(copy);
     expect(values.length).toBeGreaterThan(40);
     expect(values.every((value) => /[\u0900-\u097f]/u.test(value))).toBe(true);
+  });
+
+  it.each([
+    ['en', false], ['en', true], ['hi', false], ['hi', true],
+  ] as const)('has a closed localized checklist in %s simple=%s', (language, simpleMode) => {
+    const copy = getOfficialHandoffPresentation(language, simpleMode);
+    for (const route of ['legacy', 'nextgen'] as const) {
+      expect(copy.checklists[route]).toHaveLength(3);
+      if (language === 'hi') {
+        expect(copy.checklists[route].every((item) => /[\u0900-\u097f]/u.test(item))).toBe(true);
+        expect(copy.checklists[route].join(' ')).not.toMatch(/Enter|Choose|Review|official service|attachment/);
+      }
+    }
   });
 });
 

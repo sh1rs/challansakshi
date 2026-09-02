@@ -2,12 +2,40 @@
 
 import { useState, type ReactNode } from 'react';
 import type { Language } from '../../lib/domain';
+import { CURRENT_EXTENSION_RELEASE_STATE, evaluatePublicExtensionRelease } from '../../lib/extension-release';
 import { PublicBetaShell, publicBetaStyles as styles } from './PublicBetaShell';
 
 function t(language: Language, en: string, hi: string) { return language === 'hi' ? hi : en; }
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
   return <section className={styles.infoSection}><h2>{title}</h2>{children}</section>;
+}
+
+export function ExtensionInformationPage() {
+  const [language, setLanguage] = useState<Language>('en');
+  const release = evaluatePublicExtensionRelease(CURRENT_EXTENSION_RELEASE_STATE);
+  return <PublicBetaShell language={language} setLanguage={setLanguage} service="ChallanSakshi" serviceHindi="डेस्कटॉप सहायता">
+    <main className={styles.infoPage}>
+      <p className={styles.eyebrow}>{t(language, 'Optional desktop assistance', 'वैकल्पिक डेस्कटॉप सहायता')}</p>
+      <h1>{t(language, 'Review the extension boundary before choosing it', 'एक्सटेंशन चुनने से पहले उसकी सीमा जाँचें')}</h1>
+      <p>{t(language, 'The complete web review works without the extension. The extension is only an optional desktop aid after you have reviewed and confirmed a safe field pack.', 'पूरी वेब समीक्षा एक्सटेंशन के बिना काम करती है। सुरक्षित फ़ील्ड पैक जाँचने और पुष्ट करने के बाद एक्सटेंशन केवल वैकल्पिक डेस्कटॉप सहायता है।')}</p>
+      <InfoSection title={t(language, 'Local data and intended recipient', 'स्थानीय डेटा और तय प्राप्तकर्ता')}>
+        <p>{t(language, 'A confirmed description, an eligible category when supported, and the active official route are handled locally in your browser. The official service is the only intended recipient after you explicitly choose to fill reviewed fields; the project operator does not receive the pack.', 'पुष्ट विवरण, समर्थित होने पर योग्य श्रेणी और सक्रिय आधिकारिक रास्ता आपके ब्राउज़र में स्थानीय रूप से संभाले जाते हैं। समीक्षित फ़ील्ड भरना स्पष्ट रूप से चुनने के बाद केवल आधिकारिक सेवा तय प्राप्तकर्ता है; परियोजना संचालक को पैक नहीं मिलता।')}</p>
+      </InfoSection>
+      <InfoSection title={t(language, 'Retention, recovery, and protected fields', 'अवधि, पुनर्प्राप्ति और सुरक्षित फ़ील्ड')}>
+        <p>{t(language, 'A prepared capsule expires within 10 minutes and its payload is cleared before any field placement. A payload-free safety record may remain only for local recovery, and cannot reconstruct the reviewed values.', 'तैयार कैप्सूल दस मिनट में समाप्त होता है और फ़ील्ड रखने से पहले उसका पेलोड साफ़ होता है। केवल स्थानीय पुनर्प्राप्ति के लिए पेलोड-रहित सुरक्षा रिकॉर्ड रह सकता है और वह समीक्षित मान दोबारा नहीं बना सकता।')}</p>
+        <p>{t(language, 'The helper leaves protected identity, authentication, declaration, and submission fields untouched. It does not submit, solve a CAPTCHA, enter an OTP, make a payment, or infer official acceptance.', 'सहायता सुरक्षित पहचान, प्रमाणीकरण, घोषणा और जमा करने वाले फ़ील्ड नहीं छूती। यह जमा, CAPTCHA हल, OTP दर्ज, भुगतान या आधिकारिक स्वीकृति का अनुमान नहीं करती।')}</p>
+      </InfoSection>
+      <InfoSection title={t(language, 'Mobile and unsupported-browser fallback', 'मोबाइल और असमर्थित ब्राउज़र विकल्प')}>
+        <p>{t(language, 'On mobile or an unsupported browser, use the complete web field pack and its private-device copy aid, or manually transcribe the selectable text on a shared device.', 'मोबाइल या असमर्थित ब्राउज़र पर पूरा वेब फ़ील्ड पैक और निजी-डिवाइस कॉपी सहायता उपयोग करें, या साझा डिवाइस पर चुने जा सकने वाले पाठ को स्वयं लिखें।')}</p>
+      </InfoSection>
+      {release.status === 'public-enabled' ? (
+        <p><a href={release.acquisition.storeUrl} target="_blank" rel="noreferrer">{t(language, 'Open approved store listing', 'स्वीकृत स्टोर सूची खोलें')}</a></p>
+      ) : (
+        <p role="status">{t(language, 'The optional desktop helper is not available for public installation in this release.', 'इस रिलीज़ में वैकल्पिक डेस्कटॉप सहायता सार्वजनिक इंस्टॉलेशन के लिए उपलब्ध नहीं है।')}</p>
+      )}
+    </main>
+  </PublicBetaShell>;
 }
 
 export function PrivacyPage() {

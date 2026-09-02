@@ -31,6 +31,10 @@ const securityConfig = readFileSync(
   new URL('../next.config.ts', import.meta.url),
   'utf8',
 );
+const handoffControllerSource = readFileSync(
+  new URL('../lib/citizen-review-handoff-controller.ts', import.meta.url),
+  'utf8',
+);
 
 function mediaBlock(source: string, query: string) {
   const marker = `@media ${query}`;
@@ -179,7 +183,7 @@ describe('citizen review release contracts', () => {
   it('keeps the official result route ahead of optional audit detail', () => {
     const result = reviewSource.slice(reviewSource.indexOf("{step === 'result' && ("));
     const resultHero = result.indexOf('styles.resultHero');
-    const officialRoute = result.indexOf('styles.officialHandoff');
+    const officialRoute = result.indexOf('<OfficialHandoffPanel');
     const visibleSections = result.indexOf('styles.resultColumns');
     const missingRecords = result.indexOf('presentation.resultSections.missing');
     const evidenceDetails = result.indexOf('Evidence details');
@@ -191,6 +195,38 @@ describe('citizen review release contracts', () => {
     expect(evidenceDetails).toBeGreaterThan(missingRecords);
     expect(result.indexOf('Review history')).toBeGreaterThan(evidenceDetails);
     expect(result.indexOf('Preview local summary')).toBeGreaterThan(evidenceDetails);
+  });
+
+  it('uses the exact typed jurisdiction registry and a fresh opaque browser revision', () => {
+    expect(reviewSource).not.toContain('NATIONAL_URL');
+    expect(reviewSource).not.toContain('COURT_URL');
+    expect(reviewSource).toMatch(/JurisdictionConfirmation/);
+    expect(reviewSource).toMatch(/ALL_ISSUING_JURISDICTION_CODES/);
+    expect(reviewSource).toContain('I am not sure');
+    expect(reviewSource).toMatch(/new Uint8Array\(16\)/);
+    expect(reviewSource).toMatch(/crypto\.getRandomValues/);
+    expect(reviewSource).not.toMatch(/window\.open\s*\(/);
+    expect(handoffControllerSource).toMatch(/resolveOfficialDestination/);
+    expect(handoffControllerSource).toMatch(/OFFICIAL_AUXILIARY_ROUTES/);
+    expect(handoffControllerSource).not.toMatch(/National e-Challan|Virtual Court/);
+  });
+
+  it('places the controlled handoff panel directly after the result hero', () => {
+    const result = reviewSource.slice(reviewSource.indexOf("{step === 'result' && ("));
+    const resultHero = result.indexOf('styles.resultHero');
+    const panel = result.indexOf('<OfficialHandoffPanel');
+    const details = result.indexOf('styles.resultColumns');
+    expect(panel).toBeGreaterThan(resultHero);
+    expect(details).toBeGreaterThan(panel);
+    expect(result).not.toContain('styles.officialHandoff');
+  });
+
+  it('keeps browser effects in the thin adapter and the pure controller navigation-free', () => {
+    expect(reviewSource).toMatch(/navigator\.clipboard\.writeText/);
+    expect(reviewSource).toMatch(/URL\.createObjectURL/);
+    expect(handoffControllerSource).not.toMatch(/navigator\.|window\.|document\.|URL\.createObjectURL/);
+    expect(handoffControllerSource).toMatch(/type:\s*'clipboard-write'/);
+    expect(handoffControllerSource).toMatch(/type:\s*'download-text'/);
   });
 
   it('keeps review select and official-service link targets at least 48px at base layouts', () => {
@@ -334,7 +370,7 @@ describe('citizen review release contracts', () => {
     expect(reviewSource).toMatch(/presentation\.resultSections\.unclear/);
     expect(reviewSource).toMatch(/presentation\.resultSections\.missing/);
     expect(reviewSource).toMatch(/presentation\.resultSections\.evidence/);
-    expect(reviewSource).toMatch(/presentation\.resultSections\.officialRoute/);
+    expect(reviewSource).toMatch(/<OfficialHandoffPanel/);
     expect(reviewSource).toMatch(/simpleTitle:/);
     expect(reviewSource).toMatch(/simpleMode\s*\?\s*copy\.simpleTitle/);
     expect(reviewSource).toMatch(/presentation\.resultLimitation/);

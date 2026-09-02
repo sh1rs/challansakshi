@@ -67,7 +67,17 @@ describe('real-mode privacy isolation', () => {
     for (const { path, source } of publicModeFiles) {
       expect(source, path).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket\s*\(|EventSource\s*\(/);
       expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
-      expect(source, path).not.toMatch(/<textarea|dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
+      expect(source, path).not.toMatch(/dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
+      expect(source, path).not.toMatch(/contenteditable|contentEditable/);
+      const textareas = source.match(/<textarea\b/g) ?? [];
+      expect(textareas, path).toHaveLength(path === 'components/public-beta/OfficialHandoffPanel.tsx' ? 1 : 0);
+    }
+  });
+
+  it('keeps raw selected filenames out of the complete real-mode graph', () => {
+    for (const { path, source } of publicModeFiles) {
+      expect(source, path).not.toMatch(/\b(?:file|selectedFile|recordSelection)\.name\b/);
+      expect(source, path).not.toMatch(/recordSelection\.(?:meta\.)?(?:name|filename)|selectedFileName|rawFilename/);
     }
   });
 

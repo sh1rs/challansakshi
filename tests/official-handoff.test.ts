@@ -21,6 +21,7 @@ import {
   containsRawFilename,
   containsUrlLikeValue,
   findBoundedExportSafetyMatches,
+  getOfficialHandoffChecklist,
   isAuthenticConfirmedExtensionHandoffSource,
   isAuthenticOfficialHandoffPack,
   isOpaqueRevisionId,
@@ -347,6 +348,16 @@ describe('supported Legacy issue mapping', () => {
 });
 
 describe('closed real and synthetic handoff builders', () => {
+  it('uses one canonical checklist accessor for preview and authentic pack construction', () => {
+    const pack = builtRealPack();
+    expect(pack.checklist).toBe(getOfficialHandoffChecklist('nextgen'));
+    expect(getOfficialHandoffChecklist('legacy')).toEqual([
+      'Enter the challan number directly on the official service, or use the separate private-device copy aid.',
+      'Review the category and description before submitting on the official service.',
+      'Choose any original JPEG, JPG, or PNG attachment directly on the official service; ChallanSakshi does not process or upload it.',
+    ]);
+  });
+
   it('builds a confirmed NextGen-only official pack with neutral projected limitations and opaque revisions', () => {
     const pack = builtRealPack({
       sourceKind: 'official-download',

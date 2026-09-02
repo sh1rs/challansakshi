@@ -162,7 +162,7 @@
 .localPdfOpen a { min-height: 48px; display: inline-flex; align-items: center; padding: 10px 14px; border: 1px solid var(--pb-teal); border-radius: 8px; color: var(--pb-teal-dark); font-size: 13px; font-weight: 780; text-decoration: none; }
 .localPdfOpen a:focus-visible { outline: 3px solid var(--pb-teal); outline-offset: 3px; }
 .evidenceTableSection { margin-top: 24px; }
-.evidenceTableSection h3, .timeline h3, .officialHandoff h3 { margin: 0; font: 700 21px Georgia, serif; }
+.evidenceTableSection h3, .timeline h3 { margin: 0; font: 700 21px Georgia, serif; }
 .evidenceTableSection > p { color: var(--pb-muted); font-size: 13px; line-height: 1.6; }
 .evidenceTable { overflow: hidden; border: 1px solid #d5dcd8; border-radius: 10px; }
 .evidenceTable table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -173,8 +173,6 @@
 .timeline { margin-top: 18px; padding: 22px; border-left: 3px solid var(--pb-teal); background: #f3f9f7; }
 .timeline ol { margin: 14px 0 0; padding-left: 22px; }
 .timeline li { padding: 5px 0; color: #52645c; font-size: 12px; }
-.officialHandoff { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-top: 18px; padding: 22px; border: 1px solid #cdd8d3; background: #fff; }
-.officialHandoff p { margin: 7px 0 0; color: var(--pb-muted); font-size: 12px; }
 .summaryActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .inlineStatus { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: #edf8f3; color: #17614e; font-size: 12px; font-weight: 720; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 22px; border-top: 1px solid #e0e3de; }
@@ -308,8 +306,8 @@
   .evidenceTable tr { padding: 10px 14px; border-top: 1px solid #d8e1dd; }
   .evidenceTable td { display: grid; grid-template-columns: minmax(118px, .8fr) 1.2fr; gap: 12px; padding: 8px 0; border: 0; font-size: 16px; }
   .evidenceTable td::before { content: attr(data-label); color: var(--pb-ink); font-weight: 820; }
-  .officialHandoff, .summaryActions { align-items: stretch; flex-direction: column; }
-  .summaryActions button, .officialHandoff a, .simpleMode { min-height: 48px; }
+  .summaryActions { align-items: stretch; flex-direction: column; }
+  .summaryActions button, .simpleMode { min-height: 48px; }
   .footer { grid-template-columns: 1fr; gap: 24px; }
   .footer p { grid-column: auto; }
 }

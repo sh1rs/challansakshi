@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { Language } from '../../lib/domain';
 import type { OfficialHandoffPack } from '../../lib/official-handoff';
+import type { OfficialFallbackRoute } from '../../lib/official-destinations';
 import type { CitizenReturnState } from '../../lib/official-handoff-receipt';
 import type { OfficialHandoffReceiptState } from '../../lib/official-handoff-receipt';
 import { getOfficialHandoffPresentation } from '../../lib/citizen-review-presentation';
@@ -21,6 +22,7 @@ type DestinationPresentation = Readonly<{
 
 type DraftBase = Readonly<{
   destination: DestinationPresentation;
+  fallback: OfficialFallbackRoute;
   mappedCategory: Readonly<{ label: string; value: string }> | null;
   normalizedDescription: string;
   descriptionCodePointCount: number;
@@ -59,6 +61,7 @@ type ReturnAuthorization = Readonly<{
 
 export type OfficialHandoffCallbacks = Readonly<{
   onDescriptionChange: (value: string) => void;
+  onLookupValueChange: (value: string) => void;
   onAffectedPersonPresentChange: (checked: boolean) => void;
   onAffectedPersonInspectedEvidenceChange: (checked: boolean) => void;
   onAffectedPersonInspectedReadableRecordChange: (checked: boolean) => void;
@@ -66,7 +69,7 @@ export type OfficialHandoffCallbacks = Readonly<{
   onAffectedPersonRequestedPreparationChange: (checked: boolean) => void;
   onAffectedPersonConfirmedPackChange: (checked: boolean) => void;
   onOfficialLinkActivate: () => void;
-  onCopyField: (field: 'lookup' | 'category' | 'description', value: string) => void;
+  onCopyField: (field: 'lookup' | 'category' | 'description') => void;
   onReturnStateChange: (value: CitizenReturnState) => void;
   onReferenceLastFourChange: (value: string) => void;
   onReturnAffectedPersonPresentChange: (checked: boolean) => void;
@@ -206,18 +209,24 @@ export function OfficialHandoffPanel({
             <CopyStatus status={copyStatus} feedback={copy.copyFeedback} label={copy.copyStatusLabel} />
           ) : null}
 
-          {privateDevice && lookupValue ? (
+          {privateDevice ? (
             <section className={styles.fieldGroup} aria-labelledby="handoff-lookup-heading">
               <h3 id="handoff-lookup-heading">{copy.lookupHeading}</h3>
-              <p>{copy.lookupLabel}</p>
-              <p className={styles.selectableValue}>{lookupValue}</p>
-              <button
-                type="button"
-                className={styles.copyButton}
-                onClick={() => callbacks.onCopyField('lookup', lookupValue)}
-              >
-                {copy.copyLookup}
-              </button>
+              <label className={styles.referenceField} htmlFor="handoff-lookup">
+                <span>{copy.lookupLabel}</span>
+                <input
+                  id="handoff-lookup"
+                  value={lookupValue ?? ''}
+                  autoComplete="off"
+                  onChange={(event) => callbacks.onLookupValueChange(event.currentTarget.value)}
+                />
+              </label>
+              {lookupValue ? <p className={styles.selectableValue}>{lookupValue}</p> : null}
+              {lookupValue ? (
+                <button type="button" className={styles.copyButton} onClick={() => callbacks.onCopyField('lookup')}>
+                  {copy.copyLookup}
+                </button>
+              ) : null}
             </section>
           ) : null}
 
@@ -230,7 +239,7 @@ export function OfficialHandoffPanel({
                 <button
                   type="button"
                   className={styles.copyButton}
-                  onClick={() => callbacks.onCopyField('category', draft.mappedCategory?.value ?? '')}
+                  onClick={() => callbacks.onCopyField('category')}
                 >
                   {copy.copyCategory}
                 </button>
@@ -260,7 +269,7 @@ export function OfficialHandoffPanel({
                 <button
                   type="button"
                   className={styles.copyButton}
-                  onClick={() => callbacks.onCopyField('description', draft.normalizedDescription)}
+                  onClick={() => callbacks.onCopyField('description')}
                 >
                   {copy.copyDescription}
                 </button>
@@ -271,7 +280,9 @@ export function OfficialHandoffPanel({
           <section className={styles.checklist} aria-labelledby="handoff-checklist-heading">
             <h3 id="handoff-checklist-heading">{copy.checklistHeading}</h3>
             <ul>
-              {draft.checklist.map((item) => <li key={item}>{item}</li>)}
+              {(draft.routeKey === 'legacy' || draft.routeKey === 'nextgen'
+                ? copy.checklists[draft.routeKey]
+                : draft.checklist).map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
 
@@ -338,6 +349,14 @@ export function OfficialHandoffPanel({
               {returnAnnouncement.selectedPrefix} {returnLabels[returnDraft.selectedReturnState]}{language === 'hi' ? '।' : '.'}{' '}
               {returnAnnouncement.selectedBoundary}
             </p>
+          ) : null}
+          {returnDraft.selectedReturnState === 'portal-unavailable' ? (
+            <aside className={styles.status}>
+              <strong>{copy.fallback.heading}</strong>{' '}{copy.fallback.body}{' '}
+              <a href={draft.fallback.canonicalUrl} target="_blank" rel="noreferrer">
+                {copy.fallback.openPrefix}: {draft.fallback.serviceName}
+              </a>
+            </aside>
           ) : null}
           {returnRecorded ? (
             <p className={styles.status} role="status" aria-live="polite">{returnAnnouncement.recorded}</p>

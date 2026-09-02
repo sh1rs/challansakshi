@@ -887,6 +887,13 @@ const legacyChecklist = Object.freeze([
   'Choose any original JPEG, JPG, or PNG attachment directly on the official service; ChallanSakshi does not process or upload it.',
 ] as const);
 
+export type OfficialHandoffChecklistRoute = 'legacy' | 'nextgen';
+
+/** Single source of truth for the exact pre-confirmation and built-pack checklist. */
+export function getOfficialHandoffChecklist(route: OfficialHandoffChecklistRoute): readonly string[] {
+  return route === 'legacy' ? legacyChecklist : nextgenChecklist;
+}
+
 const syntheticChecklist = Object.freeze([
   'This is a fictional field-pack simulation for the synthetic proof lane.',
   'No government service is contacted and no official compatibility is asserted.',
@@ -1221,7 +1228,7 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
     evidenceSourceAndLimitations: projectSources(shared.facts),
     legacyIssue,
     description: shared.description,
-    checklist: route.key === 'legacy' ? legacyChecklist : nextgenChecklist,
+    checklist: getOfficialHandoffChecklist(route.key),
     intentionallyBlankOfficialFields,
     nonLegalLimitation: 'This is a user-reviewed factual preparation aid, not a filing, legal opinion, official communication, or prediction of the authority’s decision.',
     fieldPackConfirmation: Object.freeze({

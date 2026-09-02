@@ -29,16 +29,45 @@ import {
   type RecordAvailability,
 } from '../../lib/public-challan';
 import { startSharedDeviceInactivityGuard } from '../../lib/shared-device-inactivity';
+import {
+  ALL_ISSUING_JURISDICTION_CODES,
+  type IssuingJurisdictionCode,
+  type JurisdictionConfirmation,
+} from '../../lib/official-destinations';
+import { CURRENT_EXTENSION_RELEASE_STATE, evaluatePublicExtensionRelease } from '../../lib/extension-release';
+import {
+  activateCitizenReviewOfficialLink,
+  buildCitizenReviewHandoffView,
+  changeCitizenExtensionHelperPermission,
+  changeCitizenReferenceLastFour,
+  changeCitizenReturnAuthorization,
+  changeCitizenReturnState,
+  changeCitizenReviewHandoffDescription,
+  changeCitizenReviewLookupValue,
+  changeCitizenReviewPackPermission,
+  clearCitizenReviewExtensionPreparation,
+  completeCitizenReviewCopy,
+  confirmCitizenReviewHandoffPack,
+  createCitizenReviewHandoffController,
+  expireCitizenReviewExtensionPreparation,
+  getCitizenReviewReceiptState,
+  getCitizenReviewEffectGuardSignature,
+  invalidateCitizenReviewHandoff,
+  prepareCitizenReviewExtension,
+  recordCitizenReviewReturn,
+  requestCitizenReceiptDownload,
+  requestCitizenReviewCopy,
+  type CitizenReviewBrowserEffect,
+  type CitizenReviewHandoffControllerState,
+} from '../../lib/citizen-review-handoff-controller';
 import { LocalRecordIntake, type LocalRecordSelection } from './LocalRecordIntake';
+import { OfficialHandoffPanel } from './OfficialHandoffPanel';
 import { PublicBetaShell, SafetyBoundary, publicBetaStyles as styles } from './PublicBetaShell';
 
 type Step = 'safety' | 'source' | 'observations' | 'result';
 type Role = 'self' | 'helper';
 type Device = 'private' | 'shared';
 type ReviewError = { step: Step; message: string };
-
-const NATIONAL_URL = 'https://echallan.parivahan.gov.in/';
-const COURT_URL = 'https://vcourts.gov.in/virtualcourt/index.php';
 
 const defaults: CitizenChallanAnswers = {
   sourceStatus: 'not-selected',
@@ -53,6 +82,12 @@ const defaults: CitizenChallanAnswers = {
   noticeCopyAvailable: 'unclear',
   custodyRecordAvailable: 'not-applicable',
 };
+
+function freshOpaqueRevisionId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function t(language: Language, en: string, hi: string) {
   return language === 'hi' ? hi : en;
@@ -307,7 +342,13 @@ export default function CitizenReviewApp() {
   const [manualEntryMode, setManualEntryMode] = useState(false);
   const [helperSignature, setHelperSignature] = useState('');
   const [answers, setAnswers] = useState<CitizenChallanAnswers>(defaults);
-  const [jurisdiction, setJurisdiction] = useState('');
+  const [jurisdiction, setJurisdiction] = useState<JurisdictionConfirmation | null>(null);
+  const [handoffState, setHandoffState] = useState<CitizenReviewHandoffControllerState>(() => (
+    createCitizenReviewHandoffController({
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    })
+  ));
   const [vehicleSuffix, setVehicleSuffix] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [officialDeadline, setOfficialDeadline] = useState('');
@@ -323,6 +364,7 @@ export default function CitizenReviewApp() {
   const recordSelectionRef = useRef<LocalRecordSelection | null>(null);
   const photographSelectionRef = useRef<LocalRecordSelection | null>(null);
   const clearAndExitRef = useRef<() => void>(() => undefined);
+  const handoffStateRef = useRef(handoffState);
 
   const signature = useMemo(
     () => JSON.stringify({
@@ -353,6 +395,13 @@ export default function CitizenReviewApp() {
   const presentationSignature = `${signature}|${language}|${simpleMode ? 'simple' : 'standard'}`;
   const summaryGenerated = artifactSignature === presentationSignature && artifactSignature !== '';
   const presentation = getCitizenReviewPresentation(language, simpleMode);
+  const reviewRole = role === 'helper' ? 'present-helper' : 'self';
+  const reviewDevice = device === 'shared' ? 'shared' : 'private';
+  const jurisdictionLabel = jurisdiction?.status === 'confirmed'
+    ? jurisdiction.code
+    : jurisdiction?.status === 'unconfirmed'
+      ? t(language, 'I am not sure', 'मुझे पता नहीं')
+      : '';
   const assessment = useMemo(() => assessCitizenChallanReview(answers), [answers]);
   const localizedAssessment = useMemo(
     () => localizeAssessment(assessment, language, simpleMode),
@@ -417,7 +466,7 @@ export default function CitizenReviewApp() {
       answers,
       assessment,
       confirmation: 'confirmed',
-      jurisdiction,
+      jurisdiction: jurisdictionLabel,
       vehicleSuffix,
       allegedOffence: offence,
       eventDate,
@@ -435,6 +484,18 @@ export default function CitizenReviewApp() {
   const resultBody = simpleMode
     ? copy.simple[language === 'hi' ? 1 : 0]
     : copy.body[language === 'hi' ? 1 : 0];
+  const handoffViewInput = {
+    answers,
+    factsConfirmed,
+    jurisdictionConfirmation: jurisdiction,
+    role: reviewRole,
+    deviceMode: reviewDevice,
+    language,
+    simpleMode,
+    nowIso: new Date().toISOString(),
+  } as const;
+  const handoffView = buildCitizenReviewHandoffView(handoffState, handoffViewInput);
+  const extensionRelease = evaluatePublicExtensionRelease(CURRENT_EXTENSION_RELEASE_STATE);
 
   useEffect(() => {
     let active = true;
@@ -451,6 +512,10 @@ export default function CitizenReviewApp() {
     signatureRef.current = signature;
   }, [signature]);
 
+  useEffect(() => {
+    handoffStateRef.current = handoffState;
+  }, [handoffState]);
+
   useEffect(() => () => {
     if (recordSelectionRef.current?.previewUrl) {
       URL.revokeObjectURL(recordSelectionRef.current.previewUrl);
@@ -458,7 +523,22 @@ export default function CitizenReviewApp() {
     if (photographSelectionRef.current?.previewUrl) {
       URL.revokeObjectURL(photographSelectionRef.current.previewUrl);
     }
+    handoffStateRef.current = invalidateCitizenReviewHandoff(handoffStateRef.current, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    });
   }, []);
+
+  useEffect(() => {
+    if (handoffState.extensionPreparation.status !== 'prepared') return;
+    const delay = Math.max(0, handoffState.extensionPreparation.expiresAtMs - Date.now());
+    const timer = window.setTimeout(() => {
+      setHandoffState((current) => expireCitizenReviewExtensionPreparation(current, Date.now(), {
+        packRevisionId: freshOpaqueRevisionId(),
+      }));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [handoffState.extensionPreparation]);
 
   useEffect(() => {
     const refresh = () => setReferenceDate(indiaDateNow());
@@ -484,6 +564,10 @@ export default function CitizenReviewApp() {
   };
 
   const invalidate = () => {
+    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    }));
     confirmedSignatureRef.current = '';
     setConfirmedSignature('');
     setHelperSignature('');
@@ -503,7 +587,7 @@ export default function CitizenReviewApp() {
     invalidate();
     setManualEntryMode(false);
     setAnswers(defaults);
-    setJurisdiction('');
+    setJurisdiction(null);
     setVehicleSuffix('');
     setEventDate('');
     setOfficialDeadline('');
@@ -547,11 +631,13 @@ export default function CitizenReviewApp() {
 
   const chooseDevice = (nextDevice: Device) => {
     invalidate();
+    setHandoffState((current) => ({ ...current, deviceMode: nextDevice }));
     setDevice(nextDevice);
   };
 
   const chooseRole = (nextRole: Role) => {
     invalidate();
+    setHandoffState((current) => ({ ...current, role: nextRole === 'helper' ? 'present-helper' : 'self' }));
     setRole(nextRole);
   };
 
@@ -565,7 +651,7 @@ export default function CitizenReviewApp() {
     setAnswers(nextAnswers);
   };
 
-  const changeJurisdiction = (nextJurisdiction: string) => {
+  const changeJurisdiction = (nextJurisdiction: JurisdictionConfirmation) => {
     invalidate();
     setJurisdiction(nextJurisdiction);
   };
@@ -591,16 +677,28 @@ export default function CitizenReviewApp() {
   };
 
   const changeHelperConfirmation = (nextSignature: string) => {
+    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    }));
     invalidateArtifact();
     setHelperSignature(nextSignature);
   };
 
   const changeLanguage = (nextLanguage: Language) => {
+    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    }));
     invalidateArtifact();
     setLanguage(nextLanguage);
   };
 
   const changeSimpleMode = (nextSimpleMode: boolean) => {
+    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    }));
     invalidateArtifact();
     setSimpleMode(nextSimpleMode);
   };
@@ -796,27 +894,93 @@ export default function CitizenReviewApp() {
     );
   };
 
-  const route = jurisdiction === 'National e-Challan'
-    ? {
-      href: NATIONAL_URL,
-      external: true,
-      label: t(language, 'Open National e-Challan', 'राष्ट्रीय ई-चालान खोलें'),
+  const changeHandoffPackPermission = (
+    key: Parameters<typeof changeCitizenReviewPackPermission>[1],
+    checked: boolean,
+  ) => setHandoffState((current) => changeCitizenReviewPackPermission(current, key, checked, {
+    packRevisionId: freshOpaqueRevisionId(),
+  }));
+
+  const confirmHandoffPack = (checked: boolean) => {
+    if (!checked) {
+      changeHandoffPackPermission('affectedPersonConfirmedPack', false);
+      return;
     }
-    : jurisdiction === 'Virtual Court'
-      ? {
-        href: COURT_URL,
-        external: true,
-        label: t(language, 'Open Virtual Courts', 'वर्चुअल कोर्ट खोलें'),
-      }
-      : {
-        href: '/safety',
-        external: false,
-        label: t(
-          language,
-          'Find the responsible official route safely',
-          'जिम्मेदार आधिकारिक रास्ता सुरक्षित खोजें',
-        ),
-      };
+    const nowIso = new Date().toISOString();
+    setHandoffState((current) => {
+      const currentView = buildCitizenReviewHandoffView(current, { ...handoffViewInput, nowIso });
+      return confirmCitizenReviewHandoffPack(current, {
+        view: currentView,
+        sourceKind: answers.sourceStatus === 'downloaded-official-record'
+          ? 'official-download'
+          : 'official-service',
+        nowIso,
+      });
+    });
+  };
+
+  const copyHandoffField = async (field: Parameters<typeof requestCitizenReviewCopy>[1]) => {
+    if (device === 'shared') return;
+    const requested = requestCitizenReviewCopy(handoffStateRef.current, field);
+    if (!requested.effect || requested.effect.type !== 'clipboard-write') return;
+    const effect = requested.effect;
+    handoffStateRef.current = requested.state;
+    setHandoffState(requested.state);
+    if (
+      handoffStateRef.current.pendingCopy?.token !== effect.token
+      || getCitizenReviewEffectGuardSignature(handoffStateRef.current) !== effect.guardSignature
+    ) return;
+    try {
+      await navigator.clipboard.writeText(effect.value);
+      setHandoffState((current) => completeCitizenReviewCopy(current, effect.token, true));
+    } catch {
+      setHandoffState((current) => completeCitizenReviewCopy(current, effect.token, false));
+    }
+  };
+
+  const downloadHandoffEffect = (effect: Extract<CitizenReviewBrowserEffect, { type: 'download-text' }>) => {
+    if (
+      effect.token !== `receipt-${handoffStateRef.current.effectCounter}`
+      || getCitizenReviewEffectGuardSignature(handoffStateRef.current) !== effect.guardSignature
+    ) return;
+    const blob = new Blob([effect.content], { type: effect.mime });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = effect.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadHandoffReceipt = () => {
+    if (device === 'shared') return;
+    const requested = requestCitizenReceiptDownload(handoffStateRef.current);
+    if (!requested.effect || requested.effect.type !== 'download-text') return;
+    handoffStateRef.current = requested.state;
+    setHandoffState(requested.state);
+    downloadHandoffEffect(requested.effect);
+  };
+
+  const extensionPresentation = {
+    release: extensionRelease,
+    preparationAllowedByController: extensionRelease.status === 'public-enabled'
+      && reviewDevice === 'private'
+      && handoffState.confirmedPack !== null
+      && handoffState.packConfirmation.supportedDesktopConfirmed
+      && handoffState.packConfirmation.boundedSafetyReviewConfirmed
+      && (reviewRole === 'self' || (
+        handoffState.extensionHelperConfirmation.affectedPersonPresent
+        && handoffState.extensionHelperConfirmation.affectedPersonReviewedFields
+        && handoffState.extensionHelperConfirmation.affectedPersonRequestedPreparation
+      )),
+    supportedDesktopConfirmed: handoffState.packConfirmation.supportedDesktopConfirmed,
+    boundedSafetyReviewConfirmed: handoffState.packConfirmation.boundedSafetyReviewConfirmed,
+    helperConfirmation: handoffState.extensionHelperConfirmation,
+    preparation: handoffState.extensionPreparation.status === 'prepared'
+      ? { status: 'prepared' as const, canonicalEnvelopeJson: handoffState.extensionPreparation.canonicalEnvelopeJson }
+      : handoffState.extensionPreparation,
+  };
+
   const observationOptions: Array<[Observation, string]> = [
     ['match', t(language, 'Appears to match', 'मेल खाता दिखता है')],
     ['different', t(language, 'Appears materially different', 'महत्वपूर्ण रूप से अलग')],
@@ -1017,45 +1181,29 @@ export default function CitizenReviewApp() {
             <h2 className={styles.decisionHeading}>
               {t(language, 'Choose where to check', 'कहाँ जाँचना है चुनें')}
             </h2>
-            <div className={styles.serviceGrid}>
-              {([
-                ['National e-Challan', NATIONAL_URL, true],
-                ['State or UT traffic service', '/safety', false],
-                ['Virtual Court', COURT_URL, true],
-                ['I am not sure', '/safety', false],
-              ] as const).map(([label, href, external]) => (
-                <article
-                  key={label}
-                  className={jurisdiction === label ? styles.serviceActive : ''}
-                >
-                  <button
-                    type="button"
-                    aria-pressed={jurisdiction === label}
-                    onClick={() => changeJurisdiction(label)}
-                  >
-                    {t(
-                      language,
-                      label,
-                      label === 'National e-Challan'
-                        ? 'राष्ट्रीय ई-चालान'
-                        : label === 'State or UT traffic service'
-                          ? 'राज्य/केंद्रशासित यातायात सेवा'
-                          : label === 'Virtual Court'
-                            ? 'वर्चुअल कोर्ट'
-                            : 'मुझे पता नहीं',
-                    )}
-                  </button>
-                  <a
-                    href={href}
-                    target={external ? '_blank' : undefined}
-                    rel={external ? 'noreferrer' : undefined}
-                  >
-                    {external
-                      ? t(language, 'Open official service ↗', 'आधिकारिक सेवा खोलें ↗')
-                      : t(language, 'Use safety route guidance', 'सुरक्षित रास्ता देखें')}
-                  </a>
-                </article>
-              ))}
+            <div className={styles.field}>
+              <label htmlFor="issuing-jurisdiction">
+                {t(language, 'Issuing state or union territory', 'जारी करने वाला राज्य या केंद्रशासित प्रदेश')}
+              </label>
+              <select
+                id="issuing-jurisdiction"
+                value={jurisdiction?.status === 'confirmed' ? jurisdiction.code : jurisdiction ? '__unconfirmed__' : ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  if (value === '__unconfirmed__') changeJurisdiction({ status: 'unconfirmed' });
+                  else if (value) changeJurisdiction({ status: 'confirmed', code: value as IssuingJurisdictionCode });
+                }}
+              >
+                <option value="">{t(language, 'Choose issuing jurisdiction', 'जारी करने वाला क्षेत्र चुनें')}</option>
+                {ALL_ISSUING_JURISDICTION_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
+                <option value="__unconfirmed__">{t(language, 'I am not sure', 'मुझे पता नहीं')}</option>
+              </select>
+              <p>
+                {t(language, 'Use this purpose-labelled registry link only to locate the record:', 'रिकॉर्ड खोजने के लिए केवल यह उद्देश्य-चिह्नित सूची लिंक उपयोग करें:')}{' '}
+                <a href={handoffView.lookupRoute.canonicalUrl} target="_blank" rel="noreferrer">
+                  {handoffView.lookupRoute.serviceName} — {handoffView.lookupRoute.purpose}
+                </a>
+              </p>
             </div>
             <div className={styles.recordSection}>
               <h3>
@@ -1436,6 +1584,10 @@ export default function CitizenReviewApp() {
                   type="checkbox"
                   checked={factsConfirmed}
                   onChange={(e) => {
+                    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+                      resultRevisionId: freshOpaqueRevisionId(),
+                      packRevisionId: freshOpaqueRevisionId(),
+                    }));
                     invalidateArtifact();
                     confirmedSignatureRef.current = e.target.checked ? signature : '';
                     setConfirmedSignature(e.target.checked ? signature : '');
@@ -1517,6 +1669,71 @@ export default function CitizenReviewApp() {
                 </p>
               </div>
             </div>
+            <OfficialHandoffPanel
+              language={language}
+              simpleMode={simpleMode}
+              reviewContext={{
+                role: reviewRole,
+                deviceMode: reviewDevice,
+                safetyConsent: {
+                  manualReviewAcknowledged: consent.manual,
+                  minimumDataAcknowledged: consent.minimum,
+                  affectedPersonPresentAcknowledged: consent.citizenConfirmed,
+                },
+              }}
+              draft={handoffView.draft}
+              confirmedPack={handoffState.confirmedPack}
+              packConfirmation={handoffState.packConfirmation}
+              copyStatus={handoffState.copyStatus}
+              lookupValue={handoffState.lookupValue}
+              officialLinkStatus={handoffState.linkActivation ? 'activated' : 'not-activated'}
+              receiptState={getCitizenReviewReceiptState(handoffState)}
+              returnDraft={handoffState.returnDraft}
+              returnAuthorization={handoffState.returnAuthorization}
+              extension={extensionPresentation}
+              callbacks={{
+                onDescriptionChange: (value) => setHandoffState((current) => (
+                  changeCitizenReviewHandoffDescription(current, value, {
+                    packRevisionId: freshOpaqueRevisionId(),
+                  })
+                )),
+                onLookupValueChange: (value) => setHandoffState((current) => (
+                  changeCitizenReviewLookupValue(current, value)
+                )),
+                onAffectedPersonPresentChange: (checked) => changeHandoffPackPermission('affectedPersonPresent', checked),
+                onAffectedPersonInspectedEvidenceChange: (checked) => changeHandoffPackPermission('affectedPersonInspectedEvidence', checked),
+                onAffectedPersonInspectedReadableRecordChange: (checked) => changeHandoffPackPermission('affectedPersonInspectedReadableRecord', checked),
+                onAffectedPersonConfirmedEntitlementChange: (checked) => changeHandoffPackPermission('affectedPersonConfirmedEntitlement', checked),
+                onAffectedPersonRequestedPreparationChange: (checked) => changeHandoffPackPermission('affectedPersonRequestedPreparation', checked),
+                onAffectedPersonConfirmedPackChange: confirmHandoffPack,
+                onOfficialLinkActivate: () => setHandoffState((current) => (
+                  activateCitizenReviewOfficialLink(current, new Date().toISOString())
+                )),
+                onCopyField: copyHandoffField,
+                onReturnStateChange: (value) => setHandoffState((current) => changeCitizenReturnState(current, value)),
+                onReferenceLastFourChange: (value) => setHandoffState((current) => changeCitizenReferenceLastFour(current, value)),
+                onReturnAffectedPersonPresentChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonPresent', checked)),
+                onReturnRecordingRequestedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonRequestedReturnRecording', checked)),
+                onReturnStateConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReturnState', checked)),
+                onReturnReferenceConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReferenceFragment', checked)),
+                onRecordReturn: () => setHandoffState((current) => recordCitizenReviewReturn(current, new Date().toISOString())),
+                onDownloadReceipt: downloadHandoffReceipt,
+              }}
+              extensionCallbacks={{
+                onSupportedDesktopChange: (checked) => changeHandoffPackPermission('supportedDesktopConfirmed', checked),
+                onBoundedSafetyReviewChange: (checked) => changeHandoffPackPermission('boundedSafetyReviewConfirmed', checked),
+                onAffectedPersonPresentChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonPresent', checked, { packRevisionId: freshOpaqueRevisionId() })),
+                onAffectedPersonReviewedFieldsChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonReviewedFields', checked, { packRevisionId: freshOpaqueRevisionId() })),
+                onAffectedPersonRequestedPreparationChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonRequestedPreparation', checked, { packRevisionId: freshOpaqueRevisionId() })),
+                onPrepare: () => setHandoffState((current) => prepareCitizenReviewExtension(current, {
+                  release: extensionRelease,
+                  language,
+                  simpleMode,
+                  nowMs: Date.now(),
+                })),
+                onClearPrepared: () => setHandoffState((current) => clearCitizenReviewExtensionPreparation(current)),
+              }}
+            />
             {answers.sourceStatus === 'message-only' || !factsConfirmed || !view ? (
               <div className={styles.stopCard}>
                 <h2>
@@ -1529,37 +1746,9 @@ export default function CitizenReviewApp() {
                     'जिम्मेदार आधिकारिक सेवा स्वतंत्र रूप से खोजें। सबूत तुलना उपलब्ध नहीं है।',
                   )}
                 </p>
-                <a
-                  className={styles.button}
-                  href={route.href}
-                  target={route.external ? '_blank' : undefined}
-                  rel={route.external ? 'noreferrer' : undefined}
-                >
-                  {route.label} →
-                </a>
               </div>
             ) : (
                 <>
-                  <section className={styles.officialHandoff}>
-                    <div>
-                      <h3>{presentation.resultSections.officialRoute}</h3>
-                      <p>
-                        {t(
-                          language,
-                          'Nothing is transferred; enter identifiers only there.',
-                          'कुछ स्थानांतरित नहीं होता; पहचान केवल वहाँ दर्ज करें।',
-                        )}
-                      </p>
-                    </div>
-                    <a
-                      className={styles.button}
-                      href={route.href}
-                      target={route.external ? '_blank' : undefined}
-                      rel={route.external ? 'noreferrer' : undefined}
-                    >
-                      {route.label} →
-                    </a>
-                  </section>
                   <div className={styles.resultColumns}>
                     <section className={styles.listPanel}>
                       <h3>{presentation.resultSections.established}</h3>

@@ -281,6 +281,23 @@ const officialHandoffEnglish = {
   copyDescription: 'Copy reviewed description',
   sharedInstruction: 'Select this reviewed description and type or paste it into the official service yourself.',
   checklistHeading: 'Before you leave',
+  checklists: {
+    nextgen: [
+      'Enter the challan number directly on the official service, or use the separate private-device copy aid.',
+      'Choose any offence requested by the official service yourself.',
+      'Review the description before submitting on the official service.',
+    ],
+    legacy: [
+      'Enter the challan number directly on the official service, or use the separate private-device copy aid.',
+      'Review the category and description before submitting on the official service.',
+      'Choose any original JPEG, JPG, or PNG attachment directly on the official service; ChallanSakshi does not process or upload it.',
+    ],
+  },
+  fallback: {
+    heading: 'The original official service did not work for you.',
+    body: 'This is your report, not a verified government service status. Your field pack and original destination have not changed.',
+    openPrefix: 'Open the official services directory',
+  },
   safetyBoundary: 'Review every field before leaving ChallanSakshi. Nothing has been submitted.',
   roles: {
     self: {
@@ -344,7 +361,7 @@ const officialHandoffEnglish = {
   returnHeading: 'What happened on the official service?',
   returnStates: {
     acknowledgementSeen: 'I saw an acknowledgement on the official service',
-    portalUnavailable: 'The official portal was unavailable',
+    portalUnavailable: 'The official portal did not work for me',
     notSubmitted: 'I did not submit',
     correctionNeeded: 'I need to correct my pack',
   },
@@ -438,6 +455,23 @@ const officialHandoffHindi = {
   copyDescription: 'समीक्षित विवरण कॉपी करें',
   sharedInstruction: 'इस समीक्षित विवरण को चुनें और आधिकारिक सेवा में स्वयं टाइप या पेस्ट करें।',
   checklistHeading: 'जाने से पहले',
+  checklists: {
+    nextgen: [
+      'चालान नंबर आधिकारिक सेवा पर स्वयं दर्ज करें या निजी डिवाइस की अलग कॉपी सहायता उपयोग करें।',
+      'आधिकारिक सेवा द्वारा माँगा गया अपराध स्वयं चुनें।',
+      'आधिकारिक सेवा पर जमा करने से पहले विवरण जाँचें।',
+    ],
+    legacy: [
+      'चालान नंबर आधिकारिक सेवा पर स्वयं दर्ज करें या निजी डिवाइस की अलग कॉपी सहायता उपयोग करें।',
+      'आधिकारिक सेवा पर जमा करने से पहले श्रेणी और विवरण जाँचें।',
+      'मूल जेपीईजी, जेपीजी या पीएनजी संलग्नक आधिकारिक सेवा पर स्वयं चुनें; ChallanSakshi इसे संसाधित या अपलोड नहीं करता।',
+    ],
+  },
+  fallback: {
+    heading: 'मूल आधिकारिक सेवा आपके लिए नहीं चली।',
+    body: 'यह आपकी रिपोर्ट है, किसी सरकारी रुकावट की सत्यापित सूचना नहीं। आपका फ़ील्ड पैक और मूल गंतव्य नहीं बदले हैं।',
+    openPrefix: 'आधिकारिक सेवा निर्देशिका खोलें',
+  },
   safetyBoundary: 'ChallanSakshi छोड़ने से पहले हर फ़ील्ड जाँचें। कुछ भी जमा नहीं हुआ है।',
   roles: {
     self: {
@@ -501,7 +535,7 @@ const officialHandoffHindi = {
   returnHeading: 'आधिकारिक सेवा पर क्या हुआ?',
   returnStates: {
     acknowledgementSeen: 'मुझे आधिकारिक सेवा पर पावती दिखी',
-    portalUnavailable: 'आधिकारिक पोर्टल उपलब्ध नहीं था',
+    portalUnavailable: 'आधिकारिक पोर्टल मेरे लिए नहीं चला',
     notSubmitted: 'मैंने जमा नहीं किया',
     correctionNeeded: 'मुझे अपने पैक में सुधार करना है',
   },
