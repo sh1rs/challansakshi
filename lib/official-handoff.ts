@@ -21,6 +21,14 @@ export const MAX_REVIEWED_DESCRIPTION_CODE_POINTS = 500;
 export const OPAQUE_REVISION_ID_PATTERN = /^[0-9a-f]{32}$/;
 export const PACK_DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 
+export function isOpaqueRevisionId(value: unknown): value is string {
+  return typeof value === 'string' && OPAQUE_REVISION_ID_PATTERN.test(value);
+}
+
+export function isPackDigest(value: unknown): value is string {
+  return typeof value === 'string' && PACK_DIGEST_PATTERN.test(value);
+}
+
 export const EXPORT_SAFE_NEUTRAL_LIMITATIONS = Object.freeze({
   'official-record': 'Based only on the affected person’s review of the official record; ChallanSakshi did not authenticate it.',
   'official-evidence-image': 'Based only on the affected person’s review of the supplied evidence image; image interpretation may be limited.',
@@ -207,7 +215,8 @@ export type OfficialHandoffAbstentionReason =
   | 'invalid-reviewed-facts'
   | 'invalid-description'
   | 'description-not-export-safe'
-  | 'invalid-timestamp';
+  | 'invalid-timestamp'
+  | 'generated-at-mismatch';
 
 export type SyntheticHandoffAbstentionReason =
   | 'invalid-synthetic-input'
@@ -277,8 +286,11 @@ function isWellFormedUnicode(value: string): boolean {
 }
 
 /** Normalizes citizen-reviewed text without ever truncating it. */
-export function normalizeReviewedDescription(value: string): string {
-  if (typeof value !== 'string' || !isWellFormedUnicode(value)) {
+export function normalizeReviewedDescription(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new TypeError('Reviewed description must be a primitive string.');
+  }
+  if (!isWellFormedUnicode(value)) {
     throw new Error('Reviewed description must contain well-formed Unicode.');
   }
   const normalized = value.replace(/\r\n?/g, '\n').normalize('NFC');
@@ -319,23 +331,41 @@ function containsAsciiBoundedMatch(value: string, pattern: RegExp): boolean {
   return false;
 }
 
-export function containsMarkupOrScriptSentinel(value: string): boolean {
+function requirePrimitiveString(value: unknown): asserts value is string {
+  if (typeof value !== 'string') throw new TypeError('Export-safety input must be a primitive string.');
+}
+
+type AsciiWordToken = Readonly<{ word: string; start: number; end: number }>;
+
+function asciiWordTokens(value: string): readonly AsciiWordToken[] {
+  return Array.from(value.matchAll(/[A-Za-z0-9]+/g), (match) => Object.freeze({
+    word: match[0].toLowerCase(),
+    start: match.index ?? 0,
+    end: (match.index ?? 0) + match[0].length,
+  }));
+}
+
+export function containsMarkupOrScriptSentinel(value: unknown): boolean {
+  requirePrimitiveString(value);
   return /[<>]/.test(value) || /(?:javascript:|vbscript:|data:text\/html)/i.test(value);
 }
 
-export function containsUrlLikeValue(value: string): boolean {
+export function containsUrlLikeValue(value: unknown): boolean {
+  requirePrimitiveString(value);
   if (/(?:https?:\/\/|www\.)/i.test(value)) return true;
   const domain = /(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}/g;
   return containsAsciiBoundedMatch(value, domain);
 }
 
-export function containsEmailOrUpiHandle(value: string): boolean {
+export function containsEmailOrUpiHandle(value: unknown): boolean {
+  requirePrimitiveString(value);
   const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}/g;
   const handle = /[A-Za-z0-9._-]{2,64}@[A-Za-z0-9._-]{2,64}/g;
   return containsAsciiBoundedMatch(value, email) || containsAsciiBoundedMatch(value, handle);
 }
 
-export function containsDigitLikeIdentifier(value: string): boolean {
+export function containsDigitLikeIdentifier(value: unknown): boolean {
+  requirePrimitiveString(value);
   for (const match of value.matchAll(/[0-9 +().-]+/g)) {
     const count = match[0].replace(/\D/g, '').length;
     if (count >= 9 && count <= 19) return true;
@@ -343,17 +373,20 @@ export function containsDigitLikeIdentifier(value: string): boolean {
   return false;
 }
 
-export function containsPanShapedValue(value: string): boolean {
+export function containsPanShapedValue(value: unknown): boolean {
+  requirePrimitiveString(value);
   return containsAsciiBoundedMatch(value, /[A-Za-z]{5}[0-9]{4}[A-Za-z]/g);
 }
 
-export function containsIndianRegistration(value: string): boolean {
+export function containsIndianRegistration(value: unknown): boolean {
+  requirePrimitiveString(value);
   const conventional = /[A-Za-z]{2}[ -]?[0-9]{1,2}[ -]?[A-Za-z]{1,3}[ -]?[0-9]{4}/g;
   const bharat = /[0-9]{2}[ -]?BH[ -]?[0-9]{4}[ -]?[A-Za-z]{1,2}/gi;
   return containsAsciiBoundedMatch(value, conventional) || containsAsciiBoundedMatch(value, bharat);
 }
 
-export function containsLongMixedIdentifier(value: string): boolean {
+export function containsLongMixedIdentifier(value: unknown): boolean {
+  requirePrimitiveString(value);
   for (const match of value.matchAll(/[A-Za-z0-9_-]+/g)) {
     const compact = match[0].replace(/[_-]/g, '');
     const letters = (compact.match(/[A-Za-z]/g) ?? []).length;
@@ -363,23 +396,91 @@ export function containsLongMixedIdentifier(value: string): boolean {
   return false;
 }
 
-export function containsCredentialOrPaymentToken(value: string): boolean {
-  return /(?:password|passcode|credential|secret|api[ _-]?key|otp|captcha|cvv|upi[ _-]?pin|payment[ _-]?token|bank[ _-]?account|account[ _-]?number|card[ _-]?number|transaction[ _-]?id)\s*[:=]\s*\S+/i.test(value);
+const credentialKeywordSequences = Object.freeze([
+  ['password'], ['passcode'], ['credential'], ['secret'], ['otp'], ['captcha'], ['cvv'],
+  ['api', 'key'], ['key', 'api'], ['upi', 'pin'], ['pin', 'upi'],
+  ['payment', 'token'], ['token', 'payment'], ['bank', 'account'], ['account', 'bank'],
+  ['account', 'number'], ['number', 'account'], ['card', 'number'], ['number', 'card'],
+  ['transaction', 'id'], ['id', 'transaction'],
+] as const);
+const credentialKeywordWords: ReadonlySet<string> = new Set(credentialKeywordSequences.flat());
+const statusNouns = new Set([
+  'submission', 'grievance', 'complaint', 'ticket', 'case', 'status',
+  'acknowledgement', 'acknowledgment', 'confirmation', 'authority', 'government', 'police',
+]);
+const officialOutcomeWords = new Set([
+  'success', 'successful', 'successfully', 'submitted', 'filed', 'created', 'accepted',
+  'approved', 'acknowledged', 'cancelled', 'canceled', 'resolved', 'completed',
+]);
+
+function wordsMatchAt(tokens: readonly AsciiWordToken[], start: number, words: readonly string[]): boolean {
+  return words.every((word, offset) => tokens[start + offset]?.word === word);
 }
 
-export function containsRawFilename(value: string): boolean {
-  return containsAsciiBoundedMatch(
-    value,
-    /[A-Za-z0-9_-](?:[A-Za-z0-9._ -]{0,126}[A-Za-z0-9_-])?\.(?:pdf|jpe?g|png|webp|heic|gif|tiff?|docx?|xlsx?|txt|csv)/gi,
-  );
+export function containsCredentialOrPaymentToken(value: unknown): boolean {
+  requirePrimitiveString(value);
+  const tokens = asciiWordTokens(value);
+  for (let index = 0; index < tokens.length; index += 1) {
+    for (const keyword of credentialKeywordSequences) {
+      if (!wordsMatchAt(tokens, index, keyword)) continue;
+      const keywordEnd = tokens[index + keyword.length - 1].end;
+      const following = tokens.slice(index + keyword.length, index + keyword.length + 3);
+      for (let offset = 0; offset < following.length; offset += 1) {
+        const candidate = following[offset];
+        if (candidate.start - keywordEnd > 48) break;
+        const separator = value.slice(keywordEnd, candidate.start);
+        const marked = /[:=\-–—>→\[\](){}]/u.test(separator)
+          || (offset > 0 && ['value', 'code', 'number', 'id'].includes(following[offset - 1].word));
+        const looksLikeValue = /[0-9]/.test(candidate.word)
+          && (candidate.word.length >= 3 || /[A-Za-z]/.test(candidate.word));
+        if (!credentialKeywordWords.has(candidate.word)
+          && ((marked && candidate.word.length >= 2) || looksLikeValue)) return true;
+      }
+    }
+  }
+  return false;
 }
 
-export function containsFabricatedOfficialStatus(value: string): boolean {
-  return /(?:grievance|complaint|ticket|case)\s+(?:was\s+)?(?:submitted|filed|created|accepted|approved|acknowledged|cancelled|canceled|resolved)(?:\s+successfully)?|(?:submitted|filed|accepted|approved|acknowledged|cancelled|canceled|resolved)\s+by\s+(?:the\s+)?(?:authority|government|police)|(?:official|government)\s+(?:status|acknowledgement|confirmation)\s*:/i.test(value);
+export function containsRawFilename(value: unknown): boolean {
+  requirePrimitiveString(value);
+  for (const extension of value.matchAll(/\.(?:pdf|jpe?g|png|webp|heic|gif|tiff?|docx?|xlsx?|txt|csv)(?![A-Za-z0-9])/gi)) {
+    const dot = extension.index ?? 0;
+    const boundedPrefix = value.slice(Math.max(0, dot - 127), dot);
+    const basename = boundedPrefix.slice(Math.max(
+      boundedPrefix.lastIndexOf('/'),
+      boundedPrefix.lastIndexOf('\\'),
+      boundedPrefix.lastIndexOf('\n'),
+      boundedPrefix.lastIndexOf('\r'),
+      boundedPrefix.lastIndexOf('\t'),
+    ) + 1).trim();
+    if (
+      basename.length > 0
+      && basename.length <= 127
+      && /^[\x20-\x7e]+$/.test(basename)
+      && /[A-Za-z0-9]/.test(basename)
+      && /[A-Za-z0-9)\]}]$/.test(basename)
+    ) return true;
+  }
+  return false;
+}
+
+export function containsFabricatedOfficialStatus(value: unknown): boolean {
+  requirePrimitiveString(value);
+  const tokens = asciiWordTokens(value);
+  for (let left = 0; left < tokens.length; left += 1) {
+    for (let right = Math.max(0, left - 5); right <= Math.min(tokens.length - 1, left + 5); right += 1) {
+      if (left === right) continue;
+      const pairMatches = (statusNouns.has(tokens[left].word) && officialOutcomeWords.has(tokens[right].word))
+        || (officialOutcomeWords.has(tokens[left].word) && statusNouns.has(tokens[right].word));
+      if (pairMatches && Math.abs(tokens[right].start - tokens[left].start) <= 96) return true;
+    }
+  }
+  return false;
 }
 
 /** Shared bounded matcher used by the web pack and the extension envelope. */
-export function findBoundedExportSafetyMatches(value: string): readonly BoundedExportSafetyMatch[] {
+export function findBoundedExportSafetyMatches(value: unknown): readonly BoundedExportSafetyMatch[] {
+  requirePrimitiveString(value);
   const matches: BoundedExportSafetyMatch[] = [];
   const add = (match: BoundedExportSafetyMatch, condition: boolean) => {
     if (condition) matches.push(match);
@@ -399,7 +500,8 @@ export function findBoundedExportSafetyMatches(value: string): readonly BoundedE
   return Object.freeze(matches);
 }
 
-export function validateExportSafeReviewedText(value: string): string {
+export function validateExportSafeReviewedText(value: unknown): string {
+  requirePrimitiveString(value);
   const matches = findBoundedExportSafetyMatches(value);
   if (matches.length > 0) {
     throw new Error(`Reviewed text failed bounded export-safety checks: ${matches.join(', ')}.`);
@@ -413,6 +515,7 @@ function cloneFact<T>(candidate: unknown, revisionId: string): ReviewFact<T> | n
     !factSources.has(candidate.source as ReviewFactSource)
     || candidate.confidence !== 'high'
     || candidate.confirmation !== 'citizen-confirmed'
+    || !isOpaqueRevisionId(candidate.reviewRevisionId)
     || candidate.reviewRevisionId !== revisionId
     || !nonEmptyText(candidate.limitation)
   ) return null;
@@ -434,11 +537,14 @@ function twoVersusFour(left: unknown, right: unknown): boolean {
 
 /** Rebuilds only the neutral, provenance-bearing fields approved by Task 1. */
 export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): ReviewedFactProjection {
-  if (!isRecord(facts) || !OPAQUE_REVISION_ID_PATTERN.test(facts.reviewRevisionId) || !Array.isArray(facts.supportedSignals)) {
+  if (!isRecord(facts)) throw new Error('Action-ready facts are invalid.');
+  const reviewRevisionCandidate = facts.reviewRevisionId;
+  const supportedSignalsCandidate = facts.supportedSignals;
+  if (!isOpaqueRevisionId(reviewRevisionCandidate) || !Array.isArray(supportedSignalsCandidate)) {
     throw new Error('Action-ready facts are invalid.');
   }
-  const reviewRevisionId = facts.reviewRevisionId.trim();
-  const signals = [...facts.supportedSignals];
+  const reviewRevisionId = reviewRevisionCandidate;
+  const signals = [...supportedSignalsCandidate];
   if (
     signals.length === 0
     || signals.some((signal) => !supportedSignals.has(signal))
@@ -607,32 +713,53 @@ function roleConfirmationIsComplete(value: unknown): value is PackRoleConfirmati
 }
 
 function validateSharedInput(input: SharedHandoffBuildInput):
-  | Readonly<{ ok: true; facts: ReviewedFactProjection; description: string; role: ReviewRole }>
-  | Readonly<{ ok: false; reason: Exclude<OfficialHandoffAbstentionReason, 'invalid-real-input' | 'route-not-action-ready'> }> {
+  | Readonly<{
+    ok: true;
+    facts: ReviewedFactProjection;
+    description: string;
+    role: ReviewRole;
+    resultRevisionId: string;
+    packRevisionId: string;
+    generatedAt: string;
+  }>
+  | Readonly<{
+    ok: false;
+    reason: Exclude<OfficialHandoffAbstentionReason, 'invalid-real-input' | 'route-not-action-ready' | 'generated-at-mismatch'>;
+  }> {
   if (input.resultClass !== 'possible-discrepancy') {
     return { ok: false, reason: 'result-not-action-ready' };
   }
+  const resultRevisionCandidate: unknown = input.resultRevisionId;
+  const packRevisionCandidate: unknown = input.packRevisionId;
+  const factsCandidate: unknown = input.facts;
   if (
-    !OPAQUE_REVISION_ID_PATTERN.test(input.resultRevisionId)
-    || !OPAQUE_REVISION_ID_PATTERN.test(input.packRevisionId)
+    !isOpaqueRevisionId(resultRevisionCandidate)
+    || !isOpaqueRevisionId(packRevisionCandidate)
+    || !isRecord(factsCandidate)
   ) return { ok: false, reason: 'invalid-revision-id' };
-  if (input.facts?.reviewRevisionId !== input.resultRevisionId) {
+  const reviewRevisionCandidate: unknown = factsCandidate.reviewRevisionId;
+  if (!isOpaqueRevisionId(reviewRevisionCandidate)) return { ok: false, reason: 'invalid-revision-id' };
+  if (reviewRevisionCandidate !== resultRevisionCandidate) {
     return { ok: false, reason: 'result-revision-mismatch' };
   }
+  const confirmationCandidate: unknown = input.confirmation;
+  if (!isRecord(confirmationCandidate)) return { ok: false, reason: 'pack-confirmation-stale' };
+  const confirmedPackRevisionCandidate: unknown = confirmationCandidate.packRevisionId;
+  if (!isOpaqueRevisionId(confirmedPackRevisionCandidate)) return { ok: false, reason: 'invalid-revision-id' };
   if (
-    !nonEmptyText(input.packRevisionId)
-    || !isRecord(input.confirmation)
-    || input.confirmation.status !== 'confirmed'
-    || input.confirmation.packRevisionId !== input.packRevisionId
+    confirmationCandidate.status !== 'confirmed'
+    || confirmedPackRevisionCandidate !== packRevisionCandidate
   ) return { ok: false, reason: 'pack-confirmation-stale' };
-  if (!roleConfirmationIsComplete(input.confirmation.roleConfirmation)) {
+  const roleConfirmationCandidate: unknown = confirmationCandidate.roleConfirmation;
+  if (!roleConfirmationIsComplete(roleConfirmationCandidate)) {
     return { ok: false, reason: 'role-confirmation-incomplete' };
   }
-  if (!isCanonicalTimestamp(input.generatedAt)) return { ok: false, reason: 'invalid-timestamp' };
+  const generatedAtCandidate: unknown = input.generatedAt;
+  if (!isCanonicalTimestamp(generatedAtCandidate)) return { ok: false, reason: 'invalid-timestamp' };
 
   let facts: ReviewedFactProjection;
   try {
-    facts = buildReviewedFactProjection(input.facts);
+    facts = buildReviewedFactProjection(factsCandidate as unknown as ActionReadyReviewFacts);
   } catch {
     return { ok: false, reason: 'invalid-reviewed-facts' };
   }
@@ -651,7 +778,10 @@ function validateSharedInput(input: SharedHandoffBuildInput):
     ok: true,
     facts,
     description,
-    role: input.confirmation.roleConfirmation.role,
+    role: roleConfirmationCandidate.role,
+    resultRevisionId: resultRevisionCandidate,
+    packRevisionId: packRevisionCandidate,
+    generatedAt: generatedAtCandidate,
   };
 }
 
@@ -847,9 +977,9 @@ export function isAuthenticOfficialHandoffPack(candidate: unknown): candidate is
     || (candidate.sourceKind !== 'official-service' && candidate.sourceKind !== 'official-download')
     || (candidate.reviewRole !== 'self' && candidate.reviewRole !== 'present-helper')
     || candidate.resultClass !== 'possible-discrepancy'
-    || !OPAQUE_REVISION_ID_PATTERN.test(candidate.resultRevisionId as string)
-    || !OPAQUE_REVISION_ID_PATTERN.test(candidate.packRevisionId as string)
-    || !PACK_DIGEST_PATTERN.test(candidate.packDigest as string)
+    || !isOpaqueRevisionId(candidate.resultRevisionId)
+    || !isOpaqueRevisionId(candidate.packRevisionId)
+    || !isPackDigest(candidate.packDigest)
     || candidate.routeRegistryVersion !== OFFICIAL_ROUTE_REGISTRY_VERSION
     || candidate.issueFamily !== 'wrong-photo-or-wrong-vehicle'
     || candidate.evidenceAssessment !== 'Possible discrepancy'
@@ -869,6 +999,12 @@ export function isAuthenticOfficialHandoffPack(candidate: unknown): candidate is
   } catch {
     return false;
   }
+}
+
+function instantMilliseconds(value: string | Date): number | null {
+  if (typeof value !== 'string' && !(value instanceof Date)) return null;
+  const milliseconds = new Date(value).getTime();
+  return Number.isFinite(milliseconds) ? milliseconds : null;
 }
 
 function isRealWrapperInput(input: unknown): input is RealHandoffBuildInput {
@@ -894,11 +1030,16 @@ function isSyntheticWrapperInput(input: unknown): input is SyntheticHandoffBuild
 
 export function buildOfficialHandoffPack(input: RealHandoffBuildInput): OfficialHandoffBuildResult {
   if (!isRealWrapperInput(input)) return { status: 'abstained', reason: 'invalid-real-input' };
-  if (!isActionReadyOfficialDestination(input.route, input.jurisdictionConfirmation, input.now)) {
+  const routeReadyNow = input.now;
+  if (!isActionReadyOfficialDestination(input.route, input.jurisdictionConfirmation, routeReadyNow)) {
     return { status: 'abstained', reason: 'route-not-action-ready' };
   }
   const shared = validateSharedInput(input);
   if (!shared.ok) return { status: 'abstained', reason: shared.reason };
+  const routeReadyInstant = instantMilliseconds(routeReadyNow);
+  if (routeReadyInstant === null || new Date(shared.generatedAt).getTime() !== routeReadyInstant) {
+    return { status: 'abstained', reason: 'generated-at-mismatch' };
+  }
 
   const route = input.route;
   const legacyIssue = route.key === 'legacy' ? mapLegacyIssue(shared.facts) : null;
@@ -912,8 +1053,8 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
     sourceKind: input.sourceKind,
     reviewRole: shared.role,
     resultClass: 'possible-discrepancy',
-    resultRevisionId: input.resultRevisionId,
-    packRevisionId: input.packRevisionId,
+    resultRevisionId: shared.resultRevisionId,
+    packRevisionId: shared.packRevisionId,
     packDigest: '',
     issueFamily: 'wrong-photo-or-wrong-vehicle',
     routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
@@ -941,9 +1082,9 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
     fieldPackConfirmation: Object.freeze({
       status: 'confirmed',
       confirmedBy: 'affected-person',
-      packRevisionId: input.packRevisionId,
+      packRevisionId: shared.packRevisionId,
     }),
-    generatedAt: input.generatedAt,
+    generatedAt: shared.generatedAt,
   };
   pack.packDigest = sha256Hex(canonicalPackDigestInput(pack));
   Object.defineProperty(pack, OFFICIAL_PACK_BRAND, {
@@ -954,6 +1095,10 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
   });
   issuedOfficialPacks.add(pack);
   deepFreeze(pack);
+  if (!isAuthenticOfficialHandoffPack(pack)) {
+    issuedOfficialPacks.delete(pack);
+    return { status: 'abstained', reason: 'invalid-real-input' };
+  }
   return Object.freeze({ status: 'built', pack });
 }
 
@@ -971,8 +1116,8 @@ export function buildSyntheticHandoffSimulation(input: SyntheticHandoffBuildInpu
     permanentLabel: 'Synthetic demonstration data',
     reviewRole: shared.role,
     resultClass: 'possible-discrepancy',
-    resultRevisionId: input.resultRevisionId,
-    packRevisionId: input.packRevisionId,
+    resultRevisionId: shared.resultRevisionId,
+    packRevisionId: shared.packRevisionId,
     issueFamily: 'wrong-photo-or-wrong-vehicle',
     facts: shared.facts,
     factualBullets: projectFactBullets(shared.facts),
@@ -983,9 +1128,9 @@ export function buildSyntheticHandoffSimulation(input: SyntheticHandoffBuildInpu
     fieldPackConfirmation: Object.freeze({
       status: 'confirmed',
       confirmedBy: 'affected-person',
-      packRevisionId: input.packRevisionId,
+      packRevisionId: shared.packRevisionId,
     }),
-    generatedAt: input.generatedAt,
+    generatedAt: shared.generatedAt,
   });
   return Object.freeze({ status: 'built', simulation });
 }

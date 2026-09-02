@@ -6,8 +6,20 @@ import {
   buildReviewedFactProjection,
   buildSyntheticHandoffSimulation,
   canonicalOfficialHandoffPackDigestInput,
+  containsCredentialOrPaymentToken,
+  containsDigitLikeIdentifier,
+  containsEmailOrUpiHandle,
+  containsFabricatedOfficialStatus,
+  containsIndianRegistration,
+  containsLongMixedIdentifier,
+  containsMarkupOrScriptSentinel,
+  containsPanShapedValue,
+  containsRawFilename,
+  containsUrlLikeValue,
   findBoundedExportSafetyMatches,
   isAuthenticOfficialHandoffPack,
+  isOpaqueRevisionId,
+  isPackDigest,
   mapLegacyIssue,
   normalizeReviewedDescription,
   validateExportSafeReviewedText,
@@ -140,18 +152,68 @@ describe('reviewed handoff description normalization and export safety', () => {
     ['long-mixed-identifier', 'Reference CASE_12ABCD345678'],
     ['credential-or-payment-token', 'password: hunter2'],
     ['credential-or-payment-token', 'payment token=abc123xyz'],
+    ['credential-or-payment-token', 'OTP 123456'],
+    ['credential-or-payment-token', 'oTp [ 654321 ]'],
+    ['credential-or-payment-token', 'PAYMENT — TOKEN: zx9Q7'],
+    ['credential-or-payment-token', 'token, payment = aB12xy'],
     ['raw-filename', 'Selected private-notice.jpg'],
+    ['raw-filename', 'private notice (1).pdf'],
+    ['raw-filename', '[PRIVATE Notice 2].PDF'],
     ['fabricated-official-status', 'Grievance submitted successfully'],
     ['fabricated-official-status', 'Official status: accepted'],
+    ['fabricated-official-status', 'Complaint has been successfully submitted'],
+    ['fabricated-official-status', 'Submission successful'],
+    ['fabricated-official-status', 'SUCCESS: grievance filed'],
+    ['fabricated-official-status', 'Resolved — CASE'],
   ] as const)('detects bounded export-safety class %s', (expected, text) => {
     expect(findBoundedExportSafetyMatches(normalizeReviewedDescription(text))).toContain(expected);
     expect(() => validateExportSafeReviewedText(normalizeReviewedDescription(text))).toThrow(/export-safety/);
   });
 
-  it('permits ordinary Hindi, emoji, and explicit masked last-four prose', () => {
-    const valid = normalizeReviewedDescription('मैं इस रिकॉर्ड की समीक्षा का अनुरोध करता हूँ। वाहन का नंबर …3317 पर समाप्त होता है। 😀');
+  it.each([
+    'मैं इस रिकॉर्ड की समीक्षा का अनुरोध करता हूँ। वाहन का नंबर …3317 पर समाप्त होता है। 😀',
+    'Plate ending …3317. Please review this possible discrepancy.',
+    'The citizen must complete CAPTCHA and OTP on the official site. No value is stored here.',
+    'Complete the OTP and CAPTCHA yourself on the official service; ChallanSakshi does not submit anything.',
+    'The citizen must complete CAPTCHA/OTP on the official site, without sharing either value.',
+    'Please complete your complaint on the official site yourself.',
+  ])('permits ordinary, masked, and neutral official-site guidance: %s', (text) => {
+    const valid = normalizeReviewedDescription(text);
     expect(findBoundedExportSafetyMatches(valid)).toEqual([]);
     expect(validateExportSafeReviewedText(valid)).toBe(valid);
+  });
+
+  it('fails every public matcher and validator closed on non-string input without coercion', () => {
+    let coercions = 0;
+    const adversary = {
+      toString: () => { coercions += 1; return 'https://private.example'; },
+      [Symbol.toPrimitive]: () => { coercions += 1; return 'password: secret123'; },
+    };
+    const publicMatchers = [
+      containsMarkupOrScriptSentinel,
+      containsUrlLikeValue,
+      containsEmailOrUpiHandle,
+      containsDigitLikeIdentifier,
+      containsPanShapedValue,
+      containsIndianRegistration,
+      containsLongMixedIdentifier,
+      containsCredentialOrPaymentToken,
+      containsRawFilename,
+      containsFabricatedOfficialStatus,
+      findBoundedExportSafetyMatches,
+      validateExportSafeReviewedText,
+      normalizeReviewedDescription,
+    ] as const;
+
+    for (const matcher of publicMatchers) {
+      expect(() => matcher(adversary as never)).toThrow(/primitive string/i);
+    }
+    expect(coercions).toBe(0);
+    expect(isOpaqueRevisionId(adversary)).toBe(false);
+    expect(isPackDigest(adversary)).toBe(false);
+    expect(isOpaqueRevisionId(RESULT_REVISION)).toBe(true);
+    expect(isPackDigest('a'.repeat(64))).toBe(true);
+    expect(coercions).toBe(0);
   });
 
   it.each([
@@ -343,6 +405,47 @@ describe('closed real and synthetic handoff builders', () => {
       .toEqual({ status: 'abstained', reason: 'invalid-revision-id' });
     expect(buildOfficialHandoffPack(realInput({ resultRevisionId: 'https://private.example/revision' })))
       .toEqual({ status: 'abstained', reason: 'invalid-revision-id' });
+  });
+
+  it('rejects coercible revision objects in every real and synthetic revision position without serializing them', () => {
+    const makeAdversary = () => ({
+      toString: () => RESULT_REVISION,
+      toJSON: () => 'private-record.pdf',
+    });
+    const variants = [
+      (base: RealHandoffBuildInput | SyntheticHandoffBuildInput) => ({ ...base, resultRevisionId: makeAdversary() }),
+      (base: RealHandoffBuildInput | SyntheticHandoffBuildInput) => ({ ...base, packRevisionId: makeAdversary() }),
+      (base: RealHandoffBuildInput | SyntheticHandoffBuildInput) => ({
+        ...base,
+        facts: { ...base.facts, reviewRevisionId: makeAdversary() },
+      }),
+    ];
+
+    for (const mutate of variants) {
+      const realResult = buildOfficialHandoffPack(mutate(realInput()) as unknown as RealHandoffBuildInput);
+      const syntheticResult = buildSyntheticHandoffSimulation(mutate(syntheticInput()) as unknown as SyntheticHandoffBuildInput);
+      expect(realResult.status).toBe('abstained');
+      expect(syntheticResult.status).toBe('abstained');
+      expect(JSON.stringify(realResult)).not.toContain('private-record.pdf');
+      expect(JSON.stringify(syntheticResult)).not.toContain('private-record.pdf');
+    }
+  });
+
+  it('binds real route readiness and generatedAt to exactly one normalized instant', () => {
+    const equalDate = buildOfficialHandoffPack(realInput({ now: new Date(NOW), generatedAt: NOW }));
+    const equalOffsetString = buildOfficialHandoffPack(realInput({
+      now: '2026-09-03T16:00:00+05:30',
+      generatedAt: NOW,
+    }));
+    for (const result of [equalDate, equalOffsetString]) {
+      expect(result.status).toBe('built');
+      if (result.status === 'built') expect(isAuthenticOfficialHandoffPack(result.pack)).toBe(true);
+    }
+
+    expect(buildOfficialHandoffPack(realInput({ generatedAt: '2026-09-03T10:30:00.001Z' })))
+      .toEqual({ status: 'abstained', reason: 'generated-at-mismatch' });
+    expect(buildOfficialHandoffPack(realInput({ generatedAt: '2026-10-10T10:30:00.000Z' })))
+      .toEqual({ status: 'abstained', reason: 'generated-at-mismatch' });
   });
 
   it('fails Delhi, unresolved, and the tests-only Legacy fixture closed for real pack authority', () => {

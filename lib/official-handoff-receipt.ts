@@ -1,7 +1,7 @@
 import {
-  OPAQUE_REVISION_ID_PATTERN,
-  PACK_DIGEST_PATTERN,
   isAuthenticOfficialHandoffPack,
+  isOpaqueRevisionId,
+  isPackDigest,
   type HandoffResultClass,
   type OfficialHandoffPack,
   type ReviewRole,
@@ -171,8 +171,8 @@ function bindingMatchesPack(binding: ReceiptBinding, pack: OfficialHandoffPack):
 }
 
 function validBindingShape(value: Record<string, unknown>): boolean {
-  return OPAQUE_REVISION_ID_PATTERN.test(value.packRevisionId as string)
-    && PACK_DIGEST_PATTERN.test(value.packDigest as string)
+  return isOpaqueRevisionId(value.packRevisionId)
+    && isPackDigest(value.packDigest)
     && value.resultClass === 'possible-discrepancy'
     && (value.reviewRole === 'self' || value.reviewRole === 'present-helper')
     && (value.deviceMode === 'private' || value.deviceMode === 'shared');
@@ -253,10 +253,10 @@ function isAuthenticInvalidated(value: unknown): value is InvalidatedOfficialHan
     && stateBrandIs(value, INVALIDATED_BRAND)
     && value.status === 'invalidated'
     && value.reason === 'pack-binding-changed'
-    && OPAQUE_REVISION_ID_PATTERN.test(value.previousPackRevisionId as string)
-    && PACK_DIGEST_PATTERN.test(value.previousPackDigest as string)
-    && OPAQUE_REVISION_ID_PATTERN.test(value.currentPackRevisionId as string)
-    && PACK_DIGEST_PATTERN.test(value.currentPackDigest as string);
+    && isOpaqueRevisionId(value.previousPackRevisionId)
+    && isPackDigest(value.previousPackDigest)
+    && isOpaqueRevisionId(value.currentPackRevisionId)
+    && isPackDigest(value.currentPackDigest);
 }
 
 function assertAuthenticState(value: unknown): asserts value is OfficialHandoffReceiptState {
