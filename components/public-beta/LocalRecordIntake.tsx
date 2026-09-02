@@ -123,7 +123,7 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
     onSelectionChange({
       meta: {
         size: file.size,
-        type: file.type,
+        type: validation.type,
         role,
         previewKind: validation.previewKind,
       },

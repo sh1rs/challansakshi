@@ -31,6 +31,8 @@
 .confirmation {
   display: flex;
   align-items: flex-start;
+  min-height: 48px;
+  padding: 8px 0;
   gap: 10px;
   color: var(--pb-ink);
   line-height: 1.55;
@@ -54,10 +56,14 @@
   font-weight: 750;
   text-align: center;
   text-decoration: none;
-  background: var(--pb-teal-dark);
   border: 1px solid var(--pb-teal-dark);
   border-radius: 12px;
   cursor: pointer;
+}
+
+.secondaryAction {
+  color: var(--pb-teal-dark);
+  background: var(--pb-paper);
 }
 
 .action:disabled {

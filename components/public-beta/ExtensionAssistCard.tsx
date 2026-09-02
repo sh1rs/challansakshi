@@ -30,7 +30,7 @@ export type ExtensionAssistCallbacks = Readonly<{
   onClearPrepared: () => void;
 }>;
 
-type ExtensionAssistCardProps = Readonly<{
+export type ExtensionAssistCardProps = Readonly<{
   language: Language;
   simpleMode: boolean;
   role: 'self' | 'present-helper';
@@ -74,7 +74,7 @@ export function ExtensionAssistCard({
       <p>{copy.independence}</p>
 
       <a
-        className={styles.action}
+        className={`${styles.action} ${styles.secondaryAction}`}
         href={presentation.release.acquisition.firstPartyLandingUrl}
         target="_blank"
         rel="noreferrer"
@@ -116,7 +116,7 @@ export function ExtensionAssistCard({
       </div>
 
       <button
-        className={styles.action}
+        className={`${styles.action} ${styles.secondaryAction}`}
         type="button"
         disabled={!presentation.preparationAllowedByController}
         onClick={callbacks.onPrepare}
@@ -130,7 +130,7 @@ export function ExtensionAssistCard({
       {presentation.preparation.status === 'prepared' ? (
         <>
           <p className={styles.status} role="status" aria-live="polite">{copy.prepared}</p>
-          <button className={styles.action} type="button" onClick={callbacks.onClearPrepared}>
+          <button className={`${styles.action} ${styles.secondaryAction}`} type="button" onClick={callbacks.onClearPrepared}>
             {copy.clear}
           </button>
           <span

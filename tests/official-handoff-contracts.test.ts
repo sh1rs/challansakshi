@@ -134,8 +134,13 @@ function destinationFor(pack: OfficialHandoffPack, serviceName = pack.destinatio
   } as const;
 }
 
-function eligibleDraft(pack: OfficialHandoffPack, overrides: Partial<OfficialHandoffDraft> = {}): OfficialHandoffDraft {
-  return {
+type EligibleOfficialHandoffDraft = Extract<OfficialHandoffDraft, { status: 'eligible' }>;
+
+function eligibleDraft(
+  pack: OfficialHandoffPack,
+  overrides: Partial<EligibleOfficialHandoffDraft> = {},
+): EligibleOfficialHandoffDraft {
+  const draft: EligibleOfficialHandoffDraft = {
     status: 'eligible',
     eligibilityReason: 'action-ready',
     routeKey: 'nextgen',
@@ -148,7 +153,8 @@ function eligibleDraft(pack: OfficialHandoffPack, overrides: Partial<OfficialHan
     resultRevisionId: pack.resultRevisionId,
     packRevisionId: pack.packRevisionId,
     ...overrides,
-  } as OfficialHandoffDraft;
+  };
+  return draft;
 }
 
 const extensionCallbacks: ExtensionAssistCallbacks = {
@@ -264,6 +270,26 @@ function mediaBlock(source: string, query: string) {
   return '';
 }
 
+function sectionMarkup(html: string, labelledBy: string): string {
+  const start = html.indexOf(`aria-labelledby="${labelledBy}"`);
+  if (start < 0) return '';
+  const opening = html.lastIndexOf('<section', start);
+  const closing = html.indexOf('</section>', start);
+  return html.slice(opening, closing + '</section>'.length);
+}
+
+function openingTagForText(html: string, text: string): string {
+  const textIndex = html.indexOf(text);
+  if (textIndex < 0) return '';
+  const opening = html.lastIndexOf('<', textIndex);
+  const closing = html.indexOf('>', opening);
+  return html.slice(opening, closing + 1);
+}
+
+function primaryActionCount(html: string): number {
+  return html.match(/class="[^"]*primaryAction[^"]*"/g)?.length ?? 0;
+}
+
 describe('controlled official handoff presentation', () => {
   it('starts after the result with Prepared for and preserves the complete installation-free order', () => {
     const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps()));
@@ -303,6 +329,69 @@ describe('controlled official handoff presentation', () => {
     expect(html).toContain('rel="noreferrer"');
     expect(panelSource).toMatch(/onCopyField\('description',\s*draft\.normalizedDescription\)/);
     expect(panelSource).not.toMatch(/onCopyField[\s\S]{0,180}onOfficialLinkActivate/);
+  });
+
+  it.each([
+    ['en', 'failed', 'lookup', 'Copy failed. The challan number remains visible and selectable; copy it manually. Nothing opened.'],
+    ['en', 'failed', 'category', 'Copy failed. The reviewed category remains visible and selectable; copy it manually. Nothing opened.'],
+    ['en', 'failed', 'description', 'Copy failed. The reviewed description remains visible and selectable; copy it manually. Nothing opened.'],
+    ['en', 'copied', 'lookup', 'Challan number copied. Nothing opened or was submitted.'],
+    ['en', 'copied', 'category', 'Reviewed category copied. Nothing opened or was submitted.'],
+    ['en', 'copied', 'description', 'Reviewed description copied. Nothing opened or was submitted.'],
+    ['hi', 'failed', 'lookup', 'कॉपी नहीं हुई। चालान नंबर दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।'],
+    ['hi', 'failed', 'category', 'कॉपी नहीं हुई। समीक्षित श्रेणी दिखती और चुनी जा सकती है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।'],
+    ['hi', 'failed', 'description', 'कॉपी नहीं हुई। समीक्षित विवरण दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।'],
+    ['hi', 'copied', 'lookup', 'चालान नंबर कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।'],
+    ['hi', 'copied', 'category', 'समीक्षित श्रेणी कॉपी हुई। कुछ नहीं खुला या जमा हुआ।'],
+    ['hi', 'copied', 'description', 'समीक्षित विवरण कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।'],
+  ] as const)('places %s %s feedback beside only the %s value', (language, status, field, expected) => {
+    const pack = nextgenPack();
+    const draft = eligibleDraft(pack, {
+      mappedCategory: { label: 'Wrong Evidence Captured', value: 'Wrong Image' },
+    });
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      language,
+      draft,
+      confirmedPack: pack,
+      copyStatus: { status, field },
+    })));
+    const sectionIds = {
+      lookup: 'handoff-lookup-heading',
+      category: 'handoff-category-heading',
+      description: 'handoff-description-heading',
+    } as const;
+
+    expect(sectionMarkup(html, sectionIds[field])).toContain(expected);
+    for (const otherField of ['lookup', 'category', 'description'] as const) {
+      if (otherField !== field) expect(sectionMarkup(html, sectionIds[otherField])).not.toContain(expected);
+    }
+    expect(html).toContain(`href="${draft.destination.canonicalUrl}"`);
+    expect(html).toContain('target="_blank"');
+  });
+
+  it.each([
+    ['en', false, 'A😀e\u0301', 4, '4 of 500 Unicode code points'],
+    ['en', true, 'हिंदी', 5, '5 of 500 Unicode code points'],
+    ['hi', false, 'A😀e\u0301', 4, '500 यूनिकोड कोड पॉइंट में से 4'],
+    ['hi', true, 'हिंदी', 5, '500 यूनिकोड कोड पॉइंट में से 5'],
+  ] as const)('announces the exact Unicode count in %s simple=%s', (language, simpleMode, description, count, expected) => {
+    const pack = nextgenPack();
+    const draft = eligibleDraft(pack, {
+      normalizedDescription: description,
+      descriptionCodePointCount: count,
+    });
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      language,
+      simpleMode,
+      draft,
+      confirmedPack: pack,
+    })));
+    const descriptionSection = sectionMarkup(html, 'handoff-description-heading');
+
+    expect(Array.from(description)).toHaveLength(count);
+    expect(descriptionSection).toContain(expected);
+    expect(descriptionSection).toContain('role="status"');
+    expect(descriptionSection).toContain('aria-live="polite"');
   });
 
   it('keeps shared-device values selectable while omitting lookup, clipboard, receipt, reference, and helper controls', () => {
@@ -381,6 +470,52 @@ describe('controlled official handoff presentation', () => {
     expect(html).not.toContain('screenshot');
   });
 
+  it.each([
+    ['en', false, {
+      opened: 'Official service opened from this review. ChallanSakshi cannot see what happened there.',
+      selected: 'Selected return note: I saw an acknowledgement on the official service. Citizen-reported and unverified; this does not show submission or acceptance.',
+      recorded: 'Return note recorded in this tab only. Citizen-reported and unverified; not a submission or official acceptance.',
+    }],
+    ['en', true, {
+      opened: 'Official service opened from this review. ChallanSakshi cannot see what happened there.',
+      selected: 'You selected: I saw an acknowledgement. You reported this; it is not verified. ChallanSakshi did not see a submission or acceptance.',
+      recorded: 'Your return note is recorded only on this tab and is not verified. ChallanSakshi did not submit it or verify acceptance.',
+    }],
+    ['hi', false, {
+      opened: 'आधिकारिक सेवा इस समीक्षा से खोली गई। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
+      selected: 'चुना गया वापसी नोट: मुझे आधिकारिक सेवा पर पावती दिखी। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या स्वीकृति नहीं दिखाता।',
+      recorded: 'वापसी नोट केवल इस टैब में दर्ज हुआ। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या आधिकारिक स्वीकृति नहीं है।',
+    }],
+    ['hi', true, {
+      opened: 'आधिकारिक सेवा इस समीक्षा से खोली गई। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
+      selected: 'आपने चुना: मुझे पावती दिखी। यह आपने बताया है और सत्यापित नहीं है; ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
+      recorded: 'आपका वापसी नोट केवल इस टैब में दर्ज है और सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
+    }],
+  ] as const)('announces opened, selected, and local-recorded states in %s simple=%s', (language, simpleMode, expected) => {
+    const pack = nextgenPack();
+    const receipt = recordCitizenReturn(
+      recordOfficialLinkActivation(createOfficialHandoffReceiptSession(pack, 'private'), pack, OPENED_AT),
+      pack,
+      { selectedReturnState: 'acknowledgement-seen', localTimestamp: RETURNED_AT },
+    );
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      language,
+      simpleMode,
+      draft: eligibleDraft(pack),
+      confirmedPack: pack,
+      officialLinkStatus: 'activated',
+      receiptState: receipt,
+      returnDraft: { selectedReturnState: 'acknowledgement-seen', referenceLastFour: '' },
+    })));
+
+    expect(html).toContain(expected.opened);
+    expect(html).toContain(expected.selected);
+    expect(html).toContain(expected.recorded);
+    expect(html.match(/role="status" aria-live="polite"/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(html).not.toContain('submission observed');
+    expect(html).not.toContain('officially accepted');
+  });
+
   it('keeps helper pack and return authorizations as separate affected-person confirmations', () => {
     const pack = nextgenPack('present-helper');
     const activated = recordOfficialLinkActivation(
@@ -421,6 +556,70 @@ describe('controlled official handoff presentation', () => {
     ]) expect(html).toContain(label);
   });
 
+  it('groups the four return choices as one native radio fieldset', () => {
+    const pack = nextgenPack();
+    const activated = recordOfficialLinkActivation(
+      createOfficialHandoffReceiptSession(pack, 'private'),
+      pack,
+      OPENED_AT,
+    );
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      draft: eligibleDraft(pack),
+      confirmedPack: pack,
+      officialLinkStatus: 'activated',
+      receiptState: activated,
+    })));
+
+    expect(html).toContain('<fieldset');
+    expect(html).toContain('<legend>What happened on the official service?</legend>');
+    expect(html.match(/name="official-handoff-return-state"/g)).toHaveLength(4);
+  });
+
+  it('keeps exactly one filled primary action across unopened, activated, and locally recorded states', () => {
+    const pack = nextgenPack();
+    const base = panelProps({
+      draft: eligibleDraft(pack),
+      confirmedPack: pack,
+      extension: publicEnabledExtension,
+    });
+    const unopened = renderToStaticMarkup(createElement(OfficialHandoffPanel, base));
+    const activatedReceipt = recordOfficialLinkActivation(
+      createOfficialHandoffReceiptSession(pack, 'private'),
+      pack,
+      OPENED_AT,
+    );
+    const activated = renderToStaticMarkup(createElement(OfficialHandoffPanel, {
+      ...base,
+      officialLinkStatus: 'activated',
+      receiptState: activatedReceipt,
+      returnDraft: { selectedReturnState: 'not-submitted', referenceLastFour: '' },
+    }));
+    const recordedReceipt = recordCitizenReturn(activatedReceipt, pack, {
+      selectedReturnState: 'not-submitted',
+      localTimestamp: RETURNED_AT,
+    });
+    const recorded = renderToStaticMarkup(createElement(OfficialHandoffPanel, {
+      ...base,
+      officialLinkStatus: 'activated',
+      receiptState: recordedReceipt,
+      returnDraft: { selectedReturnState: 'not-submitted', referenceLastFour: '' },
+    }));
+
+    expect(primaryActionCount(unopened)).toBe(1);
+    expect(openingTagForText(unopened, 'Open NextGen e-Challan grievance service')).toContain('primaryAction');
+    expect(openingTagForText(unopened, 'Review desktop helper and installation')).toContain('secondaryAction');
+    expect(openingTagForText(unopened, 'Already installed? Prepare reviewed fields')).toContain('secondaryAction');
+
+    expect(primaryActionCount(activated)).toBe(1);
+    expect(openingTagForText(activated, 'Open NextGen e-Challan grievance service')).toContain('secondaryAction');
+    expect(openingTagForText(activated, 'Record this return locally')).toContain('primaryAction');
+
+    expect(primaryActionCount(recorded)).toBe(1);
+    expect(openingTagForText(recorded, 'Open NextGen e-Challan grievance service')).toContain('secondaryAction');
+    expect(openingTagForText(recorded, 'Record this return locally')).toContain('secondaryAction');
+    expect(openingTagForText(recorded, 'Download redacted continuation receipt')).toContain('primaryAction');
+  });
+
   it('renders Legacy only through an explicitly labelled presentation-only fixture while production issuance stays empty', () => {
     const authenticNextgen = nextgenPack();
     const PRESENTATION_ONLY_LEGACY_PACK_FIXTURE = Object.freeze({
@@ -453,18 +652,57 @@ describe('controlled official handoff presentation', () => {
   });
 
   it.each([
-    ['manual', 'manual-route-only', 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.'],
-    ['unresolved', 'route-unresolved', 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.'],
-    ['abstained', 'result-not-action-ready', 'This review does not support a confirmed field pack. Check the missing or unclear evidence before preparing official information.'],
-  ] as const)('renders the closed %s presentation without category, draft field, or helper', (status, eligibilityReason, expected) => {
+    {
+      status: 'manual',
+      destinationKey: 'delhi-manual',
+      expected: 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.',
+    },
+    {
+      status: 'unresolved',
+      destinationKey: 'unresolved',
+      expected: 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.',
+    },
+    {
+      status: 'abstained',
+      destinationKey: 'nextgen',
+      expected: 'This review does not support a confirmed field pack. Check the missing or unclear evidence before preparing official information.',
+    },
+  ] as const)('renders the closed $status presentation from the exact registry destination', ({ status, destinationKey, expected }) => {
     const pack = nextgenPack();
-    const draft = {
-      ...eligibleDraft(pack),
-      status,
-      eligibilityReason,
-      routeKey: status === 'manual' ? 'delhi-manual' : status === 'unresolved' ? 'unresolved' : 'nextgen',
+    const common = {
       mappedCategory: null,
-    } as OfficialHandoffDraft;
+      normalizedDescription: pack.description,
+      descriptionCodePointCount: Array.from(pack.description).length,
+      descriptionError: null,
+      checklist: pack.checklist,
+      resultRevisionId: pack.resultRevisionId,
+      packRevisionId: pack.packRevisionId,
+    } as const;
+    const drafts = {
+      manual: {
+        ...common,
+        status: 'manual',
+        eligibilityReason: 'manual-route-only',
+        routeKey: 'delhi-manual',
+        destination: OFFICIAL_DESTINATIONS['delhi-manual'],
+      } satisfies OfficialHandoffDraft,
+      unresolved: {
+        ...common,
+        status: 'unresolved',
+        eligibilityReason: 'route-unresolved',
+        routeKey: 'unresolved',
+        destination: OFFICIAL_DESTINATIONS.unresolved,
+      } satisfies OfficialHandoffDraft,
+      abstained: {
+        ...common,
+        status: 'abstained',
+        eligibilityReason: 'result-not-action-ready',
+        routeKey: 'nextgen',
+        destination: OFFICIAL_DESTINATIONS.nextgen,
+      } satisfies OfficialHandoffDraft,
+    };
+    const draft = drafts[status];
+    const expectedDestination = OFFICIAL_DESTINATIONS[destinationKey];
     const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
       draft,
       confirmedPack: null,
@@ -473,8 +711,14 @@ describe('controlled official handoff presentation', () => {
 
     expect(html).toContain('Prepared for');
     expect(html).toContain(expected);
+    expect(html).toContain(expectedDestination.serviceName);
+    expect(html).toContain(expectedDestination.domain);
+    expect(html).toContain(`href="${expectedDestination.canonicalUrl}"`);
+    expect(html).toContain(`data-purpose="${expectedDestination.purpose}"`);
     expect(html).not.toContain('<textarea');
     expect(html).not.toContain('Reviewed category');
+    expect(html).not.toContain('Copy reviewed description');
+    expect(html).not.toContain('Copy reviewed category');
     expect(html).not.toContain('Optional desktop helper');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noreferrer"');
@@ -551,6 +795,10 @@ describe('optional desktop helper presentation', () => {
     expect(html).toContain('data-challansakshi-extension-envelope="v1"');
     expect(html).toContain('&amp;lt;not markup&amp;gt;');
     expect(html).not.toContain('<script');
+    expect(primaryActionCount(html)).toBe(0);
+    expect(openingTagForText(html, 'Review desktop helper and installation')).toContain('secondaryAction');
+    expect(openingTagForText(html, 'Already installed? Prepare reviewed fields')).toContain('secondaryAction');
+    expect(openingTagForText(html, 'Clear prepared fields')).toContain('secondaryAction');
     expect(panelSource).not.toContain('dangerouslySetInnerHTML');
     expect(helperSource).not.toContain('dangerouslySetInnerHTML');
   });
@@ -608,6 +856,7 @@ describe('English, Hindi, and Simple Mode safety copy', () => {
     expect(copy.returnBasis.self).toBe(expected.selfReturnBasis);
     expect(copy.returnBasis.helper).toBe(expected.helperReturnBasis);
     expect(copy.helper.independence).toBe(expected.helperIndependence);
+    expect(copy.purpose['official-service']).toBe(language === 'hi' ? 'आधिकारिक सेवा' : 'Official service');
     expect(Object.keys(copy.roles.helper.confirmations)).toEqual([
       'affectedPersonPresent',
       'affectedPersonInspectedEvidence',
@@ -675,8 +924,14 @@ describe('presentation authority, privacy, and responsive contracts', () => {
     expect(panelStyles).not.toMatch(/grid-template-columns:\s*repeat\(/);
     expect(panelStyles).toMatch(/\.selectableValue\s*\{[^}]*user-select:\s*text/);
     expect(panelStyles).toMatch(/\.(?:action|copyButton|officialAnchor)[^{]*\{[^}]*min-height:\s*(?:48|5\d)px/);
+    expect(panelStyles).toMatch(/\.confirmation[^}]*min-height:\s*(?:48|5\d)px/);
+    expect(panelStyles).toMatch(/\.returnChoice[^}]*min-height:\s*(?:48|5\d)px/);
+    expect(panelStyles).toMatch(/\.primaryAction\s*\{[^}]*background:/);
+    expect(panelStyles).toMatch(/\.secondaryAction\s*\{[^}]*background:/);
     expect(panelStyles).toMatch(/:focus-visible\s*\{[^}]*outline:/);
     expect(helperStyles).toMatch(/\.action[^{]*\{[^}]*min-height:\s*(?:48|5\d)px/);
+    expect(helperStyles).toMatch(/\.confirmation[^}]*min-height:\s*(?:48|5\d)px/);
+    expect(helperStyles).toMatch(/\.secondaryAction\s*\{[^}]*background:/);
     expect(helperStyles).toMatch(/:focus-visible\s*\{[^}]*outline:/);
     const panelMobile = mediaBlock(panelStyles, '(max-width: 420px)');
     const helperMobile = mediaBlock(helperStyles, '(max-width: 420px)');

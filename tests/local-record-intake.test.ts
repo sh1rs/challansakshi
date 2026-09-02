@@ -6,6 +6,7 @@ import { LocalRecordIntake } from '../components/public-beta/LocalRecordIntake';
 import {
   formatLocalRecordSize,
   validateLocalRecordFile,
+  type ApprovedLocalRecordMimeType,
   type LocalRecordFileMeta,
 } from '../lib/local-record-intake';
 
@@ -35,9 +36,13 @@ function mediaBlock(source: string, query: string) {
 
 describe('local official-record intake', () => {
   it('accepts only the approved PDF and image MIME types', () => {
-    expect(validateLocalRecordFile({ size: 2 * MiB, type: 'application/pdf' }, 'official-record')).toMatchObject({ ok: true, previewKind: 'pdf' });
-    expect(validateLocalRecordFile({ size: MiB, type: 'image/webp' }, 'photograph')).toMatchObject({ ok: true, previewKind: 'image' });
+    expect(validateLocalRecordFile({ size: 2 * MiB, type: 'application/pdf' }, 'official-record')).toEqual({ ok: true, type: 'application/pdf', previewKind: 'pdf' });
+    expect(validateLocalRecordFile({ size: MiB, type: 'image/jpeg' }, 'photograph')).toEqual({ ok: true, type: 'image/jpeg', previewKind: 'image' });
+    expect(validateLocalRecordFile({ size: MiB, type: 'image/png' }, 'photograph')).toEqual({ ok: true, type: 'image/png', previewKind: 'image' });
+    expect(validateLocalRecordFile({ size: MiB, type: 'image/webp' }, 'photograph')).toEqual({ ok: true, type: 'image/webp', previewKind: 'image' });
     expect(validateLocalRecordFile({ size: 100, type: 'image/svg+xml' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
+    expect(validateLocalRecordFile({ size: 100, type: 'text/html' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
+    expect(validateLocalRecordFile({ size: 100, type: 'application/x-arbitrary' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
   });
 
   it('rejects empty and oversized files before preview', () => {
@@ -58,8 +63,17 @@ describe('local official-record intake', () => {
     } satisfies LocalRecordFileMeta;
 
     expect(Object.keys(metadata)).toEqual(['role', 'type', 'size', 'previewKind']);
+    expectTypeOf<LocalRecordFileMeta['type']>().toEqualTypeOf<ApprovedLocalRecordMimeType>();
     expectTypeOf<Parameters<typeof validateLocalRecordFile>[0]>()
       .toEqualTypeOf<Pick<File, 'size' | 'type'>>();
+
+    // @ts-expect-error Unsafe browser MIME strings cannot enter stored metadata.
+    const unsafeSvgMetadataType: LocalRecordFileMeta['type'] = 'image/svg+xml';
+    // @ts-expect-error Arbitrary browser MIME strings cannot enter stored metadata.
+    const unsafeHtmlMetadataType: LocalRecordFileMeta['type'] = 'text/html';
+    expect([unsafeSvgMetadataType, unsafeHtmlMetadataType]).toEqual(['image/svg+xml', 'text/html']);
+    expect(intakeComponentSource).toMatch(/type:\s*validation\.type/);
+    expect(intakeComponentSource).not.toMatch(/type:\s*file\.type/);
   });
 
   it('formats selected size without exposing file contents', () => {

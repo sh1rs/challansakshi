@@ -265,7 +265,7 @@ const officialHandoffEnglish = {
   eyebrow: 'Prepared for',
   purpose: {
     'official-grievance-service': 'Official grievance service',
-    'official-services-directory': 'Official services directory',
+    'official-service': 'Official service',
   },
   verified: 'Route last verified',
   lookupHeading: 'Optional challan number aid',
@@ -277,6 +277,7 @@ const officialHandoffEnglish = {
   descriptionHeading: 'Reviewed description',
   descriptionLabel: 'Description to review before using the official service',
   descriptionHelp: 'Keep this factual and limited to the evidence you personally checked.',
+  descriptionCounter: 'of 500 Unicode code points',
   copyDescription: 'Copy reviewed description',
   sharedInstruction: 'Select this reviewed description and type or paste it into the official service yourself.',
   checklistHeading: 'Before you leave',
@@ -307,9 +308,24 @@ const officialHandoffEnglish = {
   leaveHeading: 'You are leaving ChallanSakshi',
   leaveBody: 'The official service opens in a new tab. Sign in, declare, and submit there yourself.',
   openPrefix: 'Open',
-  activated: 'You recorded that the official link was opened. ChallanSakshi cannot see what happened there.',
-  copyFailure: 'Copy failed. The reviewed description remains visible and selectable; copy it manually. Nothing opened.',
-  copySuccess: 'Copied. Nothing opened or was submitted.',
+  activated: 'Official service opened from this review. ChallanSakshi cannot see what happened there.',
+  selectedReturnPrefix: 'Selected return note:',
+  selectedReturnBoundary: 'Citizen-reported and unverified; this does not show submission or acceptance.',
+  recordedReturn: 'Return note recorded in this tab only. Citizen-reported and unverified; not a submission or official acceptance.',
+  copyFeedback: {
+    lookup: {
+      failed: 'Copy failed. The challan number remains visible and selectable; copy it manually. Nothing opened.',
+      copied: 'Challan number copied. Nothing opened or was submitted.',
+    },
+    category: {
+      failed: 'Copy failed. The reviewed category remains visible and selectable; copy it manually. Nothing opened.',
+      copied: 'Reviewed category copied. Nothing opened or was submitted.',
+    },
+    description: {
+      failed: 'Copy failed. The reviewed description remains visible and selectable; copy it manually. Nothing opened.',
+      copied: 'Reviewed description copied. Nothing opened or was submitted.',
+    },
+  },
   eligibility: {
     manual: 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.',
     unresolved: 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.',
@@ -374,6 +390,9 @@ const officialHandoffSimpleEnglish = {
     self: 'You reported this. ChallanSakshi did not verify it.',
     helper: 'The present person reported this; the helper only typed it. ChallanSakshi did not verify it.',
   },
+  selectedReturnPrefix: 'You selected:',
+  selectedReturnBoundary: 'You reported this; it is not verified. ChallanSakshi did not see a submission or acceptance.',
+  recordedReturn: 'Your return note is recorded only on this tab and is not verified. ChallanSakshi did not submit it or verify acceptance.',
   helper: {
     ...officialHandoffEnglish.helper,
     independence: 'This helper is optional. You can use the field pack and official link without it.',
@@ -384,7 +403,7 @@ const officialHandoffHindi = {
   eyebrow: 'इसके लिए तैयार',
   purpose: {
     'official-grievance-service': 'आधिकारिक शिकायत सेवा',
-    'official-services-directory': 'आधिकारिक सेवाओं की निर्देशिका',
+    'official-service': 'आधिकारिक सेवा',
   },
   verified: 'रास्ते की अंतिम जाँच',
   lookupHeading: 'वैकल्पिक चालान नंबर सहायता',
@@ -396,6 +415,7 @@ const officialHandoffHindi = {
   descriptionHeading: 'समीक्षित विवरण',
   descriptionLabel: 'आधिकारिक सेवा उपयोग करने से पहले जाँचने वाला विवरण',
   descriptionHelp: 'इसे तथ्यात्मक रखें और केवल उन सबूतों तक सीमित रखें जिन्हें आपने स्वयं जाँचा है।',
+  descriptionCounter: '500 यूनिकोड कोड पॉइंट में से',
   copyDescription: 'समीक्षित विवरण कॉपी करें',
   sharedInstruction: 'इस समीक्षित विवरण को चुनें और आधिकारिक सेवा में स्वयं टाइप या पेस्ट करें।',
   checklistHeading: 'जाने से पहले',
@@ -426,9 +446,24 @@ const officialHandoffHindi = {
   leaveHeading: 'आप ChallanSakshi छोड़ रहे हैं',
   leaveBody: 'आधिकारिक सेवा नए टैब में खुलेगी। वहाँ स्वयं साइन इन, घोषणा और जमा करें।',
   openPrefix: 'आधिकारिक सेवा खोलें',
-  activated: 'आपने आधिकारिक लिंक खुलना दर्ज किया। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
-  copyFailure: 'कॉपी नहीं हुई। समीक्षित विवरण दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
-  copySuccess: 'कॉपी हो गई। कुछ नहीं खुला या जमा हुआ।',
+  activated: 'आधिकारिक सेवा इस समीक्षा से खोली गई। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
+  selectedReturnPrefix: 'चुना गया वापसी नोट:',
+  selectedReturnBoundary: 'नागरिक द्वारा बताया गया और असत्यापित; यह जमा या स्वीकृति नहीं दिखाता।',
+  recordedReturn: 'वापसी नोट केवल इस टैब में दर्ज हुआ। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या आधिकारिक स्वीकृति नहीं है।',
+  copyFeedback: {
+    lookup: {
+      failed: 'कॉपी नहीं हुई। चालान नंबर दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
+      copied: 'चालान नंबर कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।',
+    },
+    category: {
+      failed: 'कॉपी नहीं हुई। समीक्षित श्रेणी दिखती और चुनी जा सकती है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
+      copied: 'समीक्षित श्रेणी कॉपी हुई। कुछ नहीं खुला या जमा हुआ।',
+    },
+    description: {
+      failed: 'कॉपी नहीं हुई। समीक्षित विवरण दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
+      copied: 'समीक्षित विवरण कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।',
+    },
+  },
   eligibility: {
     manual: 'इस आधिकारिक गंतव्य के लिए इस रिलीज़ में सत्यापित फ़ील्ड-संगत फ़ॉर्म नहीं है। आधिकारिक साइट उपयोग करें और उसके मौजूदा विकल्प स्वयं जाँचें।',
     unresolved: 'जारी करने वाला क्षेत्र पुष्ट नहीं है या कोई मौजूदा सत्यापित रास्ता उपलब्ध नहीं है। केवल आधिकारिक सेवा निर्देशिका उपयोग करें।',
@@ -493,6 +528,9 @@ const officialHandoffSimpleHindi = {
     self: 'यह आपने बताया है। ChallanSakshi ने इसकी जाँच नहीं की।',
     helper: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। ChallanSakshi ने जाँच नहीं की।',
   },
+  selectedReturnPrefix: 'आपने चुना:',
+  selectedReturnBoundary: 'यह आपने बताया है और सत्यापित नहीं है; ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
+  recordedReturn: 'आपका वापसी नोट केवल इस टैब में दर्ज है और सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
   helper: {
     ...officialHandoffHindi.helper,
     independence: 'यह मददगार वैकल्पिक है। फ़ील्ड पैक और आधिकारिक लिंक इसके बिना भी काम करते हैं।',

@@ -13,7 +13,7 @@ import styles from './OfficialHandoffPanel.module.css';
 
 type DestinationPresentation = Readonly<{
   serviceName: string;
-  purpose: 'official-grievance-service' | 'official-services-directory';
+  purpose: 'official-grievance-service' | 'official-service';
   domain: string;
   lastVerifiedAt: string;
   canonicalUrl: string;
@@ -128,17 +128,17 @@ function Confirmation(props: {
 
 function CopyStatus({
   status,
-  failure,
-  success,
+  field,
+  feedback,
 }: {
   status: OfficialHandoffPanelProps['copyStatus'];
-  failure: string;
-  success: string;
+  field: 'lookup' | 'category' | 'description';
+  feedback: Readonly<Record<'lookup' | 'category' | 'description', Readonly<Record<'failed' | 'copied', string>>>>;
 }): JSX.Element | null {
-  if (status.status === 'idle') return null;
+  if (status.status === 'idle' || status.field !== field) return null;
   return (
     <p className={styles.status} role="status" aria-live="polite">
-      {status.status === 'failed' ? failure : success}
+      {feedback[field][status.status]}
     </p>
   );
 }
@@ -172,6 +172,7 @@ export function OfficialHandoffPanel({
   const helping = reviewContext.role === 'present-helper';
   const eligible = draft.status === 'eligible';
   const showOfficialAnchor = !eligible || confirmedPack !== null;
+  const returnRecorded = receiptState?.status === 'citizen-return-recorded';
   const purpose = copy.purpose[draft.destination.purpose];
   const returnLabels = {
     'acknowledgement-seen': copy.returnStates.acknowledgementSeen,
@@ -184,7 +185,7 @@ export function OfficialHandoffPanel({
     <section className={styles.panel} aria-labelledby="official-handoff-heading">
       <p className={styles.eyebrow}>{copy.eyebrow}</p>
       <h2 id="official-handoff-heading">{draft.destination.serviceName}</h2>
-      <p className={styles.purpose}>{purpose}</p>
+      <p className={styles.purpose} data-purpose={draft.destination.purpose}>{purpose}</p>
       <p className={styles.domain}>{draft.destination.domain}</p>
       <p className={styles.verified}>{copy.verified}: {draft.destination.lastVerifiedAt}</p>
 
@@ -206,6 +207,7 @@ export function OfficialHandoffPanel({
               >
                 {copy.copyLookup}
               </button>
+              <CopyStatus status={copyStatus} field="lookup" feedback={copy.copyFeedback} />
             </section>
           ) : null}
 
@@ -223,6 +225,7 @@ export function OfficialHandoffPanel({
                   {copy.copyCategory}
                 </button>
               ) : null}
+              {privateDevice ? <CopyStatus status={copyStatus} field="category" feedback={copy.copyFeedback} /> : null}
             </section>
           ) : null}
 
@@ -236,19 +239,25 @@ export function OfficialHandoffPanel({
               aria-invalid={draft.descriptionError ? true : undefined}
             />
             <p className={styles.fieldHelp}>{copy.descriptionHelp}</p>
-            <p className={styles.fieldHelp}>{draft.descriptionCodePointCount} {language === 'hi' ? 'अक्षर' : 'characters'}</p>
+            <p className={styles.fieldHelp} role="status" aria-live="polite">
+              {language === 'hi'
+                ? `${copy.descriptionCounter} ${draft.descriptionCodePointCount}`
+                : `${draft.descriptionCodePointCount} ${copy.descriptionCounter}`}
+            </p>
             {draft.descriptionError ? <p className={styles.error} role="alert">{draft.descriptionError}</p> : null}
             <p className={styles.selectableValue}>{draft.normalizedDescription}</p>
             {privateDevice ? (
-              <button
-                type="button"
-                className={styles.copyButton}
-                onClick={() => callbacks.onCopyField('description', draft.normalizedDescription)}
-              >
-                {copy.copyDescription}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={styles.copyButton}
+                  onClick={() => callbacks.onCopyField('description', draft.normalizedDescription)}
+                >
+                  {copy.copyDescription}
+                </button>
+                <CopyStatus status={copyStatus} field="description" feedback={copy.copyFeedback} />
+              </>
             ) : <p className={styles.manualCopy}>{copy.sharedInstruction}</p>}
-            <CopyStatus status={copyStatus} failure={copy.copyFailure} success={copy.copySuccess} />
           </section>
 
           <section className={styles.checklist} aria-labelledby="handoff-checklist-heading">
@@ -288,7 +297,7 @@ export function OfficialHandoffPanel({
         <p className={styles.boundary}>{copy.safetyBoundary}</p>
         {showOfficialAnchor ? (
           <a
-            className={styles.officialAnchor}
+            className={`${styles.officialAnchor} ${officialLinkStatus === 'not-activated' ? styles.primaryAction : styles.secondaryAction}`}
             href={draft.destination.canonicalUrl}
             target="_blank"
             rel="noreferrer"
@@ -300,21 +309,31 @@ export function OfficialHandoffPanel({
       </section>
 
       {eligible && confirmedPack && officialLinkStatus === 'activated' ? (
-        <section className={styles.returnSection} aria-labelledby="handoff-return-heading">
-          <h3 id="handoff-return-heading">{copy.returnHeading}</h3>
-          <p className={styles.status}>{copy.activated}</p>
-          <div className={styles.returnChoices}>
+        <section className={styles.returnSection}>
+          <p className={styles.status} role="status" aria-live="polite">{copy.activated}</p>
+          <fieldset className={styles.returnChoices}>
+            <legend>{copy.returnHeading}</legend>
             {returnStateKeys.map((state) => (
               <label className={styles.returnChoice} key={state}>
                 <input
                   type="radio"
+                  name="official-handoff-return-state"
                   checked={returnDraft.selectedReturnState === state}
                   onChange={() => callbacks.onReturnStateChange(state)}
                 />
                 <span>{returnLabels[state]}</span>
               </label>
             ))}
-          </div>
+          </fieldset>
+          {returnDraft.selectedReturnState ? (
+            <p className={styles.status} role="status" aria-live="polite">
+              {copy.selectedReturnPrefix} {returnLabels[returnDraft.selectedReturnState]}{language === 'hi' ? '।' : '.'}{' '}
+              {copy.selectedReturnBoundary}
+            </p>
+          ) : null}
+          {returnRecorded ? (
+            <p className={styles.status} role="status" aria-live="polite">{copy.recordedReturn}</p>
+          ) : null}
           {privateDevice && returnDraft.selectedReturnState === 'acknowledgement-seen' ? (
             <label className={styles.referenceField}>
               <span>{copy.referenceLabel}</span>
@@ -334,9 +353,15 @@ export function OfficialHandoffPanel({
             </div>
           ) : null}
           <p className={styles.boundary}>{helping ? copy.returnBasis.helper : copy.returnBasis.self}</p>
-          <button className={styles.action} type="button" onClick={callbacks.onRecordReturn}>{copy.recordReturn}</button>
-          {privateDevice && receiptState?.status === 'citizen-return-recorded' ? (
-            <button className={styles.action} type="button" onClick={callbacks.onDownloadReceipt}>{copy.receiptDownload}</button>
+          <button
+            className={`${styles.action} ${returnRecorded ? styles.secondaryAction : styles.primaryAction}`}
+            type="button"
+            onClick={callbacks.onRecordReturn}
+          >
+            {copy.recordReturn}
+          </button>
+          {privateDevice && returnRecorded ? (
+            <button className={`${styles.action} ${styles.primaryAction}`} type="button" onClick={callbacks.onDownloadReceipt}>{copy.receiptDownload}</button>
           ) : null}
         </section>
       ) : null}

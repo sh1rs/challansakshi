@@ -78,6 +78,8 @@
 .returnChoice {
   display: flex;
   align-items: flex-start;
+  min-height: 48px;
+  padding: 8px 0;
   gap: 10px;
   line-height: 1.55;
 }
@@ -94,6 +96,18 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.returnChoices legend {
+  margin-bottom: 12px;
+  padding: 0;
+  color: var(--pb-ink);
+  font-size: 1.17em;
+  font-weight: 750;
 }
 
 .referenceField {
@@ -115,16 +129,21 @@
   font-weight: 750;
   text-align: center;
   text-decoration: none;
-  background: var(--pb-teal-dark);
   border: 1px solid var(--pb-teal-dark);
   border-radius: 12px;
   cursor: pointer;
 }
 
-.copyButton {
+.copyButton,
+.secondaryAction {
   align-self: flex-start;
   color: var(--pb-teal-dark);
   background: var(--pb-card);
+}
+
+.primaryAction {
+  color: var(--pb-paper);
+  background: var(--pb-teal-dark);
 }
 
 .action:focus-visible,
