@@ -1,10 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { assessCitizenChallanReview, buildCitizenChallanWorksheet, calculateEnteredOfficialDeadline, citizenSituationForFinding, type CitizenChallanAnswers } from '../lib/public-challan';
+import {
+  assessCitizenChallanReview,
+  buildCitizenChallanWorksheet,
+  calculateEnteredOfficialDeadline,
+  citizenSituationForFinding,
+  projectActionReadyReviewFacts,
+  type CitizenChallanAnswers,
+  type ReviewFact,
+} from '../lib/public-challan';
 
 const complete: CitizenChallanAnswers = {
   sourceStatus: 'official-service', imageInspected: true, plateObservation: 'match', categoryObservation: 'match', colourObservation: 'match',
   offenceObservation: 'appears-visible', timestampStatus: 'displayed', locationStatus: 'displayed',
   ownRecordAvailable: 'present', noticeCopyAvailable: 'present', custodyRecordAvailable: 'not-applicable',
+};
+
+const fact = <T>(
+  value: T,
+  overrides: Partial<ReviewFact<T>> = {},
+): ReviewFact<T> => ({
+  value,
+  source: 'citizen-attestation',
+  confidence: 'high',
+  limitation: 'Citizen-confirmed fact used only for this review.',
+  confirmation: 'citizen-confirmed',
+  reviewRevisionId: 'review-1',
+  ...overrides,
+});
+
+const actionReadyBase: CitizenChallanAnswers = {
+  ...complete,
+  categoryObservation: 'different',
+  reviewRevisionId: 'review-1',
 };
 
 describe('public challan self-review', () => {
@@ -29,6 +56,224 @@ describe('public challan self-review', () => {
   it('treats readable plate or category conflict as a citizen-recorded inconsistency', () => {
     expect(assessCitizenChallanReview({ ...complete, plateObservation: 'different' }).finding).toBe('citizen-recorded-inconsistency');
     expect(assessCitizenChallanReview({ ...complete, categoryObservation: 'different' }).finding).toBe('citizen-recorded-inconsistency');
+  });
+
+  it('keeps a generic category difference worksheet-eligible but abstains from action-ready class mapping', () => {
+    const assessment = assessCitizenChallanReview(actionReadyBase);
+    expect(assessment).toMatchObject({ finding: 'citizen-recorded-inconsistency', canPrepareWorksheet: true });
+    expect(projectActionReadyReviewFacts(actionReadyBase)).toMatchObject({
+      status: 'abstained',
+      reason: 'missing-explicit-facts',
+    });
+  });
+
+  it('requires both explicit two-versus-four vehicle classes and an independent readable record', () => {
+    const citizenVehicleClass = fact('four-wheeler' as const, { source: 'independent-vehicle-record' });
+    const observedEvidenceVehicleClass = fact('two-wheeler' as const, { source: 'official-evidence-image' });
+    const independentReadableVehicleRecord = fact(true, { source: 'independent-vehicle-record' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      citizenVehicleClass,
+      observedEvidenceVehicleClass,
+      independentReadableVehicleRecord,
+    })).toEqual({
+      status: 'eligible',
+      facts: {
+        reviewRevisionId: 'review-1',
+        citizenVehicleClass,
+        observedEvidenceVehicleClass,
+        independentReadableVehicleRecord,
+        supportedSignals: ['vehicle-class-conflict'],
+      },
+    });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      citizenVehicleClass,
+      independentReadableVehicleRecord,
+    })).toMatchObject({ status: 'abstained', reason: 'missing-explicit-facts' });
+  });
+
+  it('does not treat other, unclear, or same explicit classes as a supported class conflict', () => {
+    const independentReadableVehicleRecord = fact(true, { source: 'independent-vehicle-record' });
+    for (const [citizenVehicleClass, observedEvidenceVehicleClass] of [
+      ['four-wheeler', 'four-wheeler'],
+      ['other', 'two-wheeler'],
+      ['unclear', 'four-wheeler'],
+    ] as const) {
+      expect(projectActionReadyReviewFacts({
+        ...actionReadyBase,
+        citizenVehicleClass: fact(citizenVehicleClass, { source: 'independent-vehicle-record' }),
+        observedEvidenceVehicleClass: fact(observedEvidenceVehicleClass, { source: 'official-evidence-image' }),
+        independentReadableVehicleRecord,
+      })).toMatchObject({ status: 'abstained', reason: 'unsupported-signal' });
+    }
+  });
+
+  it('requires a separate citizen-confirmed basis before adding a duplicate-plate signal', () => {
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      duplicatePlateIndependentBasis: fact('none' as const),
+    })).toMatchObject({ status: 'abstained', reason: 'unsupported-signal' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      duplicatePlateIndependentBasis: fact('citizen-confirmed' as const, { confirmation: 'unconfirmed' }),
+    })).toMatchObject({ status: 'abstained', reason: 'unconfirmed-fact' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      duplicatePlateIndependentBasis: fact('citizen-confirmed' as const),
+    })).toMatchObject({
+      status: 'eligible',
+      facts: {
+        duplicatePlateIndependentBasis: { value: 'citizen-confirmed' },
+        supportedSignals: ['duplicate-plate'],
+      },
+    });
+  });
+
+  it('requires same-revision confirmed provenance for Wrong Evidence Captured', () => {
+    const wrongEvidenceBasis = fact('different-vehicle' as const, { source: 'citizen-attestation' });
+    expect(projectActionReadyReviewFacts({ ...actionReadyBase, wrongEvidenceBasis })).toEqual({
+      status: 'eligible',
+      facts: {
+        reviewRevisionId: 'review-1',
+        wrongEvidenceBasis,
+        supportedSignals: ['wrong-evidence'],
+      },
+    });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: fact('different-vehicle' as const, { confirmation: 'unconfirmed' }),
+    })).toMatchObject({ status: 'abstained', reason: 'unconfirmed-fact' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: fact('different-vehicle' as const, { reviewRevisionId: 'review-2' }),
+    })).toMatchObject({ status: 'abstained', reason: 'revision-mismatch' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: fact('different-vehicle' as const, { source: 'official-evidence-image' }),
+    })).toMatchObject({ status: 'abstained', reason: 'unsupported-signal' });
+  });
+
+  it('requires equivalent same-revision provenance for Wrong Vehicle Number Entered By Officer', () => {
+    const vehicleNumberEntryMismatchBasis = fact('visible-entry-mismatch' as const, { source: 'official-record' });
+    expect(projectActionReadyReviewFacts({ ...actionReadyBase, vehicleNumberEntryMismatchBasis })).toEqual({
+      status: 'eligible',
+      facts: {
+        reviewRevisionId: 'review-1',
+        vehicleNumberEntryMismatchBasis,
+        supportedSignals: ['vehicle-number-entry-mismatch'],
+      },
+    });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      vehicleNumberEntryMismatchBasis: fact('visible-entry-mismatch' as const, { source: 'official-evidence-image' }),
+    })).toMatchObject({ status: 'abstained', reason: 'unsupported-signal' });
+  });
+
+  it('requires a high-confidence, non-empty, same-revision fact before carrying it into the projection', () => {
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: fact('unrelated-scene' as const, { confidence: 'medium' }),
+    })).toMatchObject({ status: 'abstained', reason: 'low-confidence-fact' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: fact('unrelated-scene' as const, { limitation: '   ' }),
+    })).toMatchObject({ status: 'abstained', reason: 'missing-explicit-facts' });
+
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      reviewRevisionId: '',
+      wrongEvidenceBasis: fact('unrelated-scene' as const),
+    })).toMatchObject({ status: 'abstained', reason: 'missing-explicit-facts' });
+  });
+
+  it('reconstructs an action-ready fact without carrying unknown caller properties', () => {
+    const projection = projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      wrongEvidenceBasis: {
+        ...fact('unrelated-scene' as const),
+        citizenIdentifier: 'must-not-cross-the-projection',
+      } as ReviewFact<'unrelated-scene'>,
+    });
+
+    expect(projection.status).toBe('eligible');
+    expect(JSON.stringify(projection)).not.toContain('citizenIdentifier');
+    expect(JSON.stringify(projection)).not.toContain('must-not-cross-the-projection');
+  });
+
+  it('requires a true independent readable-record fact for a plate-conflict signal', () => {
+    const plateAnswers: CitizenChallanAnswers = {
+      ...complete,
+      plateObservation: 'different',
+      reviewRevisionId: 'review-1',
+    };
+    expect(projectActionReadyReviewFacts({
+      ...plateAnswers,
+      independentReadableVehicleRecord: fact(false, { source: 'independent-vehicle-record' }),
+    })).toMatchObject({ status: 'abstained', reason: 'record-not-independent-readable' });
+
+    expect(projectActionReadyReviewFacts({
+      ...plateAnswers,
+      independentReadableVehicleRecord: fact(true, { source: 'independent-vehicle-record' }),
+    })).toMatchObject({
+      status: 'eligible',
+      facts: { supportedSignals: ['readable-plate-conflict'] },
+    });
+  });
+
+  it('abstains before projection for non-official sources and non-discrepancy assessments', () => {
+    expect(projectActionReadyReviewFacts({
+      ...actionReadyBase,
+      sourceStatus: 'message-only',
+      wrongEvidenceBasis: fact('different-vehicle' as const),
+    })).toEqual({ status: 'abstained', reason: 'source-not-official' });
+
+    expect(projectActionReadyReviewFacts({
+      ...complete,
+      reviewRevisionId: 'review-1',
+      wrongEvidenceBasis: fact('different-vehicle' as const),
+    })).toEqual({ status: 'abstained', reason: 'assessment-not-discrepancy' });
+  });
+
+  it('deduplicates supported signals in a fixed order and carries only validated same-revision facts', () => {
+    const independentReadableVehicleRecord = fact(true, { source: 'independent-vehicle-record' });
+    const wrongEvidenceBasis = fact('unrelated-scene' as const);
+    const duplicatePlateIndependentBasis = fact('citizen-confirmed' as const);
+    const projection = projectActionReadyReviewFacts({
+      ...complete,
+      plateObservation: 'different',
+      categoryObservation: 'different',
+      reviewRevisionId: 'review-1',
+      independentReadableVehicleRecord,
+      citizenVehicleClass: fact('four-wheeler' as const, { source: 'independent-vehicle-record' }),
+      observedEvidenceVehicleClass: fact('two-wheeler' as const, { source: 'official-evidence-image' }),
+      wrongEvidenceBasis,
+      duplicatePlateIndependentBasis,
+    });
+
+    expect(projection).toMatchObject({
+      status: 'eligible',
+      facts: {
+        independentReadableVehicleRecord,
+        wrongEvidenceBasis,
+        duplicatePlateIndependentBasis,
+        supportedSignals: [
+          'readable-plate-conflict',
+          'vehicle-class-conflict',
+          'wrong-evidence',
+          'duplicate-plate',
+        ],
+      },
+    });
   });
 
   it.each(['missing', 'unclear', 'not-applicable'] as const)('does not anchor a vehicle mismatch to memory when the comparison record is %s', (ownRecordAvailable) => {
