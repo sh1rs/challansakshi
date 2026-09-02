@@ -9,6 +9,7 @@ import {
   OFFICIAL_FALLBACK_ROUTE,
   OFFICIAL_ROUTE_REGISTRY_VERSION,
   isActionReadyOfficialDestination,
+  isVerifiedOfficialDestinationShape,
   isVerifiedOfficialRouteCurrent,
   resolveOfficialDestination,
   type IssuingJurisdictionCode,
@@ -17,6 +18,7 @@ import {
   type OfficialDestination,
   type OfficialFallbackRoute,
 } from '../lib/official-destinations';
+import { TEST_ONLY_VERIFIED_LEGACY_DESTINATION_FIXTURE } from './fixtures/official-destination-fixtures';
 
 const VERIFIED_NOW = '2026-09-03T12:00:00.000Z';
 const EXPECTED_NEXTGEN_CODES = [
@@ -131,12 +133,11 @@ describe('official destination registry', () => {
     expectTypeOf<OfficialFallbackRoute>().not.toMatchTypeOf<OfficialDestination>();
 
     for (const auxiliary of Object.values(OFFICIAL_AUXILIARY_ROUTES)) {
-      expect(isActionReadyOfficialDestination(auxiliary, VERIFIED_NOW)).toBe(false);
+      expect(isActionReadyOfficialDestination(auxiliary, confirmed('KA'), VERIFIED_NOW)).toBe(false);
     }
-    expect(isActionReadyOfficialDestination(OFFICIAL_FALLBACK_ROUTE, VERIFIED_NOW)).toBe(false);
-    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS['delhi-manual'], VERIFIED_NOW)).toBe(false);
-    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS.unresolved, VERIFIED_NOW)).toBe(false);
-    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS.nextgen, VERIFIED_NOW)).toBe(true);
+    expect(isActionReadyOfficialDestination(OFFICIAL_FALLBACK_ROUTE, confirmed('KA'), VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS['delhi-manual'], confirmed('DL'), VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS.unresolved, { status: 'unconfirmed' }, VERIFIED_NOW)).toBe(false);
   });
 
   it('rejects a handoff record whose fallback relationship is not the exact fallback record kind and purpose', () => {
@@ -145,7 +146,65 @@ describe('official destination registry', () => {
       fallback: OFFICIAL_AUXILIARY_ROUTES['national-services-directory'],
     } as unknown as OfficialDestination;
 
-    expect(isActionReadyOfficialDestination(auxiliaryFallback, VERIFIED_NOW)).toBe(false);
+    expect(isVerifiedOfficialDestinationShape(auxiliaryFallback, VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(auxiliaryFallback, confirmed('KA'), VERIFIED_NOW)).toBe(false);
+  });
+
+  it('binds action readiness to exact registry identity, matching jurisdiction confirmation, and current time', () => {
+    const canonicalNextgen = OFFICIAL_DESTINATIONS.nextgen;
+    const fabricatedSameShape = {
+      ...canonicalNextgen,
+      capabilities: { ...canonicalNextgen.capabilities },
+    } as OfficialDestination;
+    const arbitraryUrl = {
+      ...canonicalNextgen,
+      domain: 'attacker.example',
+      canonicalUrl: 'https://attacker.example/grievance',
+    } as OfficialDestination;
+
+    expect(isActionReadyOfficialDestination(canonicalNextgen, confirmed('KA'), VERIFIED_NOW)).toBe(true);
+    expect(isVerifiedOfficialDestinationShape(fabricatedSameShape, VERIFIED_NOW)).toBe(true);
+    expect(isActionReadyOfficialDestination(fabricatedSameShape, confirmed('KA'), VERIFIED_NOW)).toBe(false);
+    expect(isVerifiedOfficialDestinationShape(arbitraryUrl, VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(arbitraryUrl, confirmed('KA'), VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(OFFICIAL_DESTINATIONS.legacy, confirmed('AP'), VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(canonicalNextgen, { status: 'unconfirmed' }, VERIFIED_NOW)).toBe(false);
+    expect(isActionReadyOfficialDestination(
+      canonicalNextgen,
+      { status: 'confirmed' } as unknown as JurisdictionConfirmation,
+      VERIFIED_NOW,
+    )).toBe(false);
+    expect(isActionReadyOfficialDestination(canonicalNextgen, confirmed('KA'), '2026-10-03T12:00:00.000Z')).toBe(false);
+  });
+
+  it('keeps the fully verified Legacy fixture valid for pure tests but outside production routing authority', () => {
+    const fixture = TEST_ONLY_VERIFIED_LEGACY_DESTINATION_FIXTURE;
+
+    expect(fixture).toMatchObject({
+      jurisdictionCode: 'AP',
+      confirmation: { status: 'confirmed', code: 'AP' },
+      destination: {
+        routeType: 'handoff',
+        key: 'legacy',
+        canonicalUrl: 'https://echallan.parivahan.gov.in/gsticket',
+        verifier: 'Task 1 test-only route verifier',
+        evidenceRef: 'tests/fixtures/official-destination-fixtures.ts#legacy-handoff',
+        lastVerifiedAt: '2026-09-02',
+        expiresAt: '2026-10-02',
+        releaseState: 'current',
+        jurisdictionScope: ['AP'],
+        capabilities: { category: true, description: true, attachmentGuidance: true },
+        fallback: {
+          routeType: 'fallback',
+          canonicalUrl: 'https://echallan.parivahan.gov.in/index/challan-services',
+          verifier: 'Task 1 test-only route verifier',
+          evidenceRef: 'tests/fixtures/official-destination-fixtures.ts#legacy-fallback',
+        },
+      },
+    });
+    expect(isVerifiedOfficialDestinationShape(fixture.destination, VERIFIED_NOW)).toBe(true);
+    expect(resolveOfficialDestination(fixture.confirmation, VERIFIED_NOW).key).toBe('unresolved');
+    expect(isActionReadyOfficialDestination(fixture.destination, fixture.confirmation, VERIFIED_NOW)).toBe(false);
   });
 
   it.each([

@@ -257,15 +257,71 @@ function isCurrentOfficialFallback(route: unknown, now: string | Date): route is
     && isVerifiedOfficialRouteCurrent(fallback, now);
 }
 
+const destinationContracts: Readonly<Record<OfficialDestinationKind, Readonly<{
+  canonicalUrl: string;
+  domain: string;
+  purpose: OfficialDestination['purpose'];
+  capabilities: OfficialDestination['capabilities'];
+}>>> = Object.freeze({
+  legacy: Object.freeze({
+    canonicalUrl: 'https://echallan.parivahan.gov.in/gsticket',
+    domain: 'echallan.parivahan.gov.in',
+    purpose: 'official-grievance-service',
+    capabilities: Object.freeze({ category: true, description: true, attachmentGuidance: true }),
+  }),
+  nextgen: Object.freeze({
+    canonicalUrl: 'https://echallan.parivahan.nic.in/grievance',
+    domain: 'echallan.parivahan.nic.in',
+    purpose: 'official-grievance-service',
+    capabilities: grievanceCapabilities,
+  }),
+  'delhi-manual': Object.freeze({
+    canonicalUrl: 'https://traffic.delhipolice.gov.in/',
+    domain: 'traffic.delhipolice.gov.in',
+    purpose: 'official-service',
+    capabilities: manualCapabilities,
+  }),
+  unresolved: Object.freeze({
+    canonicalUrl: 'https://echallan.parivahan.gov.in/index/challan-services',
+    domain: 'echallan.parivahan.gov.in',
+    purpose: 'official-service',
+    capabilities: manualCapabilities,
+  }),
+});
+
+/** Validates metadata and the fixed destination shape, but grants no routing authority. */
+export function isVerifiedOfficialDestinationShape(route: unknown, now: string | Date): route is OfficialDestination {
+  if (!route || typeof route !== 'object') return false;
+  const destination = route as Partial<OfficialDestination>;
+  if (destination.routeType !== 'handoff' || !destination.key || !(destination.key in destinationContracts)) return false;
+  const contract = destinationContracts[destination.key];
+  if (
+    destination.canonicalUrl !== contract.canonicalUrl
+    || destination.domain !== contract.domain
+    || destination.purpose !== contract.purpose
+    || !nonEmpty(destination.routingRationale)
+  ) return false;
+  if (!Array.isArray(destination.jurisdictionScope)) return false;
+  if (!destination.jurisdictionScope.every((code) => typeof code === 'string' && issuingCodes.has(code))) return false;
+  if (new Set(destination.jurisdictionScope).size !== destination.jurisdictionScope.length) return false;
+  if (!destination.capabilities || typeof destination.capabilities !== 'object') return false;
+  if (
+    destination.capabilities.category !== contract.capabilities.category
+    || destination.capabilities.description !== contract.capabilities.description
+    || destination.capabilities.attachmentGuidance !== contract.capabilities.attachmentGuidance
+  ) return false;
+  return isVerifiedOfficialRouteCurrent(destination, now)
+    && isCurrentOfficialFallback(destination.fallback, now);
+}
+
 export function isActionReadyOfficialDestination(
-  route: OfficialDestination | OfficialAuxiliaryRoute | OfficialFallbackRoute,
+  candidate: OfficialDestination | OfficialAuxiliaryRoute | OfficialFallbackRoute,
+  confirmation: JurisdictionConfirmation,
   now: string | Date,
-): route is OfficialDestination & { key: 'legacy' | 'nextgen' } {
-  if (route.routeType !== 'handoff') return false;
-  if (route.key !== 'legacy' && route.key !== 'nextgen') return false;
-  if (route.purpose !== 'official-grievance-service' || !route.capabilities.description) return false;
-  return isVerifiedOfficialRouteCurrent(route, now)
-    && isCurrentOfficialFallback(route.fallback, now);
+): candidate is OfficialDestination & { key: 'legacy' | 'nextgen' } {
+  const resolved = resolveOfficialDestination(confirmation, now);
+  return (resolved.key === 'legacy' || resolved.key === 'nextgen')
+    && candidate === resolved;
 }
 
 function unresolvedDestination(): OfficialDestination {
@@ -283,7 +339,6 @@ export function resolveOfficialDestination(input: JurisdictionConfirmation, now:
   else if (legacyCodes.has(input.code)) candidate = OFFICIAL_DESTINATIONS.legacy;
   else return unresolvedDestination();
 
-  if (!isVerifiedOfficialRouteCurrent(candidate, now)) return unresolvedDestination();
-  if (!isCurrentOfficialFallback(candidate.fallback, now)) return unresolvedDestination();
+  if (!isVerifiedOfficialDestinationShape(candidate, now)) return unresolvedDestination();
   return candidate;
 }
