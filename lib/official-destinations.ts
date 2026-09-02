@@ -289,11 +289,16 @@ const destinationContracts: Readonly<Record<OfficialDestinationKind, Readonly<{
   }),
 });
 
+function isOfficialDestinationKind(value: unknown): value is OfficialDestinationKind {
+  return typeof value === 'string'
+    && Object.prototype.hasOwnProperty.call(destinationContracts, value);
+}
+
 /** Validates metadata and the fixed destination shape, but grants no routing authority. */
 export function isVerifiedOfficialDestinationShape(route: unknown, now: string | Date): route is OfficialDestination {
   if (!route || typeof route !== 'object') return false;
   const destination = route as Partial<OfficialDestination>;
-  if (destination.routeType !== 'handoff' || !destination.key || !(destination.key in destinationContracts)) return false;
+  if (destination.routeType !== 'handoff' || !isOfficialDestinationKind(destination.key)) return false;
   const contract = destinationContracts[destination.key];
   if (
     destination.canonicalUrl !== contract.canonicalUrl

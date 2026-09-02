@@ -207,6 +207,28 @@ describe('official destination registry', () => {
     expect(isActionReadyOfficialDestination(fixture.destination, fixture.confirmation, VERIFIED_NOW)).toBe(false);
   });
 
+  it.each(['__proto__', 'constructor', 'toString', 'not-a-destination-kind'])(
+    'returns false without throwing for inherited or unknown destination key %s',
+    (key) => {
+      const hostileUnknownInput = {
+        routeType: 'handoff',
+        key,
+        canonicalUrl: undefined,
+        domain: undefined,
+        purpose: undefined,
+        routingRationale: 'Hostile unknown input must fail closed.',
+        jurisdictionScope: [],
+        capabilities: { category: false, description: false, attachmentGuidance: false },
+      };
+      let result: boolean | undefined;
+
+      expect(() => {
+        result = isVerifiedOfficialDestinationShape(hostileUnknownInput, VERIFIED_NOW);
+      }).not.toThrow();
+      expect(result).toBe(false);
+    },
+  );
+
   it.each([
     ['handoff', OFFICIAL_DESTINATIONS.nextgen],
     ['auxiliary', OFFICIAL_AUXILIARY_ROUTES['national-record-lookup']],
