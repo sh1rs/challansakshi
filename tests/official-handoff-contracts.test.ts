@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { createElement } from 'react';
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
@@ -29,8 +29,12 @@ import {
   recordOfficialLinkActivation,
 } from '../lib/official-handoff-receipt';
 import {
+  activateCitizenReviewOfficialLink,
   buildCitizenReviewHandoffView,
+  changeCitizenReviewPackPermission,
+  confirmCitizenReviewHandoffPack,
   createCitizenReviewHandoffController,
+  reconcileCitizenReviewCurrentPack,
 } from '../lib/citizen-review-handoff-controller';
 import type { ActionReadyReviewFacts, CitizenChallanAnswers, ReviewFact } from '../lib/public-challan';
 
@@ -182,7 +186,7 @@ const callbacks: OfficialHandoffCallbacks = {
   onAffectedPersonRequestedPreparationChange: () => undefined,
   onAffectedPersonConfirmedPackChange: () => undefined,
   onCopyField: () => undefined,
-  onOfficialLinkActivate: () => undefined,
+  onOfficialLinkActivate: () => true,
   onReturnStateChange: () => undefined,
   onReferenceLastFourChange: () => undefined,
   onReturnAffectedPersonPresentChange: () => undefined,
@@ -297,6 +301,22 @@ function primaryActionCount(html: string): number {
   return html.match(/class="[^"]*primaryAction[^"]*"/g)?.length ?? 0;
 }
 
+function findReactElement(
+  node: ReactNode,
+  predicate: (element: ReactElement) => boolean,
+): ReactElement | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findReactElement(child, predicate);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement(node)) return null;
+  if (predicate(node)) return node;
+  return findReactElement((node.props as { children?: ReactNode }).children, predicate);
+}
+
 describe('controlled official handoff presentation', () => {
   it('starts after the result with Prepared for and preserves the complete installation-free order', () => {
     const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps()));
@@ -336,6 +356,158 @@ describe('controlled official handoff presentation', () => {
     expect(html).toContain('rel="noreferrer"');
     expect(panelSource).toMatch(/onCopyField\('description'\)/);
     expect(panelSource).not.toMatch(/onCopyField[\s\S]{0,180}onOfficialLinkActivate/);
+  });
+
+  it('preserves native anchor semantics, prevents an expired transition, and allows a current transition', () => {
+    let controller = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+    });
+    for (const key of [
+      'affectedPersonInspectedEvidence',
+      'affectedPersonInspectedReadableRecord',
+      'affectedPersonConfirmedEntitlement',
+    ] as const) controller = changeCitizenReviewPackPermission(controller, key, true, {
+      resultRevisionId: controller.resultRevisionId,
+      packRevisionId: PACK_REVISION,
+    });
+    const input = {
+      answers: {
+        sourceStatus: 'official-service',
+        imageInspected: true,
+        plateObservation: 'different',
+        categoryObservation: 'match',
+        colourObservation: 'match',
+        offenceObservation: 'appears-visible',
+        timestampStatus: 'displayed',
+        locationStatus: 'displayed',
+        ownRecordAvailable: 'present',
+        noticeCopyAvailable: 'present',
+        custodyRecordAvailable: 'not-applicable',
+      },
+      factsConfirmed: true,
+      jurisdictionConfirmation: { status: 'confirmed', code: 'KA' },
+      role: 'self',
+      deviceMode: 'private',
+      language: 'en',
+      simpleMode: false,
+      nowIso: NOW,
+    } as const;
+    let currentView = buildCitizenReviewHandoffView(controller, input);
+    controller = confirmCitizenReviewHandoffPack(controller, {
+      view: currentView,
+      sourceKind: 'official-service',
+      nowIso: NOW,
+    });
+    currentView = buildCitizenReviewHandoffView(controller, input);
+    const expiredView = buildCitizenReviewHandoffView(controller, {
+      ...input,
+      nowIso: new Date(Date.parse(OFFICIAL_DESTINATIONS.nextgen.expiresAt) + 86_400_000).toISOString(),
+    });
+
+    for (const [label, actionView, expectedPrevented] of [
+      ['expired', expiredView, true],
+      ['current', currentView, false],
+    ] as const) {
+      let activationCalls = 0;
+      const rendered = OfficialHandoffPanel(panelProps({
+        draft: currentView.draft,
+        confirmedPack: controller.confirmedPack,
+        callbacks: {
+          ...callbacks,
+          onOfficialLinkActivate: () => {
+            activationCalls += 1;
+            const reconciled = reconcileCitizenReviewCurrentPack(controller, actionView, {
+              resultRevisionId: '99999999999999999999999999999999',
+              packRevisionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            });
+            if (reconciled !== controller) return false;
+            return activateCitizenReviewOfficialLink(controller, actionView, actionView.nowIso) !== controller;
+          },
+        },
+      }));
+      const anchor = findReactElement(rendered, (element) => (
+        element.type === 'a'
+        && (element.props as { href?: string }).href === OFFICIAL_DESTINATIONS.nextgen.canonicalUrl
+      ));
+      expect(anchor, label).not.toBeNull();
+
+      let prevented = false;
+      const anchorProps = anchor!.props as {
+        href: string;
+        target: string;
+        rel: string;
+        onClick?: (event: { preventDefault: () => void }) => void;
+      };
+      anchorProps.onClick?.({ preventDefault: () => { prevented = true; } });
+
+      expect(activationCalls, label).toBe(1);
+      expect(prevented, label).toBe(expectedPrevented);
+      expect(anchorProps.href).toBe(OFFICIAL_DESTINATIONS.nextgen.canonicalUrl);
+      expect(anchorProps.target).toBe('_blank');
+      expect(anchorProps.rel).toBe('noreferrer');
+    }
+  });
+
+  it('renders only the newly re-confirmed helper presence after departure invalidates every prior assertion', () => {
+    const firstResultRevision = '33333333333333333333333333333333';
+    const firstPackRevision = '44444444444444444444444444444444';
+    let state = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+      role: 'present-helper',
+    });
+    for (const key of [
+      'affectedPersonPresent',
+      'affectedPersonInspectedEvidence',
+      'affectedPersonInspectedReadableRecord',
+      'affectedPersonConfirmedEntitlement',
+      'affectedPersonRequestedPreparation',
+    ] as const) {
+      state = changeCitizenReviewPackPermission(state, key, true, {
+        resultRevisionId: firstResultRevision,
+        packRevisionId: firstPackRevision,
+      });
+    }
+    const allConfirmed = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      reviewContext: {
+        role: 'present-helper',
+        deviceMode: 'private',
+        safetyConsent: {
+          manualReviewAcknowledged: true,
+          minimumDataAcknowledged: true,
+          affectedPersonPresentAcknowledged: true,
+        },
+      },
+      packConfirmation: state.packConfirmation,
+    })));
+    expect(allConfirmed.match(/type="checkbox" checked=""/g)).toHaveLength(5);
+
+    state = changeCitizenReviewPackPermission(state, 'affectedPersonPresent', false, {
+      resultRevisionId: '55555555555555555555555555555555',
+      packRevisionId: '66666666666666666666666666666666',
+    });
+    state = changeCitizenReviewPackPermission(state, 'affectedPersonPresent', true, {
+      resultRevisionId: '77777777777777777777777777777777',
+      packRevisionId: '88888888888888888888888888888888',
+    });
+    const returned = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      reviewContext: {
+        role: 'present-helper',
+        deviceMode: 'private',
+        safetyConsent: {
+          manualReviewAcknowledged: true,
+          minimumDataAcknowledged: true,
+          affectedPersonPresentAcknowledged: true,
+        },
+      },
+      packConfirmation: state.packConfirmation,
+    })));
+
+    expect(returned.match(/type="checkbox" checked=""/g)).toHaveLength(1);
+    expect(returned).toContain('The affected person is present.');
+    expect(returned).toContain('The affected person inspected the supplied evidence.');
+    expect(returned).toContain('The affected person inspected a readable comparison record.');
   });
 
   it.each([

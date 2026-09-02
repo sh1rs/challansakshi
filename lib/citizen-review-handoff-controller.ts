@@ -262,8 +262,11 @@ export function changeCitizenReviewPackPermission(
   state: CitizenReviewHandoffControllerState,
   key: PackPermissionKey,
   checked: boolean,
-  revisions: Readonly<{ packRevisionId: string }>,
+  revisions: Readonly<{ resultRevisionId: string; packRevisionId: string }>,
 ): CitizenReviewHandoffControllerState {
+  if (state.role === 'present-helper' && key === 'affectedPersonPresent' && !checked) {
+    return invalidateCitizenReviewHandoff(state, revisions);
+  }
   const retained = { ...state.packConfirmation, [key]: checked, affectedPersonConfirmedPack: false };
   const invalidated = invalidateCitizenReviewHandoff(state, revisions);
   return { ...invalidated, packConfirmation: retained };
@@ -903,6 +906,34 @@ export function getCitizenReviewCurrentExtensionPreparation(
   return state.extensionPreparation;
 }
 
+export type CitizenReviewHandoffRenderState = Readonly<{
+  currentPack: OfficialHandoffPack | null;
+  extensionPreparation: CitizenReviewExtensionPreparation;
+}>;
+
+/**
+ * Projects sensitive render state against the clock read for this render. This
+ * makes a delayed timer harmless: an expired capsule and its pack disappear on
+ * the next render before the cleanup effect commits the invalidation.
+ */
+export function projectCitizenReviewHandoffRenderState(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+  nowMs: number,
+): CitizenReviewHandoffRenderState {
+  const extensionExpired = state.extensionPreparation.status === 'prepared'
+    && (!Number.isFinite(nowMs) || nowMs >= state.extensionPreparation.expiresAtMs);
+  const currentPack = !extensionExpired && isCitizenReviewCurrentPack(state, view)
+    ? state.confirmedPack
+    : null;
+  return {
+    currentPack,
+    extensionPreparation: currentPack
+      ? getCitizenReviewCurrentExtensionPreparation(state, view, nowMs)
+      : { status: 'idle' },
+  };
+}
+
 export function clearCitizenReviewExtensionPreparation(state: CitizenReviewHandoffControllerState) {
   return { ...state, extensionPreparation: { status: 'idle' } as const };
 }
@@ -910,7 +941,7 @@ export function clearCitizenReviewExtensionPreparation(state: CitizenReviewHando
 export function expireCitizenReviewExtensionPreparation(
   state: CitizenReviewHandoffControllerState,
   nowMs: number,
-  revisions: Readonly<{ packRevisionId: string }>,
+  revisions: Readonly<{ resultRevisionId?: string; packRevisionId: string }>,
 ): CitizenReviewHandoffControllerState {
   if (state.extensionPreparation.status !== 'prepared' || nowMs < state.extensionPreparation.expiresAtMs) return state;
   return invalidateCitizenReviewHandoff(state, revisions);

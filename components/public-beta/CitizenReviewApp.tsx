@@ -50,7 +50,6 @@ import {
   confirmCitizenReviewHandoffPack,
   createCitizenReviewHandoffController,
   expireCitizenReviewExtensionPreparation,
-  getCitizenReviewCurrentExtensionPreparation,
   getCitizenReviewExtensionReadiness,
   getCitizenReviewReceiptState,
   getCitizenReviewEffectGuardSignature,
@@ -58,6 +57,7 @@ import {
   invalidateCitizenReviewHandoff,
   isCitizenReviewCurrentPack,
   prepareCitizenReviewExtension,
+  projectCitizenReviewHandoffRenderState,
   recordCitizenReviewReturn,
   requestCitizenReceiptDownload,
   requestCitizenReviewCopy,
@@ -328,7 +328,11 @@ function EvidenceRows({
   );
 }
 
-export default function CitizenReviewApp() {
+type CitizenReviewAppProps = Readonly<{
+  readRenderNowMs?: () => number;
+}>;
+
+export default function CitizenReviewApp({ readRenderNowMs = Date.now }: CitizenReviewAppProps = {}) {
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<Step>('safety');
   const [goal, setGoal] = useState<CitizenGoal | null>(null);
@@ -511,19 +515,22 @@ export default function CitizenReviewApp() {
   ]);
   const handoffView = buildCitizenReviewHandoffView(handoffState, handoffViewInput);
   const extensionRelease = evaluatePublicExtensionRelease(CURRENT_EXTENSION_RELEASE_STATE);
-  const hasCurrentHandoffPack = isCitizenReviewCurrentPack(handoffState, handoffView);
-  const currentHandoffPack = hasCurrentHandoffPack ? handoffState.confirmedPack : null;
+  const renderNowMs = handoffState.extensionPreparation.status === 'prepared'
+    ? readRenderNowMs()
+    : Date.parse(routeNowIso);
+  const handoffRenderState = projectCitizenReviewHandoffRenderState(
+    handoffState,
+    handoffView,
+    renderNowMs,
+  );
+  const hasCurrentHandoffPack = isCitizenReviewCurrentPack(handoffState, handoffView)
+    && handoffRenderState.currentPack !== null;
+  const currentHandoffPack = handoffRenderState.currentPack;
   const returnReadiness = getCitizenReviewReturnReadiness(handoffState, handoffView);
-  const extensionReadiness = getCitizenReviewExtensionReadiness(
-    handoffState,
-    handoffView,
-    extensionRelease,
-  );
-  const currentExtensionPreparation = getCitizenReviewCurrentExtensionPreparation(
-    handoffState,
-    handoffView,
-    Date.parse(routeNowIso),
-  );
+  const extensionReadiness = currentHandoffPack
+    ? getCitizenReviewExtensionReadiness(handoffState, handoffView, extensionRelease)
+    : { status: 'blocked' as const, reason: 'current-pack-required' as const };
+  const currentExtensionPreparation = handoffRenderState.extensionPreparation;
 
   useEffect(() => {
     let active = true;
@@ -549,19 +556,26 @@ export default function CitizenReviewApp() {
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      setHandoffState((current) => reconcileCitizenReviewCurrentPack(
-        current,
-        buildCitizenReviewHandoffView(current, handoffViewInput),
-        {
+      setHandoffState((current) => {
+        const revisions = {
           resultRevisionId: freshOpaqueRevisionId(),
           packRevisionId: freshOpaqueRevisionId(),
-        },
-      ));
+        };
+        const expired = expireCitizenReviewExtensionPreparation(current, renderNowMs, revisions);
+        const nowIso = Number.isFinite(renderNowMs)
+          ? new Date(renderNowMs).toISOString()
+          : handoffViewInput.nowIso;
+        return reconcileCitizenReviewCurrentPack(
+          expired,
+          buildCitizenReviewHandoffView(expired, { ...handoffViewInput, nowIso }),
+          revisions,
+        );
+      });
     });
     return () => {
       active = false;
     };
-  }, [handoffState.confirmedPack, handoffView.contextSignature, handoffViewInput, hasCurrentHandoffPack]);
+  }, [handoffState.confirmedPack, handoffView.contextSignature, handoffViewInput, hasCurrentHandoffPack, renderNowMs]);
 
   useEffect(() => () => {
     if (recordSelectionRef.current?.previewUrl) {
@@ -582,6 +596,7 @@ export default function CitizenReviewApp() {
     const timer = window.setTimeout(() => {
       setRouteNowIso(new Date().toISOString());
       setHandoffState((current) => expireCitizenReviewExtensionPreparation(current, Date.now(), {
+        resultRevisionId: freshOpaqueRevisionId(),
         packRevisionId: freshOpaqueRevisionId(),
       }));
     }, delay);
@@ -949,6 +964,7 @@ export default function CitizenReviewApp() {
     key: Parameters<typeof changeCitizenReviewPackPermission>[1],
     checked: boolean,
   ) => setHandoffState((current) => changeCitizenReviewPackPermission(current, key, checked, {
+    resultRevisionId: freshOpaqueRevisionId(),
     packRevisionId: freshOpaqueRevisionId(),
   }));
 
@@ -1799,12 +1815,17 @@ export default function CitizenReviewApp() {
                 onOfficialLinkActivate: () => {
                   const nowIso = new Date().toISOString();
                   setRouteNowIso(nowIso);
-                  setHandoffState((current) => {
-                    const action = currentHandoffForAction(current, nowIso);
-                    return action.status === 'current'
-                      ? activateCitizenReviewOfficialLink(action.state, action.view, nowIso)
-                      : action.state;
-                  });
+                  const action = currentHandoffForAction(handoffState, nowIso);
+                  if (action.status === 'invalidated') {
+                    handoffStateRef.current = action.state;
+                    setHandoffState(action.state);
+                    return false;
+                  }
+                  const activated = activateCitizenReviewOfficialLink(action.state, action.view, nowIso);
+                  if (activated === action.state) return false;
+                  handoffStateRef.current = activated;
+                  setHandoffState(activated);
+                  return true;
                 },
                 onCopyField: copyHandoffField,
                 onReturnStateChange: (value) => setHandoffState((current) => changeCitizenReturnState(current, value)),

@@ -233,6 +233,9 @@ describe('citizen review release contracts', () => {
     expect(reviewSource).toMatch(/isCitizenReviewCurrentPack\(handoffState,\s*handoffView\)/);
     expect(reviewSource).toMatch(/reconcileCitizenReviewCurrentPack/);
     expect(reviewSource).toMatch(/getCitizenReviewExtensionReadiness/);
+    expect(reviewSource).toMatch(/readRenderNowMs/);
+    expect(reviewSource).toMatch(/projectCitizenReviewHandoffRenderState\(\s*handoffState,\s*handoffView,\s*renderNowMs/);
+    expect(reviewSource).not.toMatch(/getCitizenReviewCurrentExtensionPreparation\(\s*handoffState,\s*handoffView,\s*Date\.parse\(routeNowIso\)/);
     expect(reviewSource).not.toMatch(/preparationAllowedByController:\s*extensionRelease\.status[\s\S]{0,700}affectedPersonRequestedPreparation/);
     expect(reviewSource).toMatch(/routeNowIso/);
   });

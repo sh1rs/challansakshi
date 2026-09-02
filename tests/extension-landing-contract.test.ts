@@ -38,10 +38,10 @@ describe('state-free extension information route', () => {
     expect(html).toContain('staged values remain for no more than 10 minutes');
     expect(html).toContain('popup heap and session state');
     expect(html).toContain('browser-activity metadata');
-    expect(html).toContain('payload-free local replay');
-    expect(html).toContain('affected-person acknowledgement or 24 hours');
-    expect(html).toContain('unresolved or orphaned records have no automatic time-based clearing');
-    expect(html).toContain('all relevant official tabs and browser processes are closed and reopened');
+    expect(html).toContain('After a partial, indeterminate, or late attempt settles, only a payload-free replay-prevention record and warning may remain for up to 24 hours from settlement.');
+    expect(html).toContain('An unresolved attempt is not cleared by time, browser or extension restart, reload, update, or disabling the extension.');
+    expect(html).toContain('Exceptional device-owner recovery means manually clearing extension storage or uninstalling the extension, and only after every relevant official tab and every browser process has been closed.');
+    expect(html).not.toMatch(/replay is available|closed and reopened/i);
     expect(html).toContain('project developer is not a recipient');
     expect(html).toContain('only after you explicitly choose Fill');
     if (acquisition >= 0) expect(bounded).toBeLessThan(acquisition);
@@ -50,8 +50,10 @@ describe('state-free extension information route', () => {
   it('keeps the complete bounded disclosure available in Hindi', () => {
     expect(infoSource).toContain('सीमित सुरक्षा जाँच');
     expect(infoSource).toContain('संवेदनशील जानकारी न होने का प्रमाण नहीं');
-    expect(infoSource).toContain('चौबीस घंटे');
-    expect(infoSource).toContain('कोई स्वचालित समय-आधारित सफ़ाई नहीं');
+    expect(infoSource).toContain('आंशिक, अनिर्णायक या देर से हुए प्रयास के निपटने के बाद, निपटारे से अधिकतम 24 घंटे तक केवल पेलोड-रहित दोबारा उपयोग रोकने वाला रिकॉर्ड और चेतावनी रह सकते हैं।');
+    expect(infoSource).toContain('अनसुलझा प्रयास समय बीतने, ब्राउज़र या एक्सटेंशन दोबारा शुरू करने, रीलोड, अपडेट या एक्सटेंशन अक्षम करने से साफ़ नहीं होता।');
+    expect(infoSource).toContain('असाधारण डिवाइस-मालिक पुनर्प्राप्ति का अर्थ है एक्सटेंशन स्टोरेज को हाथ से साफ़ करना या एक्सटेंशन अनइंस्टॉल करना, और यह केवल हर संबंधित आधिकारिक टैब और हर ब्राउज़र प्रक्रिया बंद करने के बाद।');
+    expect(infoSource).not.toMatch(/पेलोड-रहित स्थानीय replay केवल प्रभावी समाप्ति तक उपलब्ध|बंद करके फिर खोली/);
     expect(infoSource).toContain('डेवलपर प्राप्तकर्ता नहीं है');
   });
 

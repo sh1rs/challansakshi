@@ -69,7 +69,7 @@ export type OfficialHandoffCallbacks = Readonly<{
   onAffectedPersonConfirmedEntitlementChange: (checked: boolean) => void;
   onAffectedPersonRequestedPreparationChange: (checked: boolean) => void;
   onAffectedPersonConfirmedPackChange: (checked: boolean) => void;
-  onOfficialLinkActivate: () => void;
+  onOfficialLinkActivate: () => boolean;
   onCopyField: (field: 'lookup' | 'category' | 'description') => void;
   onReturnStateChange: (value: CitizenReturnState) => void;
   onReferenceLastFourChange: (value: string) => void;
@@ -345,7 +345,9 @@ export function OfficialHandoffPanel({
               href={draft.destination.canonicalUrl}
               target="_blank"
               rel="noreferrer"
-              onClick={callbacks.onOfficialLinkActivate}
+              onClick={eligible ? (event) => {
+                if (!callbacks.onOfficialLinkActivate()) event.preventDefault();
+              } : undefined}
             >
               {copy.openPrefix} {draft.destination.serviceName}
             </a>
