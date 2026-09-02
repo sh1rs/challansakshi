@@ -387,6 +387,33 @@ describe('controlled official handoff presentation', () => {
     expect(clearedHtml).not.toContain('Optional challan number aid');
   });
 
+  it('keeps the idle copy live region mounted without rendering a blank callout', () => {
+    const idleHtml = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      copyStatus: { status: 'idle' },
+    })));
+    const copiedHtml = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      copyStatus: { status: 'copied', field: 'lookup' },
+    })));
+    const failedHtml = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      copyStatus: { status: 'failed', field: 'lookup' },
+    })));
+    const idleRegion = idleHtml.match(/<div[^>]*aria-label="Copy status"[^>]*><\/div>/)?.[0];
+    const copiedRegion = copiedHtml.match(/<div[^>]*aria-label="Copy status"[^>]*>Challan number copied\.[^<]*<\/div>/)?.[0];
+    const failedRegion = failedHtml.match(/<div[^>]*aria-label="Copy status"[^>]*>Copy failed\.[^<]*<\/div>/)?.[0];
+
+    expect(idleRegion).toBeDefined();
+    expect(idleRegion).toContain('role="status" aria-live="polite" aria-atomic="true"');
+    expect(idleRegion).toContain('copyStatusRegion');
+    expect(idleRegion).not.toMatch(/_status_/);
+    expect(copiedRegion).toContain('copyStatusRegion');
+    expect(copiedRegion).toMatch(/_status_/);
+    expect(failedRegion).toContain('copyStatusRegion');
+    expect(failedRegion).toMatch(/_status_/);
+    expect(panelStyles).toMatch(/\.copyStatusRegion\s*\{[^}]*margin:\s*0/);
+    expect(panelStyles).not.toMatch(/\.copyStatusRegion\s*\{[^}]*(?:padding|background|border(?:-left)?):/);
+    expect(panelStyles).toMatch(/\.status,[\s\S]*?\{[^}]*padding:\s*12px[^}]*background:[^}]*border-left:/);
+  });
+
   it.each([
     ['en', false, 'A😀e\u0301', 4, '4 of 500 Unicode code points'],
     ['en', true, 'हिंदी', 5, '5 of 500 Unicode code points'],

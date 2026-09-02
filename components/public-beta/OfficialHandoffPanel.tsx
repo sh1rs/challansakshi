@@ -138,7 +138,7 @@ function CopyStatus({
   const message = status.status === 'idle' ? null : feedback[status.field][status.status];
   return (
     <div
-      className={styles.status}
+      className={`${styles.copyStatusRegion}${message ? ` ${styles.status}` : ''}`}
       aria-label={label}
       role="status"
       aria-live="polite"
