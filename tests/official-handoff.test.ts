@@ -1,5 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { OFFICIAL_DESTINATIONS, OFFICIAL_ROUTE_REGISTRY_VERSION } from '../lib/official-destinations';
+import {
+  CURRENT_LEGACY_JURISDICTION_CODES,
+  OFFICIAL_DESTINATIONS,
+  OFFICIAL_ROUTE_REGISTRY_VERSION,
+} from '../lib/official-destinations';
 import {
   EXPORT_SAFE_NEUTRAL_LIMITATIONS,
   buildOfficialHandoffPack,
@@ -17,13 +21,16 @@ import {
   containsRawFilename,
   containsUrlLikeValue,
   findBoundedExportSafetyMatches,
+  isAuthenticConfirmedExtensionHandoffSource,
   isAuthenticOfficialHandoffPack,
   isOpaqueRevisionId,
   isPackDigest,
   mapLegacyIssue,
   normalizeReviewedDescription,
+  projectConfirmedExtensionHandoffSource,
   validateExportSafeReviewedText,
   type BoundedExportSafetyMatch,
+  type ConfirmedExtensionHandoffSource,
   type LegacyIssueMapping,
   type OfficialHandoffPack,
   type RealHandoffBuildInput,
@@ -491,6 +498,130 @@ describe('closed real and synthetic handoff builders', () => {
     const synthetic = buildSyntheticHandoffSimulation(syntheticInput());
     expect(synthetic.status).toBe('built');
     if (synthetic.status === 'built') expect(isAuthenticOfficialHandoffPack(synthetic.simulation)).toBe(false);
+  });
+
+  it('issues an exact deeply frozen NextGen-only extension capability without exposing the complete pack', () => {
+    const pack = builtRealPack();
+    const source = projectConfirmedExtensionHandoffSource(pack);
+    const expectedKeys = [
+      'resultRevisionId',
+      'packRevisionId',
+      'routeRegistryVersion',
+      'description',
+      'confirmed',
+      'issuedAt',
+      'routeKey',
+      'issueCode',
+    ];
+
+    expect(Object.keys(source)).toEqual(expectedKeys);
+    expect(source).toEqual({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+      routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+      description: 'I request a review of this record.\nThe evidence appears to show a different vehicle. Plate ending …3317.',
+      confirmed: true,
+      issuedAt: NOW,
+      routeKey: 'nextgen',
+      issueCode: null,
+    });
+    expect(Object.isFrozen(source)).toBe(true);
+    expect(isAuthenticConfirmedExtensionHandoffSource(source)).toBe(true);
+
+    const json = JSON.stringify(source);
+    expect(Object.keys(JSON.parse(json) as object)).toEqual(expectedKeys);
+    expect(json).not.toContain(pack.packDigest);
+    expect(json).not.toContain(pack.destination.canonicalUrl);
+    expect(json).not.toContain(pack.destination.domain);
+    expect(json).not.toContain(pack.destination.serviceName);
+    for (const forbidden of [
+      'packDigest', 'destination', 'facts', 'factualBullets', 'evidenceSourceAndLimitations',
+      'filename', 'lookupValue', 'citizenId', 'sourceKind', 'reviewRole',
+    ]) expect(source).not.toHaveProperty(forbidden);
+
+    const privateSymbols = Object.getOwnPropertySymbols(source);
+    expect(privateSymbols).toHaveLength(1);
+    expect(Object.getOwnPropertyDescriptor(source, privateSymbols[0])?.enumerable).toBe(false);
+    expect(JSON.stringify((source as unknown as Record<PropertyKey, unknown>)[privateSymbols[0]]))
+      .not.toContain(pack.packDigest);
+  });
+
+  it('authenticates only identity-issued extension capabilities and does not invoke hostile getters or coercion', () => {
+    const source = projectConfirmedExtensionHandoffSource(builtRealPack());
+    let hostileCalls = 0;
+    const getterAdversary = Object.defineProperties({}, {
+      resultRevisionId: { enumerable: true, get: () => { hostileCalls += 1; throw new Error('private-record.pdf'); } },
+      toString: { enumerable: false, value: () => { hostileCalls += 1; return RESULT_REVISION; } },
+      toJSON: { enumerable: false, value: () => { hostileCalls += 1; return 'private-record.pdf'; } },
+    });
+    const prototypeCopy = Object.assign(Object.create({ inherited: 'private-record.pdf' }), source);
+    const candidates: unknown[] = [
+      { ...source },
+      JSON.parse(JSON.stringify(source)),
+      { ...source, description: 'Mutated description' },
+      { ...source, arbitrary: 'extra' },
+      prototypeCopy,
+      getterAdversary,
+      {
+        ...source,
+        resultRevisionId: { toString: () => RESULT_REVISION, toJSON: () => 'private-record.pdf' },
+      },
+      {
+        resultRevisionId: RESULT_REVISION,
+        packRevisionId: PACK_REVISION,
+        routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+        description: 'Fabricated but structurally similar',
+        confirmed: true,
+        issuedAt: NOW,
+        routeKey: 'nextgen',
+        issueCode: null,
+      },
+    ];
+    const synthetic = buildSyntheticHandoffSimulation(syntheticInput());
+    expect(synthetic.status).toBe('built');
+    if (synthetic.status === 'built') candidates.push(synthetic.simulation);
+
+    for (const candidate of candidates) {
+      expect(() => isAuthenticConfirmedExtensionHandoffSource(candidate)).not.toThrow();
+      expect(isAuthenticConfirmedExtensionHandoffSource(candidate)).toBe(false);
+    }
+    expect(hostileCalls).toBe(0);
+  });
+
+  it('requires an authentic complete pack before issuing the reduced extension capability', () => {
+    const pack = builtRealPack();
+    const synthetic = buildSyntheticHandoffSimulation(syntheticInput());
+    expect(() => projectConfirmedExtensionHandoffSource({ ...pack }))
+      .toThrow(/authentic official handoff pack/i);
+    expect(() => projectConfirmedExtensionHandoffSource({
+      ...pack,
+      description: 'Mutated copied pack',
+    })).toThrow(/authentic official handoff pack/i);
+    expect(() => projectConfirmedExtensionHandoffSource({} as OfficialHandoffPack))
+      .toThrow(/authentic official handoff pack/i);
+    expect(() => projectConfirmedExtensionHandoffSource({
+      ...pack,
+      generatedAt: '2020-01-01T00:00:00.000Z',
+    })).toThrow(/authentic official handoff pack/i);
+    if (synthetic.status === 'built') {
+      expect(() => projectConfirmedExtensionHandoffSource(
+        synthetic.simulation as unknown as OfficialHandoffPack,
+      )).toThrow(/authentic official handoff pack/i);
+    }
+  });
+
+  it('keeps the Legacy capability branch type-closed while current empty routing prevents runtime issuance', () => {
+    type LegacySource = Extract<ConfirmedExtensionHandoffSource, { routeKey: 'legacy' }>;
+    type NextGenSource = Extract<ConfirmedExtensionHandoffSource, { routeKey: 'nextgen' }>;
+    expectTypeOf<LegacySource['issueCode']>().toEqualTypeOf<LegacyIssueMapping['issueCode']>();
+    expectTypeOf<NextGenSource['issueCode']>().toEqualTypeOf<null>();
+    expect(CURRENT_LEGACY_JURISDICTION_CODES).toEqual([]);
+
+    const result = buildOfficialHandoffPack(realInput({
+      route: TEST_ONLY_VERIFIED_LEGACY_DESTINATION_FIXTURE.destination,
+      jurisdictionConfirmation: TEST_ONLY_VERIFIED_LEGACY_DESTINATION_FIXTURE.confirmation,
+    }));
+    expect(result).toEqual({ status: 'abstained', reason: 'route-not-action-ready' });
   });
 
   it('builds a labelled synthetic simulation without an official URL, digest, or compatibility assertion', () => {

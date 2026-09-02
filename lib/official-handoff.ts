@@ -178,6 +178,25 @@ export type OfficialHandoffPack = Readonly<{
   generatedAt: string;
 }>;
 
+type ConfirmedExtensionHandoffSourceBase = Readonly<{
+  resultRevisionId: string;
+  packRevisionId: string;
+  routeRegistryVersion: typeof OFFICIAL_ROUTE_REGISTRY_VERSION;
+  description: string;
+  confirmed: true;
+  issuedAt: string;
+}>;
+
+export type ConfirmedExtensionHandoffSource =
+  | (ConfirmedExtensionHandoffSourceBase & Readonly<{
+    routeKey: 'legacy';
+    issueCode: LegacyIssueMapping['issueCode'];
+  }>)
+  | (ConfirmedExtensionHandoffSourceBase & Readonly<{
+    routeKey: 'nextgen';
+    issueCode: null;
+  }>);
+
 export type SyntheticHandoffSimulation = Readonly<{
   schema: typeof SYNTHETIC_HANDOFF_SCHEMA;
   kind: 'synthetic-handoff-simulation';
@@ -885,6 +904,30 @@ const officialPackKeys = [
 ] as const;
 
 const issuedOfficialPacks = new WeakSet<object>();
+const CONFIRMED_EXTENSION_SOURCE_BRAND = Symbol('challansakshi.authentic-confirmed-extension-handoff-source');
+const CONFIRMED_EXTENSION_SOURCE_BRAND_VALUE = Object.freeze({ kind: 'builder-issued-extension-capability' as const });
+const confirmedExtensionSources = new WeakSet<object>();
+const confirmedExtensionSourceBindings = new WeakMap<object, Readonly<{
+  pack: OfficialHandoffPack;
+  digest: string;
+}>>();
+const confirmedExtensionSourceKeys = [
+  'resultRevisionId',
+  'packRevisionId',
+  'routeRegistryVersion',
+  'description',
+  'confirmed',
+  'issuedAt',
+  'routeKey',
+  'issueCode',
+] as const;
+const legacyIssueCodes = new Set<LegacyIssueMapping['issueCode']>([
+  'wrong-evidence-captured',
+  'wrong-vehicle-number-entered-by-officer',
+  'two-wheeler-on-four-wheeler',
+  'four-wheeler-on-two-wheeler',
+  'duplicate-number-plate',
+]);
 
 function sameOwnStringKeys(value: object, expected: readonly string[]): boolean {
   const actual = Object.keys(value);
@@ -999,6 +1042,108 @@ export function isAuthenticOfficialHandoffPack(candidate: unknown): candidate is
   } catch {
     return false;
   }
+}
+
+/** Accepts only the exact reduced capability objects issued from authentic real packs. */
+export function isAuthenticConfirmedExtensionHandoffSource(
+  value: unknown,
+): value is ConfirmedExtensionHandoffSource {
+  try {
+    if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return false;
+    if (!confirmedExtensionSources.has(value)) return false;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+    if (!sameOwnStringKeys(value, confirmedExtensionSourceKeys)) return false;
+
+    const ownKeys = Reflect.ownKeys(value);
+    if (
+      ownKeys.length !== confirmedExtensionSourceKeys.length + 1
+      || ownKeys[ownKeys.length - 1] !== CONFIRMED_EXTENSION_SOURCE_BRAND
+      || (value as Record<PropertyKey, unknown>)[CONFIRMED_EXTENSION_SOURCE_BRAND]
+        !== CONFIRMED_EXTENSION_SOURCE_BRAND_VALUE
+    ) return false;
+    for (const key of confirmedExtensionSourceKeys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || descriptor.configurable || descriptor.writable || !('value' in descriptor)) {
+        return false;
+      }
+    }
+
+    const binding = confirmedExtensionSourceBindings.get(value);
+    if (
+      !binding
+      || !isPackDigest(binding.digest)
+      || !isAuthenticOfficialHandoffPack(binding.pack)
+      || binding.pack.packDigest !== binding.digest
+    ) return false;
+
+    const candidate = value as Record<string, unknown>;
+    if (
+      !isOpaqueRevisionId(candidate.resultRevisionId)
+      || !isOpaqueRevisionId(candidate.packRevisionId)
+      || candidate.routeRegistryVersion !== OFFICIAL_ROUTE_REGISTRY_VERSION
+      || candidate.confirmed !== true
+      || !isCanonicalTimestamp(candidate.issuedAt)
+      || !isDeepFrozen(value)
+      || candidate.resultRevisionId !== binding.pack.resultRevisionId
+      || candidate.packRevisionId !== binding.pack.packRevisionId
+      || candidate.description !== binding.pack.description
+      || candidate.issuedAt !== binding.pack.generatedAt
+      || candidate.routeKey !== binding.pack.destination.key
+    ) return false;
+    if (normalizeReviewedDescription(candidate.description) !== candidate.description) return false;
+    validateExportSafeReviewedText(candidate.description);
+
+    if (candidate.routeKey === 'nextgen') {
+      return candidate.issueCode === null && binding.pack.legacyIssue === null;
+    }
+    return candidate.routeKey === 'legacy'
+      && typeof candidate.issueCode === 'string'
+      && legacyIssueCodes.has(candidate.issueCode as LegacyIssueMapping['issueCode'])
+      && binding.pack.legacyIssue?.issueCode === candidate.issueCode;
+  } catch {
+    return false;
+  }
+}
+
+/** Reconstructs the only confirmed pack fields the extension is permitted to consume. */
+export function projectConfirmedExtensionHandoffSource(
+  pack: OfficialHandoffPack,
+): ConfirmedExtensionHandoffSource {
+  if (!isAuthenticOfficialHandoffPack(pack)) {
+    throw new Error('An authentic official handoff pack is required to issue an extension capability.');
+  }
+  const sharedSource = {
+    resultRevisionId: pack.resultRevisionId,
+    packRevisionId: pack.packRevisionId,
+    routeRegistryVersion: pack.routeRegistryVersion,
+    description: pack.description,
+    confirmed: true,
+    issuedAt: pack.generatedAt,
+  } as const;
+  let source: ConfirmedExtensionHandoffSource;
+  if (pack.destination.key === 'legacy') {
+    const legacyIssue = pack.legacyIssue;
+    if (legacyIssue === null) throw new Error('An authentic Legacy pack requires an exact mapped issue.');
+    source = { ...sharedSource, routeKey: 'legacy', issueCode: legacyIssue.issueCode };
+  } else {
+    if (pack.legacyIssue !== null) throw new Error('An authentic NextGen pack cannot carry a Legacy issue.');
+    source = { ...sharedSource, routeKey: 'nextgen', issueCode: null };
+  }
+  Object.defineProperty(source, CONFIRMED_EXTENSION_SOURCE_BRAND, {
+    value: CONFIRMED_EXTENSION_SOURCE_BRAND_VALUE,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  confirmedExtensionSources.add(source);
+  confirmedExtensionSourceBindings.set(source, Object.freeze({ pack, digest: pack.packDigest }));
+  deepFreeze(source);
+  if (!isAuthenticConfirmedExtensionHandoffSource(source)) {
+    confirmedExtensionSources.delete(source);
+    confirmedExtensionSourceBindings.delete(source);
+    throw new Error('The reduced extension handoff capability could not be authenticated.');
+  }
+  return source;
 }
 
 function instantMilliseconds(value: string | Date): number | null {
