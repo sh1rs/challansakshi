@@ -1,6 +1,6 @@
 # ChallanSakshi Public Launch and Top-10 Vertical — Design Specification
 
-**Status:** Web direction approved on 2 September 2026; optional desktop-extension amendment selected on 2 September 2026 and awaiting final written-specification review
+**Status:** Web direction and optional desktop-extension amendment explicitly approved by the user for implementation on 3 September 2026
 
 **Product:** ChallanSakshi
 

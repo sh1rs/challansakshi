@@ -1,6 +1,6 @@
 # ChallanSakshi Assisted Handoff Extension — Design Specification
 
-**Status:** Architectural direction selected by the user on 2 September 2026; written extension specification awaiting final user review
+**Status:** Architectural direction and written extension specification explicitly approved by the user for implementation on 3 September 2026
 
 **Parent specification:** [`2026-09-02-challansakshi-public-launch-top-10-vertical-design.md`](./2026-09-02-challansakshi-public-launch-top-10-vertical-design.md)
 
