@@ -344,7 +344,7 @@ describe('controlled official handoff presentation', () => {
     ['hi', 'copied', 'lookup', 'चालान नंबर कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।'],
     ['hi', 'copied', 'category', 'समीक्षित श्रेणी कॉपी हुई। कुछ नहीं खुला या जमा हुआ।'],
     ['hi', 'copied', 'description', 'समीक्षित विवरण कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।'],
-  ] as const)('places %s %s feedback beside only the %s value', (language, status, field, expected) => {
+  ] as const)('announces %s %s feedback once for the %s value', (language, status, field, expected) => {
     const pack = nextgenPack();
     const draft = eligibleDraft(pack, {
       mappedCategory: { label: 'Wrong Evidence Captured', value: 'Wrong Image' },
@@ -355,18 +355,36 @@ describe('controlled official handoff presentation', () => {
       confirmedPack: pack,
       copyStatus: { status, field },
     })));
-    const sectionIds = {
-      lookup: 'handoff-lookup-heading',
-      category: 'handoff-category-heading',
-      description: 'handoff-description-heading',
+    const selectableValues = {
+      lookup: 'TEST-LOOKUP-42',
+      category: 'Wrong Image',
+      description: draft.normalizedDescription,
     } as const;
 
-    expect(sectionMarkup(html, sectionIds[field])).toContain(expected);
-    for (const otherField of ['lookup', 'category', 'description'] as const) {
-      if (otherField !== field) expect(sectionMarkup(html, sectionIds[otherField])).not.toContain(expected);
-    }
+    expect(html).toContain(selectableValues[field]);
+    expect(html.split(expected)).toHaveLength(2);
+    expect(html).toMatch(/role="status" aria-live="polite" aria-atomic="true"/);
     expect(html).toContain(`href="${draft.destination.canonicalUrl}"`);
     expect(html).toContain('target="_blank"');
+  });
+
+  it('announces successful lookup copy after the controller clears the sensitive lookup value', () => {
+    const copiedStatus = { status: 'copied', field: 'lookup' } as const;
+    const expected = 'Challan number copied. Nothing opened or was submitted.';
+    const retainedHtml = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      copyStatus: copiedStatus,
+    })));
+    const clearedHtml = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      copyStatus: copiedStatus,
+      lookupValue: null,
+    })));
+
+    expect(retainedHtml).toContain('TEST-LOOKUP-42');
+    expect(clearedHtml).not.toContain('TEST-LOOKUP-42');
+    expect(retainedHtml.split(expected)).toHaveLength(2);
+    expect(clearedHtml.split(expected)).toHaveLength(2);
+    expect(clearedHtml).toMatch(/aria-label="Copy status"[^>]*role="status" aria-live="polite" aria-atomic="true">Challan number copied/);
+    expect(clearedHtml).not.toContain('Optional challan number aid');
   });
 
   it.each([
@@ -514,6 +532,74 @@ describe('controlled official handoff presentation', () => {
     expect(html.match(/role="status" aria-live="polite"/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(html).not.toContain('submission observed');
     expect(html).not.toContain('officially accepted');
+  });
+
+  it.each([
+    ['en', false, {
+      selected: 'Selected return note for the affected person: I saw an acknowledgement on the official service. Affected-person-reported and entered by the present helper; unverified. This does not show submission or acceptance.',
+      recorded: 'Return note recorded in this tab only for the affected person. Affected-person-reported and entered by the present helper; unverified. Not a submission or official acceptance.',
+      forbiddenSelfAttribution: 'Citizen-reported and unverified',
+    }],
+    ['en', true, {
+      selected: 'Selected for the present person: I saw an acknowledgement. The present person reported this; the helper only typed it. It is not verified, and ChallanSakshi did not see a submission or acceptance.',
+      recorded: 'Return note for the present person is recorded only on this tab. The helper only typed it; it is not verified. ChallanSakshi did not submit it or verify acceptance.',
+      forbiddenSelfAttribution: 'You reported this; it is not verified',
+    }],
+    ['hi', false, {
+      selected: 'प्रभावित व्यक्ति के लिए चुना गया वापसी नोट: मुझे आधिकारिक सेवा पर पावती दिखी। प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या स्वीकृति नहीं दिखाता।',
+      recorded: 'प्रभावित व्यक्ति का वापसी नोट केवल इस टैब में दर्ज हुआ। प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या आधिकारिक स्वीकृति नहीं है।',
+      forbiddenSelfAttribution: 'नागरिक द्वारा बताया गया और असत्यापित',
+    }],
+    ['hi', true, {
+      selected: 'मौजूद व्यक्ति के लिए चुना: मुझे पावती दिखी। मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। यह सत्यापित नहीं है और ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
+      recorded: 'मौजूद व्यक्ति का वापसी नोट केवल इस टैब में दर्ज है। मददगार ने केवल लिखा; यह सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
+      forbiddenSelfAttribution: 'यह आपने बताया है और सत्यापित नहीं है',
+    }],
+  ] as const)('attributes helper return announcements to the affected person in %s simple=%s', (language, simpleMode, expected) => {
+    const pack = nextgenPack('present-helper');
+    const receipt = recordCitizenReturn(
+      recordOfficialLinkActivation(createOfficialHandoffReceiptSession(pack, 'private'), pack, OPENED_AT),
+      pack,
+      {
+        selectedReturnState: 'acknowledgement-seen',
+        localTimestamp: RETURNED_AT,
+        helperConfirmation: {
+          affectedPersonPresent: true,
+          affectedPersonRequestedReturnRecording: true,
+          affectedPersonConfirmedReturnState: true,
+          affectedPersonConfirmedReferenceFragment: false,
+        },
+      },
+    );
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      language,
+      simpleMode,
+      reviewContext: {
+        role: 'present-helper',
+        deviceMode: 'private',
+        safetyConsent: {
+          manualReviewAcknowledged: true,
+          minimumDataAcknowledged: true,
+          affectedPersonPresentAcknowledged: true,
+        },
+      },
+      draft: eligibleDraft(pack),
+      confirmedPack: pack,
+      officialLinkStatus: 'activated',
+      receiptState: receipt,
+      returnDraft: { selectedReturnState: 'acknowledgement-seen', referenceLastFour: '' },
+    })));
+
+    expect(html).toContain(expected.selected);
+    expect(html).toContain(expected.recorded);
+    expect(html).not.toContain(expected.forbiddenSelfAttribution);
+    expect(html).toContain(language === 'hi'
+      ? simpleMode
+        ? 'व्यक्ति को खुद साइन इन, घोषणा और आधिकारिक साइट पर जमा करना होगा; मददगार यह नहीं करेगा।'
+        : 'मददगार नहीं, प्रभावित व्यक्ति को आधिकारिक सेवा पर स्वयं प्रमाणीकरण, घोषणा और जमा करना होगा।'
+      : simpleMode
+        ? 'The person—not the helper—must sign in, declare, and submit on the official site.'
+        : 'The affected person—not the helper—must independently authenticate, declare, and submit on the official service.');
   });
 
   it('keeps helper pack and return authorizations as separate affected-person confirmations', () => {
@@ -857,6 +943,7 @@ describe('English, Hindi, and Simple Mode safety copy', () => {
     expect(copy.returnBasis.helper).toBe(expected.helperReturnBasis);
     expect(copy.helper.independence).toBe(expected.helperIndependence);
     expect(copy.purpose['official-service']).toBe(language === 'hi' ? 'आधिकारिक सेवा' : 'Official service');
+    expect(Object.keys(copy.returnAnnouncements)).toEqual(['self', 'helper']);
     expect(Object.keys(copy.roles.helper.confirmations)).toEqual([
       'affectedPersonPresent',
       'affectedPersonInspectedEvidence',

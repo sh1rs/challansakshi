@@ -128,18 +128,24 @@ function Confirmation(props: {
 
 function CopyStatus({
   status,
-  field,
   feedback,
+  label,
 }: {
   status: OfficialHandoffPanelProps['copyStatus'];
-  field: 'lookup' | 'category' | 'description';
   feedback: Readonly<Record<'lookup' | 'category' | 'description', Readonly<Record<'failed' | 'copied', string>>>>;
-}): JSX.Element | null {
-  if (status.status === 'idle' || status.field !== field) return null;
+  label: string;
+}): JSX.Element {
+  const message = status.status === 'idle' ? null : feedback[status.field][status.status];
   return (
-    <p className={styles.status} role="status" aria-live="polite">
-      {feedback[field][status.status]}
-    </p>
+    <div
+      className={styles.status}
+      aria-label={label}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {message}
+    </div>
   );
 }
 
@@ -170,6 +176,7 @@ export function OfficialHandoffPanel({
   const copy = getOfficialHandoffPresentation(language, simpleMode);
   const privateDevice = reviewContext.deviceMode === 'private';
   const helping = reviewContext.role === 'present-helper';
+  const returnAnnouncement = helping ? copy.returnAnnouncements.helper : copy.returnAnnouncements.self;
   const eligible = draft.status === 'eligible';
   const showOfficialAnchor = !eligible || confirmedPack !== null;
   const returnRecorded = receiptState?.status === 'citizen-return-recorded';
@@ -195,6 +202,10 @@ export function OfficialHandoffPanel({
         </p>
       ) : (
         <>
+          {privateDevice ? (
+            <CopyStatus status={copyStatus} feedback={copy.copyFeedback} label={copy.copyStatusLabel} />
+          ) : null}
+
           {privateDevice && lookupValue ? (
             <section className={styles.fieldGroup} aria-labelledby="handoff-lookup-heading">
               <h3 id="handoff-lookup-heading">{copy.lookupHeading}</h3>
@@ -207,7 +218,6 @@ export function OfficialHandoffPanel({
               >
                 {copy.copyLookup}
               </button>
-              <CopyStatus status={copyStatus} field="lookup" feedback={copy.copyFeedback} />
             </section>
           ) : null}
 
@@ -225,7 +235,6 @@ export function OfficialHandoffPanel({
                   {copy.copyCategory}
                 </button>
               ) : null}
-              {privateDevice ? <CopyStatus status={copyStatus} field="category" feedback={copy.copyFeedback} /> : null}
             </section>
           ) : null}
 
@@ -255,7 +264,6 @@ export function OfficialHandoffPanel({
                 >
                   {copy.copyDescription}
                 </button>
-                <CopyStatus status={copyStatus} field="description" feedback={copy.copyFeedback} />
               </>
             ) : <p className={styles.manualCopy}>{copy.sharedInstruction}</p>}
           </section>
@@ -327,12 +335,12 @@ export function OfficialHandoffPanel({
           </fieldset>
           {returnDraft.selectedReturnState ? (
             <p className={styles.status} role="status" aria-live="polite">
-              {copy.selectedReturnPrefix} {returnLabels[returnDraft.selectedReturnState]}{language === 'hi' ? '।' : '.'}{' '}
-              {copy.selectedReturnBoundary}
+              {returnAnnouncement.selectedPrefix} {returnLabels[returnDraft.selectedReturnState]}{language === 'hi' ? '।' : '.'}{' '}
+              {returnAnnouncement.selectedBoundary}
             </p>
           ) : null}
           {returnRecorded ? (
-            <p className={styles.status} role="status" aria-live="polite">{copy.recordedReturn}</p>
+            <p className={styles.status} role="status" aria-live="polite">{returnAnnouncement.recorded}</p>
           ) : null}
           {privateDevice && returnDraft.selectedReturnState === 'acknowledgement-seen' ? (
             <label className={styles.referenceField}>

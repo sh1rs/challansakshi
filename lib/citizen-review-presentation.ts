@@ -309,9 +309,19 @@ const officialHandoffEnglish = {
   leaveBody: 'The official service opens in a new tab. Sign in, declare, and submit there yourself.',
   openPrefix: 'Open',
   activated: 'Official service opened from this review. ChallanSakshi cannot see what happened there.',
-  selectedReturnPrefix: 'Selected return note:',
-  selectedReturnBoundary: 'Citizen-reported and unverified; this does not show submission or acceptance.',
-  recordedReturn: 'Return note recorded in this tab only. Citizen-reported and unverified; not a submission or official acceptance.',
+  returnAnnouncements: {
+    self: {
+      selectedPrefix: 'Selected return note:',
+      selectedBoundary: 'Citizen-reported and unverified; this does not show submission or acceptance.',
+      recorded: 'Return note recorded in this tab only. Citizen-reported and unverified; not a submission or official acceptance.',
+    },
+    helper: {
+      selectedPrefix: 'Selected return note for the affected person:',
+      selectedBoundary: 'Affected-person-reported and entered by the present helper; unverified. This does not show submission or acceptance.',
+      recorded: 'Return note recorded in this tab only for the affected person. Affected-person-reported and entered by the present helper; unverified. Not a submission or official acceptance.',
+    },
+  },
+  copyStatusLabel: 'Copy status',
   copyFeedback: {
     lookup: {
       failed: 'Copy failed. The challan number remains visible and selectable; copy it manually. Nothing opened.',
@@ -390,9 +400,18 @@ const officialHandoffSimpleEnglish = {
     self: 'You reported this. ChallanSakshi did not verify it.',
     helper: 'The present person reported this; the helper only typed it. ChallanSakshi did not verify it.',
   },
-  selectedReturnPrefix: 'You selected:',
-  selectedReturnBoundary: 'You reported this; it is not verified. ChallanSakshi did not see a submission or acceptance.',
-  recordedReturn: 'Your return note is recorded only on this tab and is not verified. ChallanSakshi did not submit it or verify acceptance.',
+  returnAnnouncements: {
+    self: {
+      selectedPrefix: 'You selected:',
+      selectedBoundary: 'You reported this; it is not verified. ChallanSakshi did not see a submission or acceptance.',
+      recorded: 'Your return note is recorded only on this tab and is not verified. ChallanSakshi did not submit it or verify acceptance.',
+    },
+    helper: {
+      selectedPrefix: 'Selected for the present person:',
+      selectedBoundary: 'The present person reported this; the helper only typed it. It is not verified, and ChallanSakshi did not see a submission or acceptance.',
+      recorded: 'Return note for the present person is recorded only on this tab. The helper only typed it; it is not verified. ChallanSakshi did not submit it or verify acceptance.',
+    },
+  },
   helper: {
     ...officialHandoffEnglish.helper,
     independence: 'This helper is optional. You can use the field pack and official link without it.',
@@ -447,9 +466,19 @@ const officialHandoffHindi = {
   leaveBody: 'आधिकारिक सेवा नए टैब में खुलेगी। वहाँ स्वयं साइन इन, घोषणा और जमा करें।',
   openPrefix: 'आधिकारिक सेवा खोलें',
   activated: 'आधिकारिक सेवा इस समीक्षा से खोली गई। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
-  selectedReturnPrefix: 'चुना गया वापसी नोट:',
-  selectedReturnBoundary: 'नागरिक द्वारा बताया गया और असत्यापित; यह जमा या स्वीकृति नहीं दिखाता।',
-  recordedReturn: 'वापसी नोट केवल इस टैब में दर्ज हुआ। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या आधिकारिक स्वीकृति नहीं है।',
+  returnAnnouncements: {
+    self: {
+      selectedPrefix: 'चुना गया वापसी नोट:',
+      selectedBoundary: 'नागरिक द्वारा बताया गया और असत्यापित; यह जमा या स्वीकृति नहीं दिखाता।',
+      recorded: 'वापसी नोट केवल इस टैब में दर्ज हुआ। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या आधिकारिक स्वीकृति नहीं है।',
+    },
+    helper: {
+      selectedPrefix: 'प्रभावित व्यक्ति के लिए चुना गया वापसी नोट:',
+      selectedBoundary: 'प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या स्वीकृति नहीं दिखाता।',
+      recorded: 'प्रभावित व्यक्ति का वापसी नोट केवल इस टैब में दर्ज हुआ। प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या आधिकारिक स्वीकृति नहीं है।',
+    },
+  },
+  copyStatusLabel: 'कॉपी की स्थिति',
   copyFeedback: {
     lookup: {
       failed: 'कॉपी नहीं हुई। चालान नंबर दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
@@ -528,9 +557,18 @@ const officialHandoffSimpleHindi = {
     self: 'यह आपने बताया है। ChallanSakshi ने इसकी जाँच नहीं की।',
     helper: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। ChallanSakshi ने जाँच नहीं की।',
   },
-  selectedReturnPrefix: 'आपने चुना:',
-  selectedReturnBoundary: 'यह आपने बताया है और सत्यापित नहीं है; ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
-  recordedReturn: 'आपका वापसी नोट केवल इस टैब में दर्ज है और सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
+  returnAnnouncements: {
+    self: {
+      selectedPrefix: 'आपने चुना:',
+      selectedBoundary: 'यह आपने बताया है और सत्यापित नहीं है; ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
+      recorded: 'आपका वापसी नोट केवल इस टैब में दर्ज है और सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
+    },
+    helper: {
+      selectedPrefix: 'मौजूद व्यक्ति के लिए चुना:',
+      selectedBoundary: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। यह सत्यापित नहीं है और ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
+      recorded: 'मौजूद व्यक्ति का वापसी नोट केवल इस टैब में दर्ज है। मददगार ने केवल लिखा; यह सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
+    },
+  },
   helper: {
     ...officialHandoffHindi.helper,
     independence: 'यह मददगार वैकल्पिक है। फ़ील्ड पैक और आधिकारिक लिंक इसके बिना भी काम करते हैं।',
