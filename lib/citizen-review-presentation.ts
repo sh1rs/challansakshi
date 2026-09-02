@@ -261,6 +261,249 @@ export function getCitizenReviewPresentation(language: Language, simpleMode: boo
   };
 }
 
+const officialHandoffEnglish = {
+  eyebrow: 'Prepared for',
+  purpose: {
+    'official-grievance-service': 'Official grievance service',
+    'official-services-directory': 'Official services directory',
+  },
+  verified: 'Route last verified',
+  lookupHeading: 'Optional challan number aid',
+  lookupLabel: 'Challan number recorded in this review',
+  copyLookup: 'Copy challan number',
+  categoryHeading: 'Reviewed category',
+  categoryLabel: 'Category value for the official service',
+  copyCategory: 'Copy reviewed category',
+  descriptionHeading: 'Reviewed description',
+  descriptionLabel: 'Description to review before using the official service',
+  descriptionHelp: 'Keep this factual and limited to the evidence you personally checked.',
+  copyDescription: 'Copy reviewed description',
+  sharedInstruction: 'Select this reviewed description and type or paste it into the official service yourself.',
+  checklistHeading: 'Before you leave',
+  safetyBoundary: 'Review every field before leaving ChallanSakshi. Nothing has been submitted.',
+  roles: {
+    self: {
+      heading: 'My case',
+      confirmations: {
+        affectedPersonInspectedEvidence: 'I inspected the supplied evidence.',
+        affectedPersonInspectedReadableRecord: 'I inspected a readable comparison record.',
+        affectedPersonConfirmedEntitlement: 'I confirm that I am entitled to raise this matter.',
+        affectedPersonConfirmedPack: 'I reviewed and confirmed this field pack.',
+      },
+    },
+    helper: {
+      heading: 'Helping someone present',
+      submitBoundary: 'The affected person—not the helper—must independently authenticate, declare, and submit on the official service.',
+      confirmations: {
+        affectedPersonPresent: 'The affected person is present.',
+        affectedPersonInspectedEvidence: 'The affected person inspected the supplied evidence.',
+        affectedPersonInspectedReadableRecord: 'The affected person inspected a readable comparison record.',
+        affectedPersonConfirmedEntitlement: 'The affected person confirmed they are entitled to raise this matter.',
+        affectedPersonRequestedPreparation: 'The affected person asked me to prepare this information.',
+        affectedPersonConfirmedPack: 'The affected person reviewed and confirmed this field pack.',
+      },
+    },
+  },
+  leaveHeading: 'You are leaving ChallanSakshi',
+  leaveBody: 'The official service opens in a new tab. Sign in, declare, and submit there yourself.',
+  openPrefix: 'Open',
+  activated: 'You recorded that the official link was opened. ChallanSakshi cannot see what happened there.',
+  copyFailure: 'Copy failed. The reviewed description remains visible and selectable; copy it manually. Nothing opened.',
+  copySuccess: 'Copied. Nothing opened or was submitted.',
+  eligibility: {
+    manual: 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.',
+    unresolved: 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.',
+    abstained: 'This review does not support a confirmed field pack. Check the missing or unclear evidence before preparing official information.',
+  },
+  returnHeading: 'What happened on the official service?',
+  returnStates: {
+    acknowledgementSeen: 'I saw an acknowledgement on the official service',
+    portalUnavailable: 'The official portal was unavailable',
+    notSubmitted: 'I did not submit',
+    correctionNeeded: 'I need to correct my pack',
+  },
+  referenceLabel: 'Last 4 characters of the official reference, recorded by you',
+  returnBasis: {
+    self: 'Citizen-reported; not verified by ChallanSakshi.',
+    helper: 'Affected-person-reported; entered with a present helper. Not verified by ChallanSakshi.',
+  },
+  returnAuthorization: {
+    affectedPersonPresent: 'The affected person is still present for this return note.',
+    affectedPersonRequestedReturnRecording: 'The affected person asked me to record what happened.',
+    affectedPersonConfirmedReturnState: 'The affected person confirmed this exact return state.',
+    affectedPersonConfirmedReferenceFragment: 'The affected person confirmed these exact last four characters.',
+  },
+  recordReturn: 'Record this return locally',
+  receiptDownload: 'Download redacted continuation receipt',
+  helper: {
+    heading: 'Optional desktop helper',
+    independence: 'The helper is optional. The complete field pack and official link work without it.',
+    reviewLink: 'Review desktop helper and installation',
+    prepare: 'Already installed? Prepare reviewed fields',
+    confirmations: {
+      supportedDesktop: 'I am using supported desktop Google Chrome. This is product support, not a security guarantee.',
+      boundedSafetyReview: 'I reviewed these fields and removed names, contact details, full vehicle, challan, reference or government-ID numbers, credentials, authentication codes, and payment information.',
+      affectedPersonPresent: 'The affected person is still present.',
+      affectedPersonReviewedFields: 'The affected person separately reviewed and confirmed the exact fields.',
+      affectedPersonRequestedPreparation: 'The affected person asked me to prepare, load, and place these fields.',
+    },
+    submitBoundary: 'The affected person must inspect the result and independently authenticate, declare, and submit.',
+    prepared: 'Prepared on this page only. Open the ChallanSakshi extension on this tab to preview and load the reviewed fields. Nothing has opened or been filled.',
+    failed: 'The reviewed fields could not be prepared. Nothing opened or was filled.',
+    clear: 'Clear prepared fields',
+  },
+} as const;
+
+const officialHandoffSimpleEnglish = {
+  ...officialHandoffEnglish,
+  safetyBoundary: 'Check every field yourself. ChallanSakshi has not sent anything.',
+  roles: {
+    ...officialHandoffEnglish.roles,
+    helper: {
+      ...officialHandoffEnglish.roles.helper,
+      submitBoundary: 'The person—not the helper—must sign in, declare, and submit on the official site.',
+    },
+  },
+  returnStates: {
+    acknowledgementSeen: 'I saw an acknowledgement',
+    portalUnavailable: 'The official site did not work',
+    notSubmitted: 'I did not send it',
+    correctionNeeded: 'I need to fix my pack',
+  },
+  returnBasis: {
+    self: 'You reported this. ChallanSakshi did not verify it.',
+    helper: 'The present person reported this; the helper only typed it. ChallanSakshi did not verify it.',
+  },
+  helper: {
+    ...officialHandoffEnglish.helper,
+    independence: 'This helper is optional. You can use the field pack and official link without it.',
+  },
+} as const;
+
+const officialHandoffHindi = {
+  eyebrow: 'इसके लिए तैयार',
+  purpose: {
+    'official-grievance-service': 'आधिकारिक शिकायत सेवा',
+    'official-services-directory': 'आधिकारिक सेवाओं की निर्देशिका',
+  },
+  verified: 'रास्ते की अंतिम जाँच',
+  lookupHeading: 'वैकल्पिक चालान नंबर सहायता',
+  lookupLabel: 'इस समीक्षा में दर्ज चालान नंबर',
+  copyLookup: 'चालान नंबर कॉपी करें',
+  categoryHeading: 'समीक्षित श्रेणी',
+  categoryLabel: 'आधिकारिक सेवा के लिए श्रेणी मान',
+  copyCategory: 'समीक्षित श्रेणी कॉपी करें',
+  descriptionHeading: 'समीक्षित विवरण',
+  descriptionLabel: 'आधिकारिक सेवा उपयोग करने से पहले जाँचने वाला विवरण',
+  descriptionHelp: 'इसे तथ्यात्मक रखें और केवल उन सबूतों तक सीमित रखें जिन्हें आपने स्वयं जाँचा है।',
+  copyDescription: 'समीक्षित विवरण कॉपी करें',
+  sharedInstruction: 'इस समीक्षित विवरण को चुनें और आधिकारिक सेवा में स्वयं टाइप या पेस्ट करें।',
+  checklistHeading: 'जाने से पहले',
+  safetyBoundary: 'ChallanSakshi छोड़ने से पहले हर फ़ील्ड जाँचें। कुछ भी जमा नहीं हुआ है।',
+  roles: {
+    self: {
+      heading: 'मेरा मामला',
+      confirmations: {
+        affectedPersonInspectedEvidence: 'मैंने दिए गए सबूत को जाँचा है।',
+        affectedPersonInspectedReadableRecord: 'मैंने तुलना के लिए पढ़ने योग्य रिकॉर्ड जाँचा है।',
+        affectedPersonConfirmedEntitlement: 'मैं पुष्टि करता हूँ कि मुझे यह मामला उठाने का अधिकार है।',
+        affectedPersonConfirmedPack: 'मैंने इस फ़ील्ड पैक को जाँचकर पुष्ट किया है।',
+      },
+    },
+    helper: {
+      heading: 'मौजूद व्यक्ति की मदद',
+      submitBoundary: 'मददगार नहीं, प्रभावित व्यक्ति को आधिकारिक सेवा पर स्वयं प्रमाणीकरण, घोषणा और जमा करना होगा।',
+      confirmations: {
+        affectedPersonPresent: 'प्रभावित व्यक्ति मौजूद है।',
+        affectedPersonInspectedEvidence: 'प्रभावित व्यक्ति ने दिए गए सबूत को जाँचा है।',
+        affectedPersonInspectedReadableRecord: 'प्रभावित व्यक्ति ने तुलना का पढ़ने योग्य रिकॉर्ड जाँचा है।',
+        affectedPersonConfirmedEntitlement: 'प्रभावित व्यक्ति ने मामला उठाने का अधिकार पुष्ट किया है।',
+        affectedPersonRequestedPreparation: 'प्रभावित व्यक्ति ने मुझसे यह जानकारी तैयार करने को कहा है।',
+        affectedPersonConfirmedPack: 'प्रभावित व्यक्ति ने इस फ़ील्ड पैक को जाँचकर पुष्ट किया है।',
+      },
+    },
+  },
+  leaveHeading: 'आप ChallanSakshi छोड़ रहे हैं',
+  leaveBody: 'आधिकारिक सेवा नए टैब में खुलेगी। वहाँ स्वयं साइन इन, घोषणा और जमा करें।',
+  openPrefix: 'आधिकारिक सेवा खोलें',
+  activated: 'आपने आधिकारिक लिंक खुलना दर्ज किया। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
+  copyFailure: 'कॉपी नहीं हुई। समीक्षित विवरण दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
+  copySuccess: 'कॉपी हो गई। कुछ नहीं खुला या जमा हुआ।',
+  eligibility: {
+    manual: 'इस आधिकारिक गंतव्य के लिए इस रिलीज़ में सत्यापित फ़ील्ड-संगत फ़ॉर्म नहीं है। आधिकारिक साइट उपयोग करें और उसके मौजूदा विकल्प स्वयं जाँचें।',
+    unresolved: 'जारी करने वाला क्षेत्र पुष्ट नहीं है या कोई मौजूदा सत्यापित रास्ता उपलब्ध नहीं है। केवल आधिकारिक सेवा निर्देशिका उपयोग करें।',
+    abstained: 'यह समीक्षा पुष्ट फ़ील्ड पैक का समर्थन नहीं करती। आधिकारिक जानकारी तैयार करने से पहले गायब या अस्पष्ट सबूत जाँचें।',
+  },
+  returnHeading: 'आधिकारिक सेवा पर क्या हुआ?',
+  returnStates: {
+    acknowledgementSeen: 'मुझे आधिकारिक सेवा पर पावती दिखी',
+    portalUnavailable: 'आधिकारिक पोर्टल उपलब्ध नहीं था',
+    notSubmitted: 'मैंने जमा नहीं किया',
+    correctionNeeded: 'मुझे अपने पैक में सुधार करना है',
+  },
+  referenceLabel: 'आधिकारिक संदर्भ के अंतिम चार अक्षर, आपके द्वारा दर्ज',
+  returnBasis: {
+    self: 'नागरिक द्वारा बताया गया; ChallanSakshi ने सत्यापित नहीं किया।',
+    helper: 'प्रभावित व्यक्ति द्वारा बताया गया; मौजूद मददगार ने दर्ज किया। ChallanSakshi ने सत्यापित नहीं किया।',
+  },
+  returnAuthorization: {
+    affectedPersonPresent: 'इस वापसी नोट के लिए प्रभावित व्यक्ति अभी भी मौजूद है।',
+    affectedPersonRequestedReturnRecording: 'प्रभावित व्यक्ति ने मुझसे हुई कार्रवाई दर्ज करने को कहा है।',
+    affectedPersonConfirmedReturnState: 'प्रभावित व्यक्ति ने वापसी की यही स्थिति पुष्ट की है।',
+    affectedPersonConfirmedReferenceFragment: 'प्रभावित व्यक्ति ने अंतिम चार अक्षर ठीक यही पुष्ट किए हैं।',
+  },
+  recordReturn: 'यह वापसी स्थानीय रूप से दर्ज करें',
+  receiptDownload: 'संपादित निरंतरता रसीद डाउनलोड करें',
+  helper: {
+    heading: 'वैकल्पिक डेस्कटॉप मददगार',
+    independence: 'मददगार वैकल्पिक है। पूरा फ़ील्ड पैक और आधिकारिक लिंक इसके बिना काम करते हैं।',
+    reviewLink: 'डेस्कटॉप मददगार और इंस्टॉलेशन जाँचें',
+    prepare: 'पहले से इंस्टॉल है? समीक्षित फ़ील्ड तैयार करें',
+    confirmations: {
+      supportedDesktop: 'मैं समर्थित डेस्कटॉप Google Chrome उपयोग कर रहा हूँ। यह उत्पाद समर्थन है, सुरक्षा की गारंटी नहीं।',
+      boundedSafetyReview: 'मैंने फ़ील्ड जाँचे और नाम, संपर्क विवरण, पूरे वाहन, चालान, संदर्भ या सरकारी पहचान नंबर, क्रेडेंशियल, प्रमाणीकरण कोड और भुगतान जानकारी हटा दी।',
+      affectedPersonPresent: 'प्रभावित व्यक्ति अभी भी मौजूद है।',
+      affectedPersonReviewedFields: 'प्रभावित व्यक्ति ने हर फ़ील्ड अलग से जाँचकर पुष्ट किया है।',
+      affectedPersonRequestedPreparation: 'प्रभावित व्यक्ति ने मुझसे इन फ़ील्ड को तैयार, लोड और रखने को कहा है।',
+    },
+    submitBoundary: 'प्रभावित व्यक्ति को नतीजा जाँचकर स्वयं प्रमाणीकरण, घोषणा और जमा करना होगा।',
+    prepared: 'केवल इस पेज पर तैयार है। समीक्षित फ़ील्ड का प्रीव्यू और लोड करने के लिए इसी टैब पर ChallanSakshi एक्सटेंशन खोलें। कुछ नहीं खुला या भरा है।',
+    failed: 'समीक्षित फ़ील्ड तैयार नहीं हो सके। कुछ नहीं खुला या भरा है।',
+    clear: 'तैयार फ़ील्ड साफ़ करें',
+  },
+} as const;
+
+const officialHandoffSimpleHindi = {
+  ...officialHandoffHindi,
+  safetyBoundary: 'हर फ़ील्ड खुद जाँचें। ChallanSakshi ने कुछ नहीं भेजा है।',
+  roles: {
+    ...officialHandoffHindi.roles,
+    helper: {
+      ...officialHandoffHindi.roles.helper,
+      submitBoundary: 'व्यक्ति को खुद साइन इन, घोषणा और आधिकारिक साइट पर जमा करना होगा; मददगार यह नहीं करेगा।',
+    },
+  },
+  returnStates: {
+    acknowledgementSeen: 'मुझे पावती दिखी',
+    portalUnavailable: 'आधिकारिक साइट नहीं चली',
+    notSubmitted: 'मैंने नहीं भेजा',
+    correctionNeeded: 'मुझे अपना पैक ठीक करना है',
+  },
+  returnBasis: {
+    self: 'यह आपने बताया है। ChallanSakshi ने इसकी जाँच नहीं की।',
+    helper: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। ChallanSakshi ने जाँच नहीं की।',
+  },
+  helper: {
+    ...officialHandoffHindi.helper,
+    independence: 'यह मददगार वैकल्पिक है। फ़ील्ड पैक और आधिकारिक लिंक इसके बिना भी काम करते हैं।',
+  },
+} as const;
+
+export function getOfficialHandoffPresentation(language: Language, simpleMode: boolean) {
+  if (language === 'hi') return simpleMode ? officialHandoffSimpleHindi : officialHandoffHindi;
+  return simpleMode ? officialHandoffSimpleEnglish : officialHandoffEnglish;
+}
+
 const evidenceFields: Record<string, string> = {
   'Registration plate': 'नंबर प्लेट',
   'Vehicle category': 'वाहन श्रेणी',

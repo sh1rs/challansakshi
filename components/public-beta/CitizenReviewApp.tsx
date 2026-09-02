@@ -118,7 +118,10 @@ function Preview({
       <header>
         <strong>{title}</strong>
         <small>
-          {selection.meta.name} · {t(language, 'memory only', 'केवल मेमोरी में')}
+          {selection.meta.role === 'photograph'
+            ? t(language, 'Selected photograph', 'चुनी गई तस्वीर')
+            : t(language, 'Selected notice', 'चुना गया नोटिस')}
+          {' · '}{t(language, 'memory only', 'केवल मेमोरी में')}
         </small>
       </header>
       {selection.meta.previewKind === 'image' ? (
@@ -330,8 +333,8 @@ export default function CitizenReviewApp() {
       officialDeadline,
       offence,
       manualEntryMode,
-      recordName: recordSelection?.meta.name ?? '',
-      photographName: photographSelection?.meta.name ?? '',
+      recordSelected: Boolean(recordSelection),
+      photographSelected: Boolean(photographSelection),
     }),
     [
       answers,
@@ -341,8 +344,8 @@ export default function CitizenReviewApp() {
       officialDeadline,
       offence,
       manualEntryMode,
-      recordSelection?.meta.name,
-      photographSelection?.meta.name,
+      recordSelection,
+      photographSelection,
     ],
   );
   const factsConfirmed = confirmedSignature === signature && confirmedSignature !== '';

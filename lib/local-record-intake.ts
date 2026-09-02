@@ -2,7 +2,6 @@ export type LocalRecordRole = 'official-record' | 'photograph';
 export type LocalRecordPreviewKind = 'pdf' | 'image';
 
 export type LocalRecordFileMeta = {
-  name: string;
   size: number;
   type: string;
   role: LocalRecordRole;
@@ -23,7 +22,7 @@ const acceptedTypes = new Map<string, LocalRecordPreviewKind>([
 ]);
 
 export function validateLocalRecordFile(
-  file: Pick<File, 'name' | 'size' | 'type'>,
+  file: Pick<File, 'size' | 'type'>,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Kept in the public selection contract; every approved type is valid for both roles.
   _role: LocalRecordRole,
 ): LocalRecordValidation {

@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { LocalRecordIntake } from '../components/public-beta/LocalRecordIntake';
-import { formatLocalRecordSize, validateLocalRecordFile } from '../lib/local-record-intake';
+import {
+  formatLocalRecordSize,
+  validateLocalRecordFile,
+  type LocalRecordFileMeta,
+} from '../lib/local-record-intake';
 
 const MiB = 1024 * 1024;
 const intakeComponentSource = readFileSync(
@@ -31,18 +35,31 @@ function mediaBlock(source: string, query: string) {
 
 describe('local official-record intake', () => {
   it('accepts only the approved PDF and image MIME types', () => {
-    expect(validateLocalRecordFile({ name: 'challan.pdf', size: 2 * MiB, type: 'application/pdf' }, 'official-record')).toMatchObject({ ok: true, previewKind: 'pdf' });
-    expect(validateLocalRecordFile({ name: 'evidence.webp', size: MiB, type: 'image/webp' }, 'photograph')).toMatchObject({ ok: true, previewKind: 'image' });
-    expect(validateLocalRecordFile({ name: 'notice.svg', size: 100, type: 'image/svg+xml' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
+    expect(validateLocalRecordFile({ size: 2 * MiB, type: 'application/pdf' }, 'official-record')).toMatchObject({ ok: true, previewKind: 'pdf' });
+    expect(validateLocalRecordFile({ size: MiB, type: 'image/webp' }, 'photograph')).toMatchObject({ ok: true, previewKind: 'image' });
+    expect(validateLocalRecordFile({ size: 100, type: 'image/svg+xml' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
   });
 
   it('rejects empty and oversized files before preview', () => {
-    expect(validateLocalRecordFile({ name: 'empty.pdf', size: 0, type: 'application/pdf' }, 'official-record')).toEqual({ ok: false, reason: 'empty-file' });
-    expect(validateLocalRecordFile({ name: 'large.jpg', size: 12 * MiB + 1, type: 'image/jpeg' }, 'photograph')).toEqual({ ok: false, reason: 'file-too-large' });
+    expect(validateLocalRecordFile({ size: 0, type: 'application/pdf' }, 'official-record')).toEqual({ ok: false, reason: 'empty-file' });
+    expect(validateLocalRecordFile({ size: 12 * MiB + 1, type: 'image/jpeg' }, 'photograph')).toEqual({ ok: false, reason: 'file-too-large' });
   });
 
   it('does not infer support from a filename extension', () => {
-    expect(validateLocalRecordFile({ name: 'challan.pdf', size: 20, type: 'application/octet-stream' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
+    expect(validateLocalRecordFile({ size: 20, type: 'application/octet-stream' }, 'official-record')).toEqual({ ok: false, reason: 'unsupported-type' });
+  });
+
+  it('stores exactly role, safe MIME type, size, and preview kind as selection metadata', () => {
+    const metadata = {
+      role: 'official-record',
+      type: 'application/pdf',
+      size: 2048,
+      previewKind: 'pdf',
+    } satisfies LocalRecordFileMeta;
+
+    expect(Object.keys(metadata)).toEqual(['role', 'type', 'size', 'previewKind']);
+    expectTypeOf<Parameters<typeof validateLocalRecordFile>[0]>()
+      .toEqualTypeOf<Pick<File, 'size' | 'type'>>();
   });
 
   it('formats selected size without exposing file contents', () => {
@@ -70,6 +87,39 @@ describe('local official-record intake', () => {
     expect(html).toContain('Photo from the challan');
     expect(html).toContain('<summary>How local review works</summary>');
     expect(html).toContain('No selected file or answer has been uploaded to ChallanSakshi or an authority');
+  });
+
+  it('renders only a generic selected-role label with safe type and size feedback', () => {
+    const html = renderToStaticMarkup(createElement(LocalRecordIntake, {
+      record: {
+        meta: {
+          role: 'official-record',
+          type: 'application/pdf',
+          size: 2048,
+          previewKind: 'pdf',
+        },
+        previewUrl: 'blob:local-preview',
+      },
+      photograph: {
+        meta: {
+          role: 'photograph',
+          type: 'image/webp',
+          size: 4096,
+          previewKind: 'image',
+        },
+        previewUrl: 'blob:local-photograph-preview',
+      },
+      onRecordChange: () => undefined,
+      onPhotographChange: () => undefined,
+      language: 'en',
+    }));
+
+    expect(html).toContain('Selected notice');
+    expect(html).toContain('Selected photograph');
+    expect(html).toContain('application/pdf');
+    expect(html).toContain('2.0 KiB');
+    expect(html).toContain('image/webp');
+    expect(html).toContain('4.0 KiB');
   });
 
   it('keeps local-intake guidance and controls at 16px on narrow screens', () => {

@@ -217,9 +217,7 @@ describe('citizen review release contracts', () => {
 
   it('opens a selected PDF locally without contradicting the object-src security policy', () => {
     const selection = {
-      file: {} as File,
       meta: {
-        name: 'challan.pdf',
         size: 1024,
         type: 'application/pdf',
         role: 'official-record',
@@ -240,6 +238,7 @@ describe('citizen review release contracts', () => {
     expect(html).toContain('target="_blank"');
     expect(html).toContain('चुना गया PDF स्थानीय रूप से खोलें');
     expect(html).toContain('PDF टैब स्वयं बंद करें');
+    expect(html).toContain('चुना गया नोटिस');
     expect(html).not.toContain('<object');
     expect(reviewSource).not.toContain('<object');
     expect(reviewSource).toContain('Open selected PDF locally');

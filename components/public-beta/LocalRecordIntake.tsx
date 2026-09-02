@@ -12,7 +12,6 @@ import styles from './LocalRecordIntake.module.css';
 const ACCEPTED_RECORD_TYPES = 'application/pdf,image/jpeg,image/png,image/webp';
 
 export type LocalRecordSelection = {
-  file: File;
   meta: LocalRecordFileMeta;
   previewUrl: string;
 };
@@ -29,6 +28,8 @@ const copy = {
     recordReady: 'Selected record · ready for local review',
     photoPending: 'Selected photograph · not yet chosen',
     photoReady: 'Selected photograph · ready for local review',
+    selectedRecord: 'Selected notice',
+    selectedPhotograph: 'Selected photograph',
     upload: 'Server upload: off',
     saved: 'Saved case: off',
     recordTitle: 'Challan copy',
@@ -63,6 +64,8 @@ const copy = {
     recordReady: 'चुना गया रिकॉर्ड · स्थानीय समीक्षा के लिए तैयार',
     photoPending: 'चुनी गई तस्वीर · अभी नहीं चुनी गई',
     photoReady: 'चुनी गई तस्वीर · स्थानीय समीक्षा के लिए तैयार',
+    selectedRecord: 'चुना गया नोटिस',
+    selectedPhotograph: 'चुनी गई तस्वीर',
     upload: 'सर्वर अपलोड: बंद',
     saved: 'सेव किया गया केस: बंद',
     recordTitle: 'चालान की कॉपी',
@@ -118,9 +121,7 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
 
     setError(null);
     onSelectionChange({
-      file,
       meta: {
-        name: file.name,
         size: file.size,
         type: file.type,
         role,
@@ -159,7 +160,7 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
       {selection ? (
         <div className={styles.selection}>
           <div className={styles.metadata}>
-            <strong>{selection.meta.name}</strong>
+            <strong>{isPhotograph ? text.selectedPhotograph : text.selectedRecord}</strong>
             <span>{formatLocalRecordSize(selection.meta.size)}</span>
             <span>{text.category}: {selection.meta.type}</span>
             <span>{text.memory}</span>

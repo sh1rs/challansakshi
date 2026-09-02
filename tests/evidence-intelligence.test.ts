@@ -29,6 +29,19 @@ const answers = {
   custodyRecordAvailable: 'not-applicable' as const,
 };
 const assessment = assessCitizenChallanReview(answers);
+const recordMeta = {
+  role: 'official-record',
+  type: 'application/pdf',
+  size: 2048,
+  previewKind: 'pdf',
+} as const;
+const photographMeta = {
+  role: 'photograph',
+  type: 'image/webp',
+  size: 4096,
+  previewKind: 'image',
+} as const;
+const localSelections = { recordMeta, photographMeta } as const;
 
 // @ts-expect-error The public builder requires the Task 4 post-gate confirmation.
 void ({ answers, assessment } satisfies CitizenEvidenceViewInput);
@@ -46,7 +59,7 @@ describe('citizen evidence intelligence', () => {
   });
 
   it('labels a downloaded record as citizen-declared rather than government-authenticated', () => {
-    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', recordName: 'challan.pdf', photographName: 'photo.jpg' });
+    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', ...localSelections });
     expect(view.sources[0]).toMatchObject({
       id: 'source-official-copy',
       kind: 'official-record-copy',
@@ -56,22 +69,32 @@ describe('citizen evidence intelligence', () => {
     expect(view.sources).not.toContainEqual(expect.objectContaining({ authenticity: 'authorised-connector' }));
   });
 
-  it('keeps citizen filenames out of the evidence view used by result and print', () => {
+  it('derives local-file presence from exact safe role metadata only', () => {
     const view = buildCitizenEvidenceView({
       answers,
       assessment,
       confirmation: 'confirmed',
-      recordName: 'Asha_KA01AB3317_challan.pdf',
-      photographName: 'Asha_KA01AB3317_enforcement-photo.jpg',
+      ...localSelections,
     });
 
     expect(view.sources[0].label).toBe('Citizen-selected local official-record copy');
     expect(view.sources[1].label).toBe('Citizen-selected local supplied photograph');
-    expect(JSON.stringify(view)).not.toMatch(/Asha|KA01AB3317|challan\.pdf|enforcement-photo\.jpg/);
+    expect(JSON.stringify(view)).not.toContain('application/pdf');
+    expect(JSON.stringify(view)).not.toContain('image/webp');
+    expect(buildCitizenEvidenceView({
+      answers,
+      assessment,
+      confirmation: 'confirmed',
+      recordMeta: { ...recordMeta, role: 'photograph' },
+      photographMeta: { ...photographMeta, role: 'official-record' },
+    }).sources.slice(0, 2).map((source) => source.acquisition)).toEqual([
+      'citizen-recorded',
+      'citizen-recorded',
+    ]);
   });
 
   it('keeps unclear observations inconclusive and explains the limitation', () => {
-    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', recordName: 'challan.pdf', photographName: 'photo.jpg' });
+    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', ...localSelections });
     expect(view.observations.find((item) => item.field === 'Alleged offence')).toMatchObject({
       id: 'observation-alleged-offence',
       confidence: 'inconclusive',
@@ -81,7 +104,7 @@ describe('citizen evidence intelligence', () => {
   });
 
   it('marks readable plate and category differences as material but colour as context only', () => {
-    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', recordName: 'challan.pdf', photographName: 'photo.jpg' });
+    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', ...localSelections });
     expect(view.conflicts.map((item) => [item.reason, item.materiality])).toEqual([
       ['registration', 'material'],
       ['vehicle-category', 'material'],
@@ -94,8 +117,7 @@ describe('citizen evidence intelligence', () => {
       answers: { ...answers, imageInspected: false, plateObservation: 'different', categoryObservation: 'match', colourObservation: 'match' },
       assessment: assessCitizenChallanReview({ ...answers, imageInspected: false, plateObservation: 'different', categoryObservation: 'match', colourObservation: 'match' }),
       confirmation: 'confirmed',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
     });
     expect(view.observations.find((item) => item.field === 'Registration plate')).toMatchObject({
       confidence: 'inconclusive',
@@ -115,8 +137,7 @@ describe('citizen evidence intelligence', () => {
       answers: { ...answers, ...changes },
       assessment: assessCitizenChallanReview({ ...answers, ...changes }),
       confirmation: 'confirmed',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
     });
     expect(view.observations.find((item) => item.field === field)).toMatchObject({
       confidence: 'inconclusive',
@@ -131,8 +152,7 @@ describe('citizen evidence intelligence', () => {
       answers: unreadyAnswers,
       assessment: unreadyAssessment,
       confirmation: 'confirmed',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
     });
 
     expect(unreadyAssessment).toMatchObject({ finding: 'source-not-verified', canPrepareWorksheet: false });
@@ -146,8 +166,7 @@ describe('citizen evidence intelligence', () => {
       answers: currentAnswers,
       assessment: staleActionReadyAssessment,
       confirmation: 'confirmed',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
     });
 
     expect(staleActionReadyAssessment).toMatchObject({ finding: 'citizen-recorded-inconsistency', canPrepareWorksheet: true });
@@ -183,8 +202,7 @@ describe('citizen evidence intelligence', () => {
       answers,
       assessment,
       confirmation: 'confirmed',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
     });
     const view = buildCitizenEvidencePresentationView(canonicalView, {
       language: 'hi',
@@ -229,8 +247,7 @@ describe('citizen evidence intelligence', () => {
       allegedOffence: 'Helmet',
       eventDate: '2026-08-20',
       officialDeadline: '',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
       answers,
       assessment,
       confirmation: 'confirmed',
@@ -265,15 +282,14 @@ describe('citizen evidence intelligence', () => {
     ['en', true],
     ['hi', false],
     ['hi', true],
-  ] as const)('omits citizen filenames from the %s summary when simple mode is %s', (language, simpleMode) => {
+  ] as const)('uses generic local-source labels in the %s summary when simple mode is %s', (language, simpleMode) => {
     const summary = buildCitizenEvidenceSummary({
       jurisdiction: 'Central e-Challan service',
       vehicleSuffix: '3317',
       allegedOffence: 'Helmet',
       eventDate: '2026-08-20',
       officialDeadline: '',
-      recordName: 'Asha_KA01AB3317_challan.pdf',
-      photographName: 'Asha_KA01AB3317_enforcement-photo.jpg',
+      ...localSelections,
       answers,
       assessment,
       confirmation: 'confirmed',
@@ -289,13 +305,11 @@ describe('citizen evidence intelligence', () => {
       }),
     });
 
-    expect(summary).not.toContain('Asha');
-    expect(summary).not.toContain('KA01AB3317');
-    expect(summary).not.toContain('challan.pdf');
-    expect(summary).not.toContain('enforcement-photo.jpg');
+    expect(summary).not.toContain('application/pdf');
+    expect(summary).not.toContain('image/webp');
     expect(summary).toContain(language === 'hi'
-      ? 'साझा सारांश से फ़ाइल का नाम हटाया गया'
-      : 'file name omitted from shared summary');
+      ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी'
+      : 'Citizen-selected local official-record copy');
   });
 
   it('generates a reviewed Hindi summary while retaining the exact English disclaimer', () => {
@@ -305,8 +319,7 @@ describe('citizen evidence intelligence', () => {
       allegedOffence: 'हेलमेट',
       eventDate: '2026-08-20',
       officialDeadline: '',
-      recordName: 'challan.pdf',
-      photographName: 'photo.jpg',
+      ...localSelections,
       answers,
       assessment,
       confirmation: 'confirmed',
@@ -483,8 +496,7 @@ describe('citizen evidence intelligence', () => {
       allegedOffence: 'data:text/plain,not-a-record',
       eventDate: '2026-08-20\nCITIZEN-CONFIRMED OBSERVATIONS',
       officialDeadline: 'blob:local-only',
-      recordName: 'file:///Users/alice/secret.pdf',
-      photographName: 'image.jpg\r\nNEUTRAL CLARIFICATION REQUEST',
+      ...localSelections,
       answers,
       assessment,
       confirmation: 'confirmed',
@@ -503,7 +515,6 @@ describe('citizen evidence intelligence', () => {
     expect(summary).not.toContain('data:');
     expect(summary).not.toContain('blob:');
     expect(summary).not.toContain('file:');
-    expect(summary).not.toContain('/Users/alice/secret.pdf');
     expect(summary).not.toContain('Authority accepted');
     expect(summary).not.toContain('Authority updated');
     expect(summary).not.toContain('Authority received');

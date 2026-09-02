@@ -1,0 +1,167 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  color: var(--pb-ink);
+  background: var(--pb-paper);
+  border: 1px solid var(--pb-line);
+  border-radius: 22px;
+}
+
+.panel h2,
+.panel h3,
+.panel p,
+.panel ul {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--pb-teal-dark);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.purpose,
+.domain {
+  color: var(--pb-navy);
+  font-weight: 750;
+}
+
+.verified,
+.fieldHelp,
+.manualCopy {
+  color: var(--pb-muted);
+}
+
+.fieldGroup,
+.checklist,
+.confirmationGroup,
+.leaving,
+.returnSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--pb-line);
+}
+
+.fieldGroup textarea,
+.referenceField input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  color: var(--pb-ink);
+  font: inherit;
+  background: var(--pb-card);
+  border: 1px solid var(--pb-line);
+  border-radius: 10px;
+}
+
+.fieldGroup textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.selectableValue {
+  padding: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+  background: var(--pb-card);
+  border: 1px solid var(--pb-line);
+  border-radius: 10px;
+}
+
+.confirmation,
+.returnChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.55;
+}
+
+.confirmation input,
+.returnChoice input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--pb-teal-dark);
+}
+
+.returnChoices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.referenceField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action,
+.copyButton,
+.officialAnchor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  color: var(--pb-paper);
+  font: inherit;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+  background: var(--pb-teal-dark);
+  border: 1px solid var(--pb-teal-dark);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.copyButton {
+  align-self: flex-start;
+  color: var(--pb-teal-dark);
+  background: var(--pb-card);
+}
+
+.action:focus-visible,
+.copyButton:focus-visible,
+.officialAnchor:focus-visible,
+.confirmation input:focus-visible,
+.returnChoice input:focus-visible,
+.fieldGroup textarea:focus-visible,
+.referenceField input:focus-visible {
+  outline: 3px solid var(--pb-navy);
+  outline-offset: 3px;
+}
+
+.boundary,
+.status,
+.closedReason,
+.error {
+  padding: 12px;
+  background: var(--pb-card);
+  border-left: 3px solid var(--pb-teal);
+}
+
+.error {
+  color: var(--pb-navy);
+}
+
+@media (max-width: 420px) {
+  .panel,
+  .fieldGroup textarea,
+  .referenceField input,
+  .action,
+  .copyButton,
+  .officialAnchor {
+    font-size: 16px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+}

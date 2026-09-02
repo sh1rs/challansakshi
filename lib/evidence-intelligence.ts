@@ -87,8 +87,6 @@ export type CitizenEvidenceViewInput = {
   assessment: CitizenReviewAssessment;
   /** The evidence builders accept only facts confirmed by the citizen after that gate. */
   confirmation: 'confirmed';
-  recordName?: string;
-  photographName?: string;
   recordMeta?: LocalRecordFileMeta;
   photographMeta?: LocalRecordFileMeta;
   language?: Language;
@@ -220,37 +218,31 @@ function limitationFor(field: 'plate' | 'category' | 'colour' | 'offence' | 'tim
   return messages[`${field}:${value}`];
 }
 
-function sourceFileName(input: CitizenEvidenceViewInput, role: 'record' | 'photograph'): string | undefined {
-  return role === 'record'
-    ? input.recordMeta?.name ?? input.recordName
-    : input.photographMeta?.name ?? input.photographName;
-}
-
 /**
  * Builds a presentation-only view from facts the citizen has already confirmed.
  * This function does not inspect source bytes or authenticate a record. It reuses the deterministic conservative classifier for materiality and makes no independent or legal classification.
  */
 export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): CitizenEvidenceView {
   const currentAssessment = assessCitizenChallanReview(input.answers);
-  const hasLocalRecord = Boolean(sourceFileName(input, 'record'));
-  const hasLocalPhotograph = Boolean(sourceFileName(input, 'photograph'));
-  const recordName = hasLocalRecord
+  const hasLocalRecord = input.recordMeta?.role === 'official-record';
+  const hasLocalPhotograph = input.photographMeta?.role === 'photograph';
+  const recordLabel = hasLocalRecord
     ? 'Citizen-selected local official-record copy'
     : sourceStatusLabel(input.answers.sourceStatus);
-  const photographName = hasLocalPhotograph
+  const photographLabel = hasLocalPhotograph
     ? 'Citizen-selected local supplied photograph'
     : 'Citizen-described supplied photograph';
   const sources: EvidenceSourceRef[] = [
     {
       id: 'source-official-copy',
-      label: recordName,
+      label: recordLabel,
       kind: 'official-record-copy',
       acquisition: hasLocalRecord ? 'local-file-preview' : 'citizen-recorded',
       authenticity: CITIZEN_DECLARED_ORIGIN,
     },
     {
       id: 'source-enforcement-image',
-      label: photographName,
+      label: photographLabel,
       kind: 'enforcement-image',
       acquisition: hasLocalPhotograph ? 'local-file-preview' : 'citizen-recorded',
       authenticity: CITIZEN_DECLARED_ORIGIN,
@@ -392,17 +384,17 @@ function exportSourceLabel(source: EvidenceSourceRef, language: Language): strin
   if (source.acquisition !== 'local-file-preview') return source.label;
   if (source.id === 'source-official-copy') {
     return language === 'hi'
-      ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी (साझा सारांश से फ़ाइल का नाम हटाया गया)'
-      : 'Citizen-selected local official-record copy (file name omitted from shared summary)';
+      ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी'
+      : 'Citizen-selected local official-record copy';
   }
   if (source.id === 'source-enforcement-image') {
     return language === 'hi'
-      ? 'नागरिक द्वारा चुनी स्थानीय तस्वीर (साझा सारांश से फ़ाइल का नाम हटाया गया)'
-      : 'Citizen-selected local supplied photograph (file name omitted from shared summary)';
+      ? 'नागरिक द्वारा चुनी स्थानीय तस्वीर'
+      : 'Citizen-selected local supplied photograph';
   }
   return language === 'hi'
-    ? 'नागरिक द्वारा चुना स्थानीय रिकॉर्ड (साझा सारांश से फ़ाइल का नाम हटाया गया)'
-    : 'Citizen-selected local record (file name omitted from shared summary)';
+    ? 'नागरिक द्वारा चुना स्थानीय रिकॉर्ड'
+    : 'Citizen-selected local record';
 }
 
 export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput): string {

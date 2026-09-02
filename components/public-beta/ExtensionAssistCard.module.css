@@ -1,0 +1,96 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  color: var(--pb-ink);
+  background: var(--pb-card);
+  border: 1px solid var(--pb-line);
+  border-radius: 18px;
+}
+
+.card h3,
+.card p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--pb-teal-dark);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.confirmations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--pb-ink);
+  line-height: 1.55;
+}
+
+.confirmation input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--pb-teal-dark);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  color: var(--pb-paper);
+  font: inherit;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+  background: var(--pb-teal-dark);
+  border: 1px solid var(--pb-teal-dark);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.action:focus-visible,
+.confirmation input:focus-visible {
+  outline: 3px solid var(--pb-navy);
+  outline-offset: 3px;
+}
+
+.boundary,
+.status {
+  padding: 12px;
+  color: var(--pb-muted);
+  background: var(--pb-paper);
+  border-left: 3px solid var(--pb-teal);
+}
+
+.capsule {
+  display: none;
+}
+
+@media (max-width: 420px) {
+  .card,
+  .confirmation,
+  .action {
+    font-size: 16px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}
