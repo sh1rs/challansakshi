@@ -16,17 +16,22 @@ import {
   changeCitizenReviewHandoffDescription,
   changeCitizenReviewLookupValue,
   changeCitizenReviewPackPermission,
+  changeCitizenExtensionConsent,
   completeCitizenReviewCopy,
   confirmCitizenReviewHandoffPack,
   createCitizenReviewHandoffController,
   expireCitizenReviewExtensionPreparation,
   getCitizenReviewReceiptState,
   getCitizenReviewEffectGuardSignature,
+  getCitizenReviewExtensionReadiness,
+  getCitizenReviewReturnReadiness,
+  isCitizenReviewCurrentPack,
   invalidateCitizenReviewHandoff,
   prepareCitizenReviewExtension,
   recordCitizenReviewReturn,
   requestCitizenReceiptDownload,
   requestCitizenReviewCopy,
+  reconcileCitizenReviewCurrentPack,
   type CitizenReviewHandoffControllerState,
   type CitizenReviewHandoffViewInput,
 } from '../lib/citizen-review-handoff-controller';
@@ -221,13 +226,15 @@ describe('pack, copy, return, and receipt lifecycle', () => {
   });
 
   it('keeps authentic activation separate from the latest corrected citizen return receipt', () => {
-    const activated = activateCitizenReviewOfficialLink(confirmedSelfState(), NOW);
+    const confirmed = confirmedSelfState();
+    const view = buildCitizenReviewHandoffView(confirmed, viewInput());
+    const activated = activateCitizenReviewOfficialLink(confirmed, view, NOW);
     expect(activated.linkActivation?.status).toBe('link-activated');
     expect(activated.lookupValue).toBe('');
 
     const selected = changeCitizenReturnState(activated, 'acknowledgement-seen');
     const withFragment = changeCitizenReferenceLastFour(selected, 'A1B2');
-    const recorded = recordCitizenReviewReturn(withFragment, '2026-09-03T10:31:00.000Z');
+    const recorded = recordCitizenReviewReturn(withFragment, view, '2026-09-03T10:31:00.000Z');
     expect(recorded.latestReturnReceipt).toMatchObject({
       status: 'citizen-return-recorded',
       selectedReturnState: 'acknowledgement-seen',
@@ -259,19 +266,22 @@ describe('pack, copy, return, and receipt lifecycle', () => {
     }
     const view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
     state = confirmCitizenReviewHandoffPack(state, { view, sourceKind: 'official-service', nowIso: NOW });
-    state = activateCitizenReviewOfficialLink(state, NOW);
+    state = activateCitizenReviewOfficialLink(state, view, NOW);
     state = changeCitizenReturnState(state, 'acknowledgement-seen');
     state = changeCitizenReferenceLastFour(state, '9Z8Y');
-    expect(() => recordCitizenReviewReturn(state, '2026-09-03T10:31:00.000Z')).toThrow(/affected person/i);
+    expect(recordCitizenReviewReturn(state, view, '2026-09-03T10:31:00.000Z')).toBe(state);
 
     for (const key of [
       'affectedPersonPresent',
       'affectedPersonRequestedReturnRecording',
       'affectedPersonConfirmedReturnState',
       'affectedPersonConfirmedReferenceFragment',
-    ] as const) state = changeCitizenReturnAuthorization(state, key, true);
-    state = recordCitizenReviewReturn(state, '2026-09-03T10:31:00.000Z');
-    const requested = requestCitizenReceiptDownload(state);
+    ] as const) state = changeCitizenReturnAuthorization(state, key, true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    state = recordCitizenReviewReturn(state, view, '2026-09-03T10:31:00.000Z');
+    const requested = requestCitizenReceiptDownload(state, view);
     expect(requested.effect).toMatchObject({
       type: 'download-text',
       filename: 'challansakshi-redacted-continuation-receipt.json',
@@ -293,7 +303,8 @@ describe('pack, copy, return, and receipt lifecycle', () => {
 
   it('offers typed fallback only for portal-unavailable without changing the pack or destination', () => {
     const confirmed = confirmedSelfState();
-    const activated = activateCitizenReviewOfficialLink(confirmed, NOW);
+    const currentView = buildCitizenReviewHandoffView(confirmed, viewInput());
+    const activated = activateCitizenReviewOfficialLink(confirmed, currentView, NOW);
     const unavailable = changeCitizenReturnState(activated, 'portal-unavailable');
     const view = buildCitizenReviewHandoffView(unavailable, viewInput());
 
@@ -304,9 +315,11 @@ describe('pack, copy, return, and receipt lifecycle', () => {
   });
 
   it('synchronously clears all downstream state and replaces revisions on material invalidation', () => {
-    let state = activateCitizenReviewOfficialLink(confirmedSelfState(), NOW);
+    let state = confirmedSelfState();
+    const view = buildCitizenReviewHandoffView(state, viewInput());
+    state = activateCitizenReviewOfficialLink(state, view, NOW);
     state = changeCitizenReturnState(state, 'not-submitted');
-    state = recordCitizenReviewReturn(state, '2026-09-03T10:31:00.000Z');
+    state = recordCitizenReviewReturn(state, view, '2026-09-03T10:31:00.000Z');
     state = changeCitizenReviewLookupValue(state, 'PRIVATE-LOOKUP');
     const invalidated = invalidateCitizenReviewHandoff(state, {
       resultRevisionId: NEXT_RESULT_REVISION,
@@ -356,6 +369,7 @@ describe('closed extension preparation', () => {
   it('does nothing under the checked-in closed release and builds only from an authentic reduced source in the test-only open path', () => {
     const confirmed = confirmedSelfState();
     const closed = prepareCitizenReviewExtension(confirmed, {
+      view: buildCitizenReviewHandoffView(confirmed, viewInput()),
       release: evaluatePublicExtensionRelease({}),
       language: 'en',
       simpleMode: false,
@@ -363,25 +377,19 @@ describe('closed extension preparation', () => {
     });
     expect(closed.extensionPreparation).toEqual({ status: 'idle' });
 
-    let eligible = changeCitizenReviewPackPermission(confirmed, 'supportedDesktopConfirmed', true, {
+    let eligible = changeCitizenExtensionConsent(confirmed, 'supportedDesktopConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
       packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
     });
-    const view = buildCitizenReviewHandoffView(eligible, viewInput());
-    eligible = confirmCitizenReviewHandoffPack(eligible, {
-      view,
-      sourceKind: 'official-service',
-      nowIso: NOW,
-    });
-    eligible = changeCitizenReviewPackPermission(eligible, 'boundedSafetyReviewConfirmed', true, {
+    eligible = changeCitizenExtensionConsent(eligible, 'boundedSafetyReviewConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
       packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
     });
     const rebuiltView = buildCitizenReviewHandoffView(eligible, viewInput());
-    eligible = confirmCitizenReviewHandoffPack(eligible, {
-      view: rebuiltView,
-      sourceKind: 'official-service',
-      nowIso: NOW,
-    });
     const prepared = prepareCitizenReviewExtension(eligible, {
+      view: rebuiltView,
       release: publicEnabled,
       language: 'en',
       simpleMode: false,
@@ -396,17 +404,20 @@ describe('closed extension preparation', () => {
 
   it('expires the capsule, clears the pack, and requires fresh exact pack confirmation', () => {
     let state = confirmedSelfState();
-    state = changeCitizenReviewPackPermission(state, 'supportedDesktopConfirmed', true, {
+    state = changeCitizenExtensionConsent(state, 'supportedDesktopConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
       packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
     });
     let view = buildCitizenReviewHandoffView(state, viewInput());
-    state = confirmCitizenReviewHandoffPack(state, { view, sourceKind: 'official-service', nowIso: NOW });
-    state = changeCitizenReviewPackPermission(state, 'boundedSafetyReviewConfirmed', true, {
+    state = changeCitizenExtensionConsent(state, 'boundedSafetyReviewConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
       packRevisionId: '77777777777777777777777777777777',
+      nowMs: NOW_MS,
     });
     view = buildCitizenReviewHandoffView(state, viewInput());
-    state = confirmCitizenReviewHandoffPack(state, { view, sourceKind: 'official-service', nowIso: NOW });
     state = prepareCitizenReviewExtension(state, {
+      view,
       release: publicEnabled,
       language: 'en',
       simpleMode: false,
@@ -417,6 +428,297 @@ describe('closed extension preparation', () => {
       packRevisionId: '88888888888888888888888888888888',
     });
     expect(expired.extensionPreparation).toEqual({ status: 'idle' });
+    expect(expired.confirmedPack).toBeNull();
+    expect(expired.packConfirmation.affectedPersonConfirmedPack).toBe(false);
+  });
+});
+
+describe('current pack binding and fail-closed action gates', () => {
+  it('is current immediately after confirmation and fails closed for revision splice and route expiry', () => {
+    const confirmed = confirmedSelfState();
+    const currentView = buildCitizenReviewHandoffView(confirmed, viewInput());
+    expect(isCitizenReviewCurrentPack(confirmed, currentView)).toBe(true);
+
+    const rotated = createCitizenReviewHandoffController({
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    const spliced = {
+      ...rotated,
+      confirmedPack: confirmed.confirmedPack,
+      packContextSignature: confirmed.packContextSignature,
+      receiptSession: confirmed.receiptSession,
+    };
+    expect(isCitizenReviewCurrentPack(spliced, buildCitizenReviewHandoffView(spliced, viewInput()))).toBe(false);
+
+    const expiredView = buildCitizenReviewHandoffView(confirmed, viewInput({
+      nowIso: '2026-10-03T00:00:00.000Z',
+    }));
+    expect(expiredView.destination.key).toBe('unresolved');
+    expect(isCitizenReviewCurrentPack(confirmed, expiredView)).toBe(false);
+    const reconciled = reconcileCitizenReviewCurrentPack(confirmed, expiredView, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    expect(reconciled.confirmedPack).toBeNull();
+    expect(reconciled.resultRevisionId).toBe(NEXT_RESULT_REVISION);
+  });
+
+  it('requires the one current-pack predicate for every pack-derived action and rejects stale effects', () => {
+    const confirmed = confirmedSelfState();
+    const view = buildCitizenReviewHandoffView(confirmed, viewInput());
+    const rotated = invalidateCitizenReviewHandoff(confirmed, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    const stale = {
+      ...rotated,
+      confirmedPack: confirmed.confirmedPack,
+      packContextSignature: confirmed.packContextSignature,
+      receiptSession: confirmed.receiptSession,
+    };
+
+    expect(requestCitizenReviewCopy(stale, 'description', view).effect).toBeNull();
+    expect(activateCitizenReviewOfficialLink(stale, view, NOW)).toBe(stale);
+    expect(recordCitizenReviewReturn(stale, view, NOW)).toBe(stale);
+    expect(requestCitizenReceiptDownload(stale, view).effect).toBeNull();
+    expect(prepareCitizenReviewExtension(stale, {
+      view,
+      release: evaluatePublicExtensionRelease({}),
+      language: 'en',
+      simpleMode: false,
+      nowMs: NOW_MS,
+    })).toBe(stale);
+
+    const requested = requestCitizenReviewCopy(confirmed, 'description', view);
+    expect(requested.effect).not.toBeNull();
+    expect(requested.effect?.guardSignature).not.toBe(getCitizenReviewEffectGuardSignature(rotated));
+    expect(completeCitizenReviewCopy(rotated, requested.effect?.token ?? '', true)).toBe(rotated);
+  });
+});
+
+describe('return readiness and exact helper authorization', () => {
+  function confirmedHelperState() {
+    let state = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+      role: 'present-helper',
+    });
+    const permissions = [
+      'affectedPersonPresent',
+      'affectedPersonInspectedEvidence',
+      'affectedPersonInspectedReadableRecord',
+      'affectedPersonConfirmedEntitlement',
+      'affectedPersonRequestedPreparation',
+    ] as const;
+    for (const [index, key] of permissions.entries()) {
+      state = changeCitizenReviewPackPermission(state, key, true, {
+        packRevisionId: `${index + 4}`.repeat(32),
+      });
+    }
+    const view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
+    return confirmCitizenReviewHandoffPack(state, { view, sourceKind: 'official-service', nowIso: NOW });
+  }
+
+  it('binds helper reference confirmation to the exact current fragment', () => {
+    let state = confirmedHelperState();
+    const view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
+    state = activateCitizenReviewOfficialLink(state, view, NOW);
+    state = changeCitizenReturnState(state, 'acknowledgement-seen');
+    state = changeCitizenReferenceLastFour(state, 'A1B2');
+    for (const key of [
+      'affectedPersonPresent',
+      'affectedPersonRequestedReturnRecording',
+      'affectedPersonConfirmedReturnState',
+      'affectedPersonConfirmedReferenceFragment',
+    ] as const) state = changeCitizenReturnAuthorization(state, key, true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    expect(getCitizenReviewReturnReadiness(state, view)).toEqual({ status: 'ready' });
+
+    state = changeCitizenReferenceLastFour(state, 'Z9Y8');
+    expect(state.returnAuthorization.affectedPersonConfirmedReferenceFragment).toBe(false);
+    expect(getCitizenReviewReturnReadiness(state, view)).toEqual({
+      status: 'blocked',
+      reason: 'affected-person-reference-confirmation-required',
+    });
+    expect(recordCitizenReviewReturn(state, view, '2026-09-03T10:31:00.000Z')).toBe(state);
+  });
+
+  it('projects complete readiness without throwing for self/helper, partial fragments, and shared mode', () => {
+    let self = confirmedSelfState();
+    const selfView = buildCitizenReviewHandoffView(self, viewInput());
+    expect(getCitizenReviewReturnReadiness(self, selfView).reason).toBe('official-link-not-activated');
+    self = activateCitizenReviewOfficialLink(self, selfView, NOW);
+    expect(getCitizenReviewReturnReadiness(self, selfView).reason).toBe('return-state-required');
+    self = changeCitizenReturnState(self, 'acknowledgement-seen');
+    self = changeCitizenReferenceLastFour(self, 'A1');
+    expect(getCitizenReviewReturnReadiness(self, selfView).reason).toBe('reference-fragment-incomplete');
+    expect(() => recordCitizenReviewReturn(self, selfView, '2026-09-03T10:31:00.000Z')).not.toThrow();
+    expect(recordCitizenReviewReturn(self, selfView, '2026-09-03T10:31:00.000Z')).toBe(self);
+    self = changeCitizenReferenceLastFour(self, 'A1B2');
+    expect(getCitizenReviewReturnReadiness(self, selfView)).toEqual({ status: 'ready' });
+
+    let helper = confirmedHelperState();
+    const helperView = buildCitizenReviewHandoffView(helper, viewInput({ role: 'present-helper' }));
+    helper = activateCitizenReviewOfficialLink(helper, helperView, NOW);
+    helper = changeCitizenReturnState(helper, 'not-submitted');
+    expect(getCitizenReviewReturnReadiness(helper, helperView).reason).toBe('affected-person-present-required');
+    expect(recordCitizenReviewReturn(helper, helperView, '2026-09-03T10:31:00.000Z')).toBe(helper);
+
+    const shared = { ...self, deviceMode: 'shared' as const };
+    const sharedView = buildCitizenReviewHandoffView(shared, viewInput({ deviceMode: 'shared' }));
+    expect(isCitizenReviewCurrentPack(shared, sharedView)).toBe(false);
+  });
+
+  it('fully invalidates when a present helper reports affected-person departure', () => {
+    let state = confirmedHelperState();
+    const view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
+    state = activateCitizenReviewOfficialLink(state, view, NOW);
+    state = changeCitizenReturnState(state, 'not-submitted');
+    state = changeCitizenReviewLookupValue(state, 'PRIVATE-LOOKUP');
+    state = changeCitizenReturnAuthorization(state, 'affectedPersonPresent', false, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+    });
+    expect(state).toMatchObject({
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      lookupValue: '',
+      confirmedPack: null,
+      linkActivation: null,
+      latestReturnReceipt: null,
+      returnDraft: { selectedReturnState: null, referenceLastFour: '' },
+      extensionPreparation: { status: 'idle' },
+    });
+  });
+});
+
+describe('future-enabled extension-only consent and authoritative expiry', () => {
+  const publicEnabled = evaluatePublicExtensionRelease({
+    releaseState: 'public-enabled',
+    environmentEnabled: true,
+    storeApproval: 'approved',
+    adapterReleaseState: 'public-enabled',
+    firstPartyLandingUrl: '/extension',
+    extensionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    storeUrl: 'https://chromewebstore.google.com/detail/challansakshi-assisted-handoff/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  it('keeps a current authentic pack through the straight self consent sequence and fails closed on withdrawal', () => {
+    let state = confirmedSelfState();
+    const pack = state.confirmedPack;
+    const view = buildCitizenReviewHandoffView(state, viewInput());
+    state = changeCitizenExtensionConsent(state, 'supportedDesktopConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    state = changeCitizenExtensionConsent(state, 'boundedSafetyReviewConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    expect(state.confirmedPack).toBe(pack);
+    expect(isCitizenReviewCurrentPack(state, view)).toBe(true);
+    expect(getCitizenReviewExtensionReadiness(state, view, publicEnabled)).toEqual({ status: 'ready' });
+    state = prepareCitizenReviewExtension(state, {
+      view,
+      release: publicEnabled,
+      language: 'en',
+      simpleMode: false,
+      nowMs: NOW_MS + 5 * 60_000,
+    });
+    expect(state.extensionPreparation.status).toBe('prepared');
+    if (state.extensionPreparation.status === 'prepared') {
+      expect(state.extensionPreparation.expiresAtMs).toBe(NOW_MS + 10 * 60_000);
+    }
+    const withdrawn = changeCitizenExtensionConsent(state, 'boundedSafetyReviewConfirmed', false, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS + 5 * 60_000,
+    });
+    expect(withdrawn.confirmedPack).toBe(pack);
+    expect(withdrawn.extensionPreparation).toEqual({ status: 'idle' });
+    expect(getCitizenReviewExtensionReadiness(withdrawn, view, publicEnabled).status).toBe('blocked');
+  });
+
+  it('keeps helper consent controls independent until affected-person-present is withdrawn', () => {
+    let state = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+      role: 'present-helper',
+    });
+    for (const [index, key] of ([
+      'affectedPersonPresent',
+      'affectedPersonInspectedEvidence',
+      'affectedPersonInspectedReadableRecord',
+      'affectedPersonConfirmedEntitlement',
+      'affectedPersonRequestedPreparation',
+    ] as const).entries()) state = changeCitizenReviewPackPermission(state, key, true, { packRevisionId: `${index + 4}`.repeat(32) });
+    let view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
+    state = confirmCitizenReviewHandoffPack(state, { view, sourceKind: 'official-service', nowIso: NOW });
+    const pack = state.confirmedPack;
+    for (const key of [
+      'supportedDesktopConfirmed',
+      'boundedSafetyReviewConfirmed',
+      'affectedPersonPresent',
+      'affectedPersonReviewedFields',
+      'affectedPersonRequestedPreparation',
+    ] as const) state = changeCitizenExtensionConsent(state, key, true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    view = buildCitizenReviewHandoffView(state, viewInput({ role: 'present-helper' }));
+    expect(state.confirmedPack).toBe(pack);
+    expect(getCitizenReviewExtensionReadiness(state, view, publicEnabled)).toEqual({ status: 'ready' });
+
+    state = changeCitizenExtensionConsent(state, 'affectedPersonPresent', false, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    expect(state.confirmedPack).toBeNull();
+    expect(state.extensionPreparation).toEqual({ status: 'idle' });
+  });
+
+  it('expires against the envelope timestamp even when timer delivery is late', () => {
+    let state = confirmedSelfState();
+    const view = buildCitizenReviewHandoffView(state, viewInput());
+    state = changeCitizenExtensionConsent(state, 'supportedDesktopConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    state = changeCitizenExtensionConsent(state, 'boundedSafetyReviewConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS,
+    });
+    state = prepareCitizenReviewExtension(state, {
+      view,
+      release: publicEnabled,
+      language: 'en',
+      simpleMode: false,
+      nowMs: NOW_MS + 9 * 60_000,
+    });
+    expect(state.extensionPreparation.status).toBe('prepared');
+    const lateView = buildCitizenReviewHandoffView(state, viewInput({
+      nowIso: new Date(NOW_MS + 12 * 60_000).toISOString(),
+    }));
+    expect(isCitizenReviewCurrentPack(state, lateView)).toBe(false);
+    expect(requestCitizenReviewCopy(state, 'description', lateView).effect).toBeNull();
+    const nextTransition = changeCitizenExtensionConsent(state, 'boundedSafetyReviewConfirmed', true, {
+      resultRevisionId: NEXT_RESULT_REVISION,
+      packRevisionId: NEXT_PACK_REVISION,
+      nowMs: NOW_MS + 12 * 60_000,
+    });
+    expect(nextTransition.confirmedPack).toBeNull();
+    const expired = expireCitizenReviewExtensionPreparation(state, NOW_MS + 12 * 60_000, {
+      packRevisionId: NEXT_PACK_REVISION,
+    });
     expect(expired.confirmedPack).toBeNull();
     expect(expired.packConfirmation.affectedPersonConfirmedPack).toBe(false);
   });

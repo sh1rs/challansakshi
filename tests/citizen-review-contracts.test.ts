@@ -229,6 +229,21 @@ describe('citizen review release contracts', () => {
     expect(handoffControllerSource).toMatch(/type:\s*'download-text'/);
   });
 
+  it('derives all pack actions from the one current-view predicate and reconciles stale packs', () => {
+    expect(reviewSource).toMatch(/isCitizenReviewCurrentPack\(handoffState,\s*handoffView\)/);
+    expect(reviewSource).toMatch(/reconcileCitizenReviewCurrentPack/);
+    expect(reviewSource).toMatch(/getCitizenReviewExtensionReadiness/);
+    expect(reviewSource).not.toMatch(/preparationAllowedByController:\s*extensionRelease\.status[\s\S]{0,700}affectedPersonRequestedPreparation/);
+    expect(reviewSource).toMatch(/routeNowIso/);
+  });
+
+  it('gates the panel with the derived current pack and passes explicit return readiness', () => {
+    const result = reviewSource.slice(reviewSource.indexOf('<OfficialHandoffPanel'));
+    expect(result).toMatch(/confirmedPack=\{currentHandoffPack\}/);
+    expect(result).toMatch(/returnReadiness=\{returnReadiness\}/);
+    expect(result).not.toMatch(/confirmedPack=\{handoffState\.confirmedPack\}/);
+  });
+
   it('keeps review select and official-service link targets at least 48px at base layouts', () => {
     expect(publicBaseStyles).toMatch(
       /\.observationCard select\s*\{[^}]*min-height:\s*48px/,

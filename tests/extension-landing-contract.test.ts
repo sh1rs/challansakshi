@@ -29,6 +29,32 @@ describe('state-free extension information route', () => {
     expect(html).not.toContain('<a href="https://chromewebstore.google.com/');
   });
 
+  it('states the exact bounded-check, staging, replay, recovery, and recipient limits before acquisition', () => {
+    const html = renderToStaticMarkup(createElement(ExtensionInformationPage));
+    const bounded = html.indexOf('reviewed fields that passed bounded safety checks');
+    const acquisition = html.indexOf('Open approved store listing');
+    expect(bounded).toBeGreaterThanOrEqual(0);
+    expect(html).toContain('not proof that free-text prose contains no sensitive information');
+    expect(html).toContain('staged values remain for no more than 10 minutes');
+    expect(html).toContain('popup heap and session state');
+    expect(html).toContain('browser-activity metadata');
+    expect(html).toContain('payload-free local replay');
+    expect(html).toContain('affected-person acknowledgement or 24 hours');
+    expect(html).toContain('unresolved or orphaned records have no automatic time-based clearing');
+    expect(html).toContain('all relevant official tabs and browser processes are closed and reopened');
+    expect(html).toContain('project developer is not a recipient');
+    expect(html).toContain('only after you explicitly choose Fill');
+    if (acquisition >= 0) expect(bounded).toBeLessThan(acquisition);
+  });
+
+  it('keeps the complete bounded disclosure available in Hindi', () => {
+    expect(infoSource).toContain('सीमित सुरक्षा जाँच');
+    expect(infoSource).toContain('संवेदनशील जानकारी न होने का प्रमाण नहीं');
+    expect(infoSource).toContain('चौबीस घंटे');
+    expect(infoSource).toContain('कोई स्वचालित समय-आधारित सफ़ाई नहीं');
+    expect(infoSource).toContain('डेवलपर प्राप्तकर्ता नहीं है');
+  });
+
   it('derives any future acquisition solely from the release evaluator', () => {
     expect(infoSource).toMatch(/evaluatePublicExtensionRelease\(CURRENT_EXTENSION_RELEASE_STATE\)/);
     expect(infoSource).not.toMatch(/URLSearchParams|searchParams|window\.location|chrome\.runtime|postMessage/);

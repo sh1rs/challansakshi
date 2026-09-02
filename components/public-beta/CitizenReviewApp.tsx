@@ -38,7 +38,7 @@ import { CURRENT_EXTENSION_RELEASE_STATE, evaluatePublicExtensionRelease } from 
 import {
   activateCitizenReviewOfficialLink,
   buildCitizenReviewHandoffView,
-  changeCitizenExtensionHelperPermission,
+  changeCitizenExtensionConsent,
   changeCitizenReferenceLastFour,
   changeCitizenReturnAuthorization,
   changeCitizenReturnState,
@@ -50,13 +50,18 @@ import {
   confirmCitizenReviewHandoffPack,
   createCitizenReviewHandoffController,
   expireCitizenReviewExtensionPreparation,
+  getCitizenReviewCurrentExtensionPreparation,
+  getCitizenReviewExtensionReadiness,
   getCitizenReviewReceiptState,
   getCitizenReviewEffectGuardSignature,
+  getCitizenReviewReturnReadiness,
   invalidateCitizenReviewHandoff,
+  isCitizenReviewCurrentPack,
   prepareCitizenReviewExtension,
   recordCitizenReviewReturn,
   requestCitizenReceiptDownload,
   requestCitizenReviewCopy,
+  reconcileCitizenReviewCurrentPack,
   type CitizenReviewBrowserEffect,
   type CitizenReviewHandoffControllerState,
 } from '../../lib/citizen-review-handoff-controller';
@@ -354,6 +359,7 @@ export default function CitizenReviewApp() {
   const [officialDeadline, setOfficialDeadline] = useState('');
   const [offence, setOffence] = useState('');
   const [referenceDate, setReferenceDate] = useState(indiaDateNow);
+  const [routeNowIso, setRouteNowIso] = useState(() => new Date().toISOString());
   const [error, setError] = useState<ReviewError | null>(null);
   const [artifactStatus, setArtifactStatus] = useState<{ signature: string; message: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -484,7 +490,7 @@ export default function CitizenReviewApp() {
   const resultBody = simpleMode
     ? copy.simple[language === 'hi' ? 1 : 0]
     : copy.body[language === 'hi' ? 1 : 0];
-  const handoffViewInput = {
+  const handoffViewInput = useMemo(() => ({
     answers,
     factsConfirmed,
     jurisdictionConfirmation: jurisdiction,
@@ -492,10 +498,32 @@ export default function CitizenReviewApp() {
     deviceMode: reviewDevice,
     language,
     simpleMode,
-    nowIso: new Date().toISOString(),
-  } as const;
+    nowIso: routeNowIso,
+  } as const), [
+    answers,
+    factsConfirmed,
+    jurisdiction,
+    reviewRole,
+    reviewDevice,
+    language,
+    simpleMode,
+    routeNowIso,
+  ]);
   const handoffView = buildCitizenReviewHandoffView(handoffState, handoffViewInput);
   const extensionRelease = evaluatePublicExtensionRelease(CURRENT_EXTENSION_RELEASE_STATE);
+  const hasCurrentHandoffPack = isCitizenReviewCurrentPack(handoffState, handoffView);
+  const currentHandoffPack = hasCurrentHandoffPack ? handoffState.confirmedPack : null;
+  const returnReadiness = getCitizenReviewReturnReadiness(handoffState, handoffView);
+  const extensionReadiness = getCitizenReviewExtensionReadiness(
+    handoffState,
+    handoffView,
+    extensionRelease,
+  );
+  const currentExtensionPreparation = getCitizenReviewCurrentExtensionPreparation(
+    handoffState,
+    handoffView,
+    Date.parse(routeNowIso),
+  );
 
   useEffect(() => {
     let active = true;
@@ -516,6 +544,25 @@ export default function CitizenReviewApp() {
     handoffStateRef.current = handoffState;
   }, [handoffState]);
 
+  useEffect(() => {
+    if (!handoffState.confirmedPack || hasCurrentHandoffPack) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setHandoffState((current) => reconcileCitizenReviewCurrentPack(
+        current,
+        buildCitizenReviewHandoffView(current, handoffViewInput),
+        {
+          resultRevisionId: freshOpaqueRevisionId(),
+          packRevisionId: freshOpaqueRevisionId(),
+        },
+      ));
+    });
+    return () => {
+      active = false;
+    };
+  }, [handoffState.confirmedPack, handoffView.contextSignature, handoffViewInput, hasCurrentHandoffPack]);
+
   useEffect(() => () => {
     if (recordSelectionRef.current?.previewUrl) {
       URL.revokeObjectURL(recordSelectionRef.current.previewUrl);
@@ -533,6 +580,7 @@ export default function CitizenReviewApp() {
     if (handoffState.extensionPreparation.status !== 'prepared') return;
     const delay = Math.max(0, handoffState.extensionPreparation.expiresAtMs - Date.now());
     const timer = window.setTimeout(() => {
+      setRouteNowIso(new Date().toISOString());
       setHandoffState((current) => expireCitizenReviewExtensionPreparation(current, Date.now(), {
         packRevisionId: freshOpaqueRevisionId(),
       }));
@@ -541,7 +589,10 @@ export default function CitizenReviewApp() {
   }, [handoffState.extensionPreparation]);
 
   useEffect(() => {
-    const refresh = () => setReferenceDate(indiaDateNow());
+    const refresh = () => {
+      setReferenceDate(indiaDateNow());
+      setRouteNowIso(new Date().toISOString());
+    };
     const timer = window.setInterval(refresh, 60000);
     window.addEventListener('focus', refresh);
     return () => {
@@ -901,12 +952,39 @@ export default function CitizenReviewApp() {
     packRevisionId: freshOpaqueRevisionId(),
   }));
 
+  const changeExtensionConsent = (
+    key: Parameters<typeof changeCitizenExtensionConsent>[1],
+    checked: boolean,
+  ) => setHandoffState((current) => changeCitizenExtensionConsent(current, key, checked, {
+    resultRevisionId: freshOpaqueRevisionId(),
+    packRevisionId: freshOpaqueRevisionId(),
+    nowMs: Date.now(),
+  }));
+
+  const currentHandoffForAction = (
+    current: CitizenReviewHandoffControllerState,
+    nowIso: string,
+  ) => {
+    const view = buildCitizenReviewHandoffView(current, { ...handoffViewInput, nowIso });
+    const reconciled = reconcileCitizenReviewCurrentPack(current, view, {
+      resultRevisionId: freshOpaqueRevisionId(),
+      packRevisionId: freshOpaqueRevisionId(),
+    });
+    return reconciled === current
+      ? { status: 'current' as const, state: current, view }
+      : { status: 'invalidated' as const, state: reconciled };
+  };
+
   const confirmHandoffPack = (checked: boolean) => {
     if (!checked) {
-      changeHandoffPackPermission('affectedPersonConfirmedPack', false);
+      setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+        resultRevisionId: freshOpaqueRevisionId(),
+        packRevisionId: freshOpaqueRevisionId(),
+      }));
       return;
     }
     const nowIso = new Date().toISOString();
+    setRouteNowIso(nowIso);
     setHandoffState((current) => {
       const currentView = buildCitizenReviewHandoffView(current, { ...handoffViewInput, nowIso });
       return confirmCitizenReviewHandoffPack(current, {
@@ -921,7 +999,15 @@ export default function CitizenReviewApp() {
 
   const copyHandoffField = async (field: Parameters<typeof requestCitizenReviewCopy>[1]) => {
     if (device === 'shared') return;
-    const requested = requestCitizenReviewCopy(handoffStateRef.current, field);
+    const nowIso = new Date().toISOString();
+    const current = handoffStateRef.current;
+    const action = currentHandoffForAction(current, nowIso);
+    if (action.status === 'invalidated') {
+      handoffStateRef.current = action.state;
+      setHandoffState(action.state);
+      return;
+    }
+    const requested = requestCitizenReviewCopy(action.state, field, action.view);
     if (!requested.effect || requested.effect.type !== 'clipboard-write') return;
     const effect = requested.effect;
     handoffStateRef.current = requested.state;
@@ -954,7 +1040,15 @@ export default function CitizenReviewApp() {
 
   const downloadHandoffReceipt = () => {
     if (device === 'shared') return;
-    const requested = requestCitizenReceiptDownload(handoffStateRef.current);
+    const nowIso = new Date().toISOString();
+    const current = handoffStateRef.current;
+    const action = currentHandoffForAction(current, nowIso);
+    if (action.status === 'invalidated') {
+      handoffStateRef.current = action.state;
+      setHandoffState(action.state);
+      return;
+    }
+    const requested = requestCitizenReceiptDownload(action.state, action.view);
     if (!requested.effect || requested.effect.type !== 'download-text') return;
     handoffStateRef.current = requested.state;
     setHandoffState(requested.state);
@@ -963,22 +1057,17 @@ export default function CitizenReviewApp() {
 
   const extensionPresentation = {
     release: extensionRelease,
-    preparationAllowedByController: extensionRelease.status === 'public-enabled'
-      && reviewDevice === 'private'
-      && handoffState.confirmedPack !== null
-      && handoffState.packConfirmation.supportedDesktopConfirmed
-      && handoffState.packConfirmation.boundedSafetyReviewConfirmed
-      && (reviewRole === 'self' || (
-        handoffState.extensionHelperConfirmation.affectedPersonPresent
-        && handoffState.extensionHelperConfirmation.affectedPersonReviewedFields
-        && handoffState.extensionHelperConfirmation.affectedPersonRequestedPreparation
-      )),
-    supportedDesktopConfirmed: handoffState.packConfirmation.supportedDesktopConfirmed,
-    boundedSafetyReviewConfirmed: handoffState.packConfirmation.boundedSafetyReviewConfirmed,
-    helperConfirmation: handoffState.extensionHelperConfirmation,
-    preparation: handoffState.extensionPreparation.status === 'prepared'
-      ? { status: 'prepared' as const, canonicalEnvelopeJson: handoffState.extensionPreparation.canonicalEnvelopeJson }
-      : handoffState.extensionPreparation,
+    preparationAllowedByController: extensionReadiness.status === 'ready',
+    supportedDesktopConfirmed: handoffState.extensionConsent.supportedDesktopConfirmed,
+    boundedSafetyReviewConfirmed: handoffState.extensionConsent.boundedSafetyReviewConfirmed,
+    helperConfirmation: {
+      affectedPersonPresent: handoffState.extensionConsent.affectedPersonPresent,
+      affectedPersonReviewedFields: handoffState.extensionConsent.affectedPersonReviewedFields,
+      affectedPersonRequestedPreparation: handoffState.extensionConsent.affectedPersonRequestedPreparation,
+    },
+    preparation: currentExtensionPreparation.status === 'prepared'
+      ? { status: 'prepared' as const, canonicalEnvelopeJson: currentExtensionPreparation.canonicalEnvelopeJson }
+      : currentExtensionPreparation,
   };
 
   const observationOptions: Array<[Observation, string]> = [
@@ -1682,7 +1771,7 @@ export default function CitizenReviewApp() {
                 },
               }}
               draft={handoffView.draft}
-              confirmedPack={handoffState.confirmedPack}
+              confirmedPack={currentHandoffPack}
               packConfirmation={handoffState.packConfirmation}
               copyStatus={handoffState.copyStatus}
               lookupValue={handoffState.lookupValue}
@@ -1690,6 +1779,7 @@ export default function CitizenReviewApp() {
               receiptState={getCitizenReviewReceiptState(handoffState)}
               returnDraft={handoffState.returnDraft}
               returnAuthorization={handoffState.returnAuthorization}
+              returnReadiness={returnReadiness}
               extension={extensionPresentation}
               callbacks={{
                 onDescriptionChange: (value) => setHandoffState((current) => (
@@ -1706,31 +1796,70 @@ export default function CitizenReviewApp() {
                 onAffectedPersonConfirmedEntitlementChange: (checked) => changeHandoffPackPermission('affectedPersonConfirmedEntitlement', checked),
                 onAffectedPersonRequestedPreparationChange: (checked) => changeHandoffPackPermission('affectedPersonRequestedPreparation', checked),
                 onAffectedPersonConfirmedPackChange: confirmHandoffPack,
-                onOfficialLinkActivate: () => setHandoffState((current) => (
-                  activateCitizenReviewOfficialLink(current, new Date().toISOString())
-                )),
+                onOfficialLinkActivate: () => {
+                  const nowIso = new Date().toISOString();
+                  setRouteNowIso(nowIso);
+                  setHandoffState((current) => {
+                    const action = currentHandoffForAction(current, nowIso);
+                    return action.status === 'current'
+                      ? activateCitizenReviewOfficialLink(action.state, action.view, nowIso)
+                      : action.state;
+                  });
+                },
                 onCopyField: copyHandoffField,
                 onReturnStateChange: (value) => setHandoffState((current) => changeCitizenReturnState(current, value)),
                 onReferenceLastFourChange: (value) => setHandoffState((current) => changeCitizenReferenceLastFour(current, value)),
-                onReturnAffectedPersonPresentChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonPresent', checked)),
-                onReturnRecordingRequestedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonRequestedReturnRecording', checked)),
-                onReturnStateConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReturnState', checked)),
-                onReturnReferenceConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReferenceFragment', checked)),
-                onRecordReturn: () => setHandoffState((current) => recordCitizenReviewReturn(current, new Date().toISOString())),
+                onReturnAffectedPersonPresentChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonPresent', checked, {
+                  resultRevisionId: freshOpaqueRevisionId(),
+                  packRevisionId: freshOpaqueRevisionId(),
+                })),
+                onReturnRecordingRequestedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonRequestedReturnRecording', checked, {
+                  resultRevisionId: freshOpaqueRevisionId(),
+                  packRevisionId: freshOpaqueRevisionId(),
+                })),
+                onReturnStateConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReturnState', checked, {
+                  resultRevisionId: freshOpaqueRevisionId(),
+                  packRevisionId: freshOpaqueRevisionId(),
+                })),
+                onReturnReferenceConfirmedChange: (checked) => setHandoffState((current) => changeCitizenReturnAuthorization(current, 'affectedPersonConfirmedReferenceFragment', checked, {
+                  resultRevisionId: freshOpaqueRevisionId(),
+                  packRevisionId: freshOpaqueRevisionId(),
+                })),
+                onRecordReturn: () => {
+                  const nowIso = new Date().toISOString();
+                  setRouteNowIso(nowIso);
+                  setHandoffState((current) => {
+                    const action = currentHandoffForAction(current, nowIso);
+                    return action.status === 'current'
+                      ? recordCitizenReviewReturn(action.state, action.view, nowIso)
+                      : action.state;
+                  });
+                },
                 onDownloadReceipt: downloadHandoffReceipt,
               }}
               extensionCallbacks={{
-                onSupportedDesktopChange: (checked) => changeHandoffPackPermission('supportedDesktopConfirmed', checked),
-                onBoundedSafetyReviewChange: (checked) => changeHandoffPackPermission('boundedSafetyReviewConfirmed', checked),
-                onAffectedPersonPresentChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonPresent', checked, { packRevisionId: freshOpaqueRevisionId() })),
-                onAffectedPersonReviewedFieldsChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonReviewedFields', checked, { packRevisionId: freshOpaqueRevisionId() })),
-                onAffectedPersonRequestedPreparationChange: (checked) => setHandoffState((current) => changeCitizenExtensionHelperPermission(current, 'affectedPersonRequestedPreparation', checked, { packRevisionId: freshOpaqueRevisionId() })),
-                onPrepare: () => setHandoffState((current) => prepareCitizenReviewExtension(current, {
-                  release: extensionRelease,
-                  language,
-                  simpleMode,
-                  nowMs: Date.now(),
-                })),
+                onSupportedDesktopChange: (checked) => changeExtensionConsent('supportedDesktopConfirmed', checked),
+                onBoundedSafetyReviewChange: (checked) => changeExtensionConsent('boundedSafetyReviewConfirmed', checked),
+                onAffectedPersonPresentChange: (checked) => changeExtensionConsent('affectedPersonPresent', checked),
+                onAffectedPersonReviewedFieldsChange: (checked) => changeExtensionConsent('affectedPersonReviewedFields', checked),
+                onAffectedPersonRequestedPreparationChange: (checked) => changeExtensionConsent('affectedPersonRequestedPreparation', checked),
+                onPrepare: () => {
+                  const nowMs = Date.now();
+                  const nowIso = new Date(nowMs).toISOString();
+                  setRouteNowIso(nowIso);
+                  setHandoffState((current) => {
+                    const action = currentHandoffForAction(current, nowIso);
+                    return action.status === 'current'
+                      ? prepareCitizenReviewExtension(action.state, {
+                        view: action.view,
+                        release: extensionRelease,
+                        language,
+                        simpleMode,
+                        nowMs,
+                      })
+                      : action.state;
+                  });
+                },
                 onClearPrepared: () => setHandoffState((current) => clearCitizenReviewExtensionPreparation(current)),
               }}
             />

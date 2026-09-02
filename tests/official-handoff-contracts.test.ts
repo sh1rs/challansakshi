@@ -28,7 +28,11 @@ import {
   recordCitizenReturn,
   recordOfficialLinkActivation,
 } from '../lib/official-handoff-receipt';
-import type { ActionReadyReviewFacts, ReviewFact } from '../lib/public-challan';
+import {
+  buildCitizenReviewHandoffView,
+  createCitizenReviewHandoffController,
+} from '../lib/citizen-review-handoff-controller';
+import type { ActionReadyReviewFacts, CitizenChallanAnswers, ReviewFact } from '../lib/public-challan';
 
 const NOW = '2026-09-03T10:30:00.000Z';
 const OPENED_AT = '2026-09-03T11:00:00.000Z';
@@ -251,6 +255,7 @@ function panelProps(overrides: Partial<OfficialHandoffPanelProps> = {}): Officia
       affectedPersonConfirmedReturnState: false,
       affectedPersonConfirmedReferenceFragment: false,
     },
+    returnReadiness: { status: 'blocked', reason: 'return-state-required' },
     extension: closedExtension,
     callbacks,
     extensionCallbacks,
@@ -398,6 +403,98 @@ describe('controlled official handoff presentation', () => {
     expect(panelSource).not.toMatch(/onCopyField\('lookup',/);
   });
 
+  it.each([
+    ['en', false, 'Clipboard history and device tools are outside ChallanSakshi’s control.'],
+    ['en', true, 'Clipboard history and device tools are outside ChallanSakshi’s control.'],
+    ['hi', false, 'क्लिपबोर्ड इतिहास और डिवाइस टूल ChallanSakshi के नियंत्रण से बाहर हैं।'],
+    ['hi', true, 'क्लिपबोर्ड इतिहास और डिवाइस टूल ChallanSakshi के नियंत्रण से बाहर हैं।'],
+  ] as const)('shows the private lookup warning in %s simple=%s', (language, simpleMode, warning) => {
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({ language, simpleMode })));
+    expect(html).toContain(warning);
+  });
+
+  it('keeps description and category copy locked until the current confirmed pack is supplied', () => {
+    const pack = nextgenPack();
+    const draft = eligibleDraft(pack, {
+      mappedCategory: { label: 'Reviewed category', value: 'Wrong Image' },
+    });
+    const locked = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      draft,
+      confirmedPack: null,
+    })));
+    expect(locked).toContain('Copy challan number');
+    expect(locked).not.toContain('Copy reviewed description');
+    expect(locked).not.toContain('Copy reviewed category');
+
+    const ready = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({ draft, confirmedPack: pack })));
+    expect(ready).toContain('Copy challan number');
+    expect(ready).toContain('Copy reviewed description');
+    expect(ready).toContain('Copy reviewed category');
+  });
+
+  it.each(['abstained'] as const)('never exposes a grievance destination for %s results without a pack', (status) => {
+    const pack = nextgenPack();
+    const draft: OfficialHandoffDraft = {
+      ...eligibleDraft(pack),
+      status,
+      eligibilityReason: 'result-not-action-ready',
+    };
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      draft,
+      confirmedPack: null,
+    })));
+    expect(html).not.toContain('Official grievance service');
+    expect(html).not.toContain('NextGen e-Challan grievance service');
+    expect(html).not.toContain(OFFICIAL_DESTINATIONS.nextgen.canonicalUrl);
+  });
+
+  it.each([
+    ['consistent', { plateObservation: 'match' }],
+    ['inconclusive', { plateObservation: 'unclear' }],
+    ['missing-image', { imageInspected: false }],
+    ['missing-readable-record', { ownRecordAvailable: 'missing' }],
+    ['message-only', { sourceStatus: 'message-only' }],
+  ] as const)('renders the real %s projection without a grievance destination', (_name, overrides) => {
+    const answers: CitizenChallanAnswers = {
+      sourceStatus: 'official-service',
+      imageInspected: true,
+      plateObservation: 'different',
+      categoryObservation: 'match',
+      colourObservation: 'match',
+      offenceObservation: 'appears-visible',
+      timestampStatus: 'displayed',
+      locationStatus: 'displayed',
+      ownRecordAvailable: 'present',
+      noticeCopyAvailable: 'present',
+      custodyRecordAvailable: 'not-applicable',
+      ...overrides,
+    };
+    const state = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+    });
+    const view = buildCitizenReviewHandoffView(state, {
+      answers,
+      factsConfirmed: true,
+      jurisdictionConfirmation: { status: 'confirmed', code: 'KA' },
+      role: 'self',
+      deviceMode: 'private',
+      language: 'en',
+      simpleMode: false,
+      nowIso: NOW,
+    });
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      draft: view.draft,
+      confirmedPack: null,
+      receiptState: null,
+    })));
+
+    expect(view.draft.status).toBe('abstained');
+    expect(html).not.toContain(OFFICIAL_DESTINATIONS.nextgen.serviceName);
+    expect(html).not.toContain(OFFICIAL_DESTINATIONS.nextgen.canonicalUrl);
+    expect(html).not.toContain('data-purpose="official-grievance-service"');
+  });
+
   it('renders only the original typed fallback after the citizen reports portal-unavailable', () => {
     const pack = nextgenPack();
     const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
@@ -525,6 +622,7 @@ describe('controlled official handoff presentation', () => {
       officialLinkStatus: 'activated',
       receiptState: receipt,
       returnDraft: { selectedReturnState: 'acknowledgement-seen', referenceLastFour: 'A7B9' },
+      returnReadiness: { status: 'ready' },
     })));
 
     for (const label of [
@@ -538,6 +636,35 @@ describe('controlled official handoff presentation', () => {
     ]) expect(html).toContain(label);
     expect(html).not.toContain('full reference');
     expect(html).not.toContain('screenshot');
+  });
+
+  it('disables premature return recording and exposes the exact accessible blocker', () => {
+    const pack = nextgenPack('present-helper');
+    const activated = recordOfficialLinkActivation(
+      createOfficialHandoffReceiptSession(pack, 'private'),
+      pack,
+      OPENED_AT,
+    );
+    const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
+      reviewContext: {
+        role: 'present-helper',
+        deviceMode: 'private',
+        safetyConsent: {
+          manualReviewAcknowledged: true,
+          minimumDataAcknowledged: true,
+          affectedPersonPresentAcknowledged: true,
+        },
+      },
+      draft: eligibleDraft(pack),
+      confirmedPack: pack,
+      officialLinkStatus: 'activated',
+      receiptState: activated,
+      returnDraft: { selectedReturnState: 'not-submitted', referenceLastFour: '' },
+      returnReadiness: { status: 'blocked', reason: 'affected-person-present-required' },
+    })));
+    expect(html).toContain('The affected person must still be present.');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="handoff-return-readiness"/);
+    expect(html).toContain('id="handoff-return-readiness"');
   });
 
   it.each([
@@ -675,7 +802,7 @@ describe('controlled official handoff presentation', () => {
       confirmedPack: pack,
       officialLinkStatus: 'activated',
       receiptState: activated,
-      returnDraft: { selectedReturnState: 'acknowledgement-seen', referenceLastFour: '' },
+      returnDraft: { selectedReturnState: 'acknowledgement-seen', referenceLastFour: 'A1B2' },
     })));
 
     for (const label of [
@@ -793,19 +920,22 @@ describe('controlled official handoff presentation', () => {
     {
       status: 'manual',
       destinationKey: 'delhi-manual',
+      exposesRoute: true,
       expected: 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.',
     },
     {
       status: 'unresolved',
       destinationKey: 'unresolved',
+      exposesRoute: true,
       expected: 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.',
     },
     {
       status: 'abstained',
       destinationKey: 'nextgen',
+      exposesRoute: false,
       expected: 'This review does not support a confirmed field pack. Check the missing or unclear evidence before preparing official information.',
     },
-  ] as const)('renders the closed $status presentation from the exact registry destination', ({ status, destinationKey, expected }) => {
+  ] as const)('renders the closed $status presentation without inventing compatibility', ({ status, destinationKey, exposesRoute, expected }) => {
     const pack = nextgenPack();
     const common = {
       mappedCategory: null,
@@ -852,17 +982,24 @@ describe('controlled official handoff presentation', () => {
 
     expect(html).toContain('Prepared for');
     expect(html).toContain(expected);
-    expect(html).toContain(expectedDestination.serviceName);
-    expect(html).toContain(expectedDestination.domain);
-    expect(html).toContain(`href="${expectedDestination.canonicalUrl}"`);
-    expect(html).toContain(`data-purpose="${expectedDestination.purpose}"`);
+    if (exposesRoute) {
+      expect(html).toContain(expectedDestination.serviceName);
+      expect(html).toContain(expectedDestination.domain);
+      expect(html).toContain(`href="${expectedDestination.canonicalUrl}"`);
+      expect(html).toContain(`data-purpose="${expectedDestination.purpose}"`);
+    } else {
+      expect(html).not.toContain(expectedDestination.serviceName);
+      expect(html).not.toContain(expectedDestination.domain);
+      expect(html).not.toContain(`href="${expectedDestination.canonicalUrl}"`);
+      expect(html).not.toContain(`data-purpose="${expectedDestination.purpose}"`);
+    }
     expect(html).not.toContain('<textarea');
     expect(html).not.toContain('Reviewed category');
     expect(html).not.toContain('Copy reviewed description');
     expect(html).not.toContain('Copy reviewed category');
     expect(html).not.toContain('Optional desktop helper');
-    expect(html).toContain('target="_blank"');
-    expect(html).toContain('rel="noreferrer"');
+    expect(html.includes('target="_blank"')).toBe(exposesRoute);
+    expect(html.includes('rel="noreferrer"')).toBe(exposesRoute);
   });
 });
 
@@ -915,6 +1052,42 @@ describe('optional desktop helper presentation', () => {
       'The affected person asked me to prepare, load, and place these fields.',
       'The affected person must inspect the result and independently authenticate, declare, and submit.',
     ]) expect(html).toContain(label);
+  });
+
+  it('keeps every future helper consent mounted through one straight authorization sequence', () => {
+    const sequence = [
+      [false, false, false, false, false],
+      [true, false, false, false, false],
+      [true, true, false, false, false],
+      [true, true, true, false, false],
+      [true, true, true, true, false],
+      [true, true, true, true, true],
+    ] as const;
+
+    for (const [desktop, bounded, present, reviewed, requested] of sequence) {
+      const presentation: ExtensionAssistPresentation = {
+        ...publicEnabledExtension,
+        preparationAllowedByController: desktop && bounded && present && reviewed && requested,
+        supportedDesktopConfirmed: desktop,
+        boundedSafetyReviewConfirmed: bounded,
+        helperConfirmation: {
+          affectedPersonPresent: present,
+          affectedPersonReviewedFields: reviewed,
+          affectedPersonRequestedPreparation: requested,
+        },
+      };
+      const html = renderToStaticMarkup(createElement(ExtensionAssistCard, {
+        language: 'en',
+        simpleMode: false,
+        role: 'present-helper',
+        presentation,
+        callbacks: extensionCallbacks,
+      }));
+
+      expect(html.match(/type="checkbox"/g)).toHaveLength(5);
+      const prepareTag = openingTagForText(html, 'Already installed? Prepare reviewed fields');
+      expect(prepareTag.includes('disabled=""')).toBe(!presentation.preparationAllowedByController);
+    }
   });
 
   it('mounts canonical prepared JSON only as one escaped text node under the two exact capsule markers', () => {

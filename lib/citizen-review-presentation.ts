@@ -263,6 +263,7 @@ export function getCitizenReviewPresentation(language: Language, simpleMode: boo
 
 const officialHandoffEnglish = {
   eyebrow: 'Prepared for',
+  abstainedHeading: 'Official handoff is not ready',
   purpose: {
     'official-grievance-service': 'Official grievance service',
     'official-service': 'Official service',
@@ -270,6 +271,7 @@ const officialHandoffEnglish = {
   verified: 'Route last verified',
   lookupHeading: 'Optional challan number aid',
   lookupLabel: 'Challan number recorded in this review',
+  lookupWarning: 'Clipboard history and device tools are outside ChallanSakshi’s control.',
   copyLookup: 'Copy challan number',
   categoryHeading: 'Reviewed category',
   categoryLabel: 'Category value for the official service',
@@ -376,6 +378,16 @@ const officialHandoffEnglish = {
     affectedPersonConfirmedReturnState: 'The affected person confirmed this exact return state.',
     affectedPersonConfirmedReferenceFragment: 'The affected person confirmed these exact last four characters.',
   },
+  returnReadiness: {
+    currentPackRequired: 'Confirm the current reviewed field pack first.',
+    officialLinkNotActivated: 'Open the official service from this review first.',
+    returnStateRequired: 'Choose what happened on the official service.',
+    referenceFragmentIncomplete: 'Enter exactly four reference characters or leave the field blank.',
+    affectedPersonPresentRequired: 'The affected person must still be present.',
+    affectedPersonRecordingRequestRequired: 'The affected person must ask you to record this return note.',
+    affectedPersonReturnStateConfirmationRequired: 'The affected person must confirm this exact return state.',
+    affectedPersonReferenceConfirmationRequired: 'The affected person must confirm these exact last four characters.',
+  },
   recordReturn: 'Record this return locally',
   receiptDownload: 'Download redacted continuation receipt',
   helper: {
@@ -437,6 +449,7 @@ const officialHandoffSimpleEnglish = {
 
 const officialHandoffHindi = {
   eyebrow: 'इसके लिए तैयार',
+  abstainedHeading: 'आधिकारिक हैंडऑफ़ अभी तैयार नहीं है',
   purpose: {
     'official-grievance-service': 'आधिकारिक शिकायत सेवा',
     'official-service': 'आधिकारिक सेवा',
@@ -444,6 +457,7 @@ const officialHandoffHindi = {
   verified: 'रास्ते की अंतिम जाँच',
   lookupHeading: 'वैकल्पिक चालान नंबर सहायता',
   lookupLabel: 'इस समीक्षा में दर्ज चालान नंबर',
+  lookupWarning: 'क्लिपबोर्ड इतिहास और डिवाइस टूल ChallanSakshi के नियंत्रण से बाहर हैं।',
   copyLookup: 'चालान नंबर कॉपी करें',
   categoryHeading: 'समीक्षित श्रेणी',
   categoryLabel: 'आधिकारिक सेवा के लिए श्रेणी मान',
@@ -549,6 +563,16 @@ const officialHandoffHindi = {
     affectedPersonRequestedReturnRecording: 'प्रभावित व्यक्ति ने मुझसे हुई कार्रवाई दर्ज करने को कहा है।',
     affectedPersonConfirmedReturnState: 'प्रभावित व्यक्ति ने वापसी की यही स्थिति पुष्ट की है।',
     affectedPersonConfirmedReferenceFragment: 'प्रभावित व्यक्ति ने अंतिम चार अक्षर ठीक यही पुष्ट किए हैं।',
+  },
+  returnReadiness: {
+    currentPackRequired: 'पहले मौजूदा समीक्षित फ़ील्ड पैक की पुष्टि करें।',
+    officialLinkNotActivated: 'पहले इस समीक्षा से आधिकारिक सेवा खोलें।',
+    returnStateRequired: 'आधिकारिक सेवा पर क्या हुआ, यह चुनें।',
+    referenceFragmentIncomplete: 'संदर्भ के ठीक चार अक्षर दर्ज करें या फ़ील्ड खाली छोड़ें।',
+    affectedPersonPresentRequired: 'प्रभावित व्यक्ति का अभी भी मौजूद होना ज़रूरी है।',
+    affectedPersonRecordingRequestRequired: 'प्रभावित व्यक्ति को यह वापसी नोट दर्ज करने के लिए कहना होगा।',
+    affectedPersonReturnStateConfirmationRequired: 'प्रभावित व्यक्ति को वापसी की यही स्थिति पुष्ट करनी होगी।',
+    affectedPersonReferenceConfirmationRequired: 'प्रभावित व्यक्ति को अंतिम चार अक्षर ठीक यही पुष्ट करने होंगे।',
   },
   recordReturn: 'यह वापसी स्थानीय रूप से दर्ज करें',
   receiptDownload: 'संपादित निरंतरता रसीद डाउनलोड करें',

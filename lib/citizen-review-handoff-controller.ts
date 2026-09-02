@@ -10,7 +10,6 @@ import {
 import {
   buildRealExtensionHandoffEnvelope,
   canonicalExtensionHandoffEnvelopeJson,
-  EXTENSION_HANDOFF_MAX_LIFETIME_MS,
   type ExtensionHandoffEnvelope,
 } from './extension-handoff-contract';
 import type { PublicExtensionRelease } from './extension-release';
@@ -71,11 +70,11 @@ type PackConfirmation = Readonly<{
   affectedPersonConfirmedEntitlement: boolean;
   affectedPersonRequestedPreparation: boolean;
   affectedPersonConfirmedPack: boolean;
-  supportedDesktopConfirmed: boolean;
-  boundedSafetyReviewConfirmed: boolean;
 }>;
 
-type ExtensionHelperConfirmation = Readonly<{
+type ExtensionConsent = Readonly<{
+  supportedDesktopConfirmed: boolean;
+  boundedSafetyReviewConfirmed: boolean;
   affectedPersonPresent: boolean;
   affectedPersonReviewedFields: boolean;
   affectedPersonRequestedPreparation: boolean;
@@ -106,7 +105,7 @@ export type CitizenReviewHandoffControllerState = Readonly<{
   reviewedDescription: string;
   descriptionError: string | null;
   packConfirmation: PackConfirmation;
-  extensionHelperConfirmation: ExtensionHelperConfirmation;
+  extensionConsent: ExtensionConsent;
   returnAuthorization: ReturnAuthorization;
   lookupValue: string;
   copyStatus:
@@ -160,6 +159,9 @@ export type CitizenReviewHandoffDraft = Readonly<{
 );
 
 export type CitizenReviewHandoffView = Readonly<{
+  role: ReviewRole;
+  deviceMode: HandoffDeviceMode;
+  nowIso: string;
   jurisdictionConfirmation: JurisdictionConfirmation;
   destination: OfficialDestination;
   lookupRoute: OfficialAuxiliaryRoute;
@@ -176,11 +178,11 @@ const initialPackConfirmation = (): PackConfirmation => ({
   affectedPersonConfirmedEntitlement: false,
   affectedPersonRequestedPreparation: false,
   affectedPersonConfirmedPack: false,
-  supportedDesktopConfirmed: false,
-  boundedSafetyReviewConfirmed: false,
 });
 
-const initialExtensionHelperConfirmation = (): ExtensionHelperConfirmation => ({
+const initialExtensionConsent = (): ExtensionConsent => ({
+  supportedDesktopConfirmed: false,
+  boundedSafetyReviewConfirmed: false,
   affectedPersonPresent: false,
   affectedPersonReviewedFields: false,
   affectedPersonRequestedPreparation: false,
@@ -212,7 +214,7 @@ export function createCitizenReviewHandoffController(input: Readonly<{
     reviewedDescription: DEFAULT_REVIEWED_HANDOFF_DESCRIPTION,
     descriptionError: null,
     packConfirmation: initialPackConfirmation(),
-    extensionHelperConfirmation: initialExtensionHelperConfirmation(),
+    extensionConsent: initialExtensionConsent(),
     returnAuthorization: initialReturnAuthorization(),
     lookupValue: '',
     copyStatus: { status: 'idle' },
@@ -239,7 +241,7 @@ export function invalidateCitizenReviewHandoff(
       : requireRevision(revisions.resultRevisionId),
     packRevisionId: requireRevision(revisions.packRevisionId),
     packConfirmation: initialPackConfirmation(),
-    extensionHelperConfirmation: initialExtensionHelperConfirmation(),
+    extensionConsent: initialExtensionConsent(),
     returnAuthorization: initialReturnAuthorization(),
     lookupValue: '',
     copyStatus: { status: 'idle' },
@@ -254,7 +256,7 @@ export function invalidateCitizenReviewHandoff(
   };
 }
 
-type PackPermissionKey = keyof PackConfirmation;
+type PackPermissionKey = Exclude<keyof PackConfirmation, 'affectedPersonConfirmedPack'>;
 
 export function changeCitizenReviewPackPermission(
   state: CitizenReviewHandoffControllerState,
@@ -267,22 +269,25 @@ export function changeCitizenReviewPackPermission(
   return { ...invalidated, packConfirmation: retained };
 }
 
-export function changeCitizenExtensionHelperPermission(
+export function changeCitizenExtensionConsent(
   state: CitizenReviewHandoffControllerState,
-  key: keyof ExtensionHelperConfirmation,
+  key: keyof ExtensionConsent,
   checked: boolean,
-  revisions: Readonly<{ packRevisionId: string }>,
+  revisions: Readonly<{ resultRevisionId: string; packRevisionId: string; nowMs: number }>,
 ): CitizenReviewHandoffControllerState {
-  const retained = { ...state.extensionHelperConfirmation, [key]: checked };
-  const retainedPackConfirmation = {
-    ...state.packConfirmation,
-    affectedPersonConfirmedPack: false,
-  };
-  const invalidated = invalidateCitizenReviewHandoff(state, revisions);
+  if (
+    state.extensionPreparation.status === 'prepared'
+    && revisions.nowMs >= state.extensionPreparation.expiresAtMs
+  ) return invalidateCitizenReviewHandoff(state, revisions);
+  if (state.role === 'present-helper' && key === 'affectedPersonPresent' && !checked) {
+    return invalidateCitizenReviewHandoff(state, revisions);
+  }
   return {
-    ...invalidated,
-    packConfirmation: retainedPackConfirmation,
-    extensionHelperConfirmation: retained,
+    ...state,
+    extensionConsent: { ...state.extensionConsent, [key]: checked },
+    copyStatus: { status: 'idle' },
+    pendingCopy: null,
+    extensionPreparation: { status: 'idle' },
   };
 }
 
@@ -341,6 +346,16 @@ function projectCurrentFacts(state: CitizenReviewHandoffControllerState, input: 
     : { status: 'abstained', reason: 'missing-explicit-facts' } as const;
 }
 
+function packConfirmationContext(confirmation: PackConfirmation) {
+  return {
+    affectedPersonPresent: confirmation.affectedPersonPresent,
+    affectedPersonInspectedEvidence: confirmation.affectedPersonInspectedEvidence,
+    affectedPersonInspectedReadableRecord: confirmation.affectedPersonInspectedReadableRecord,
+    affectedPersonConfirmedEntitlement: confirmation.affectedPersonConfirmedEntitlement,
+    affectedPersonRequestedPreparation: confirmation.affectedPersonRequestedPreparation,
+  };
+}
+
 function viewSignature(state: CitizenReviewHandoffControllerState, input: CitizenReviewHandoffViewInput, route: OfficialDestination) {
   return JSON.stringify({
     resultRevisionId: state.resultRevisionId,
@@ -355,8 +370,7 @@ function viewSignature(state: CitizenReviewHandoffControllerState, input: Citize
     language: input.language,
     simpleMode: input.simpleMode,
     reviewedDescription: state.reviewedDescription,
-    packConfirmation: state.packConfirmation,
-    extensionHelperConfirmation: state.extensionHelperConfirmation,
+    packConfirmation: packConfirmationContext(state.packConfirmation),
   });
 }
 
@@ -369,7 +383,9 @@ function controllerStateSignature(state: CitizenReviewHandoffControllerState) {
     reviewedDescription: state.reviewedDescription,
     descriptionError: state.descriptionError,
     packConfirmation: state.packConfirmation,
-    extensionHelperConfirmation: state.extensionHelperConfirmation,
+    extensionConsent: state.extensionConsent,
+    returnAuthorization: state.returnAuthorization,
+    returnDraft: state.returnDraft,
   });
 }
 
@@ -417,6 +433,9 @@ export function buildCitizenReviewHandoffView(
     ? OFFICIAL_AUXILIARY_ROUTES['nextgen-service-landing']
     : OFFICIAL_AUXILIARY_ROUTES['national-record-lookup'];
   return {
+    role: input.role,
+    deviceMode: input.deviceMode,
+    nowIso: input.nowIso,
     jurisdictionConfirmation: confirmation,
     destination,
     lookupRoute,
@@ -425,6 +444,83 @@ export function buildCitizenReviewHandoffView(
     contextSignature: viewSignature(state, input, destination),
     controllerStateSignature: controllerStateSignature(state),
   };
+}
+
+function receiptBindingMatchesCurrentPack(state: CitizenReviewHandoffControllerState, pack: OfficialHandoffPack) {
+  const receipt = state.receiptSession;
+  return receipt !== null
+    && receipt.status === 'not-opened'
+    && receipt.packRevisionId === pack.packRevisionId
+    && receipt.packDigest === pack.packDigest
+    && receipt.resultClass === pack.resultClass
+    && receipt.reviewRole === pack.reviewRole
+    && receipt.deviceMode === state.deviceMode;
+}
+
+function activatedBindingMatchesCurrentPack(state: CitizenReviewHandoffControllerState, pack: OfficialHandoffPack) {
+  const activation = state.linkActivation;
+  return activation !== null
+    && activation.status === 'link-activated'
+    && activation.packRevisionId === pack.packRevisionId
+    && activation.packDigest === pack.packDigest
+    && activation.resultClass === pack.resultClass
+    && activation.reviewRole === pack.reviewRole
+    && activation.deviceMode === state.deviceMode;
+}
+
+function returnReceiptBindingMatchesCurrentPack(state: CitizenReviewHandoffControllerState, pack: OfficialHandoffPack) {
+  const receipt = state.latestReturnReceipt;
+  return receipt !== null
+    && receipt.status === 'citizen-return-recorded'
+    && receipt.packRevisionId === pack.packRevisionId
+    && receipt.packDigest === pack.packDigest
+    && receipt.resultClass === pack.resultClass
+    && receipt.reviewRole === pack.reviewRole
+    && receipt.deviceMode === state.deviceMode;
+}
+
+/** The sole binding check for every action derived from a confirmed real pack. */
+export function isCitizenReviewCurrentPack(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+): boolean {
+  const pack = state.confirmedPack;
+  const viewNowMs = Date.parse(view.nowIso);
+  if (
+    !pack
+    || !Number.isFinite(viewNowMs)
+    || (state.extensionPreparation.status === 'prepared'
+      && viewNowMs >= state.extensionPreparation.expiresAtMs)
+    || !isAuthenticOfficialHandoffPack(pack)
+    || !state.packConfirmation.affectedPersonConfirmedPack
+    || !state.packContextSignature
+    || state.packContextSignature !== view.contextSignature
+    || state.role !== view.role
+    || state.deviceMode !== view.deviceMode
+    || view.draft.status !== 'eligible'
+    || view.actionReadyProjection.status !== 'eligible'
+    || pack.resultRevisionId !== state.resultRevisionId
+    || pack.packRevisionId !== state.packRevisionId
+    || pack.resultRevisionId !== view.draft.resultRevisionId
+    || pack.packRevisionId !== view.draft.packRevisionId
+    || pack.reviewRole !== state.role
+    || pack.routeRegistryVersion !== OFFICIAL_ROUTE_REGISTRY_VERSION
+    || pack.destination.key !== view.destination.key
+    || pack.destination.canonicalUrl !== view.destination.canonicalUrl
+    || pack.destination.expiresAt !== view.destination.expiresAt
+    || pack.facts.reviewRevisionId !== state.resultRevisionId
+    || pack.fieldPackConfirmation.packRevisionId !== state.packRevisionId
+  ) return false;
+  return receiptBindingMatchesCurrentPack(state, pack);
+}
+
+export function reconcileCitizenReviewCurrentPack(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+  revisions: Readonly<{ resultRevisionId?: string; packRevisionId: string }>,
+): CitizenReviewHandoffControllerState {
+  if (!state.confirmedPack || isCitizenReviewCurrentPack(state, view)) return state;
+  return invalidateCitizenReviewHandoff(state, revisions);
 }
 
 function roleConfirmation(state: CitizenReviewHandoffControllerState): PackRoleConfirmation {
@@ -457,7 +553,12 @@ export function confirmCitizenReviewHandoffPack(
   }>,
 ): CitizenReviewHandoffControllerState {
   if (input.view.draft.status !== 'eligible' || input.view.actionReadyProjection.status !== 'eligible') return state;
-  if (state.descriptionError || input.view.controllerStateSignature !== controllerStateSignature(state)) return state;
+  if (
+    state.descriptionError
+    || input.view.role !== state.role
+    || input.view.deviceMode !== state.deviceMode
+    || input.view.controllerStateSignature !== controllerStateSignature(state)
+  ) return state;
   const built = buildOfficialHandoffPack({
     mode: 'real',
     sourceKind: input.sourceKind,
@@ -500,7 +601,11 @@ function copyValue(state: CitizenReviewHandoffControllerState, field: CitizenRev
 export function requestCitizenReviewCopy(
   state: CitizenReviewHandoffControllerState,
   field: CitizenReviewCopyField,
+  view?: CitizenReviewHandoffView,
 ): Readonly<{ state: CitizenReviewHandoffControllerState; effect: CitizenReviewBrowserEffect | null }> {
+  if (field !== 'lookup' && (!view || !isCitizenReviewCurrentPack(state, view))) {
+    return { state, effect: null };
+  }
   const value = copyValue(state, field);
   if (state.deviceMode !== 'private' || !value) return { state, effect: null };
   const counter = state.effectCounter + 1;
@@ -529,11 +634,16 @@ export function completeCitizenReviewCopy(
 
 export function activateCitizenReviewOfficialLink(
   state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
   nowIso: string,
 ): CitizenReviewHandoffControllerState {
-  if (!state.confirmedPack || !state.receiptSession) return state;
-  const linkActivation = recordOfficialLinkActivation(state.receiptSession, state.confirmedPack, nowIso);
-  return { ...state, lookupValue: '', linkActivation, latestReturnReceipt: null };
+  if (!isCitizenReviewCurrentPack(state, view) || !state.confirmedPack || !state.receiptSession) return state;
+  try {
+    const linkActivation = recordOfficialLinkActivation(state.receiptSession, state.confirmedPack, nowIso);
+    return { ...state, lookupValue: '', linkActivation, latestReturnReceipt: null };
+  } catch {
+    return state;
+  }
 }
 
 export function changeCitizenReturnState(
@@ -556,34 +666,113 @@ export function changeCitizenReferenceLastFour(
     && state.returnDraft.selectedReturnState === 'acknowledgement-seen'
     ? Array.from(value.toUpperCase().replace(/[^A-Z0-9]/g, '')).slice(0, 4).join('')
     : '';
-  return { ...state, returnDraft: { ...state.returnDraft, referenceLastFour }, latestReturnReceipt: null };
+  return {
+    ...state,
+    returnDraft: { ...state.returnDraft, referenceLastFour },
+    returnAuthorization: {
+      ...state.returnAuthorization,
+      affectedPersonConfirmedReferenceFragment: false,
+    },
+    latestReturnReceipt: null,
+  };
 }
 
 export function changeCitizenReturnAuthorization(
   state: CitizenReviewHandoffControllerState,
   key: keyof ReturnAuthorization,
   checked: boolean,
+  revisions: Readonly<{ resultRevisionId: string; packRevisionId: string }>,
 ): CitizenReviewHandoffControllerState {
-  return { ...state, returnAuthorization: { ...state.returnAuthorization, [key]: checked }, latestReturnReceipt: null };
+  if (state.role === 'present-helper' && key === 'affectedPersonPresent' && !checked) {
+    return invalidateCitizenReviewHandoff(state, revisions);
+  }
+  const referenceCanBeConfirmed = state.deviceMode === 'private'
+    && state.returnDraft.selectedReturnState === 'acknowledgement-seen'
+    && state.returnDraft.referenceLastFour.length === 4;
+  return {
+    ...state,
+    returnAuthorization: {
+      ...state.returnAuthorization,
+      [key]: key === 'affectedPersonConfirmedReferenceFragment'
+        ? checked && referenceCanBeConfirmed
+        : checked,
+    },
+    latestReturnReceipt: null,
+  };
+}
+
+export type CitizenReviewReturnReadiness =
+  | Readonly<{ status: 'ready'; reason?: never }>
+  | Readonly<{
+    status: 'blocked';
+    reason:
+      | 'current-pack-required'
+      | 'official-link-not-activated'
+      | 'return-state-required'
+      | 'reference-fragment-incomplete'
+      | 'affected-person-present-required'
+      | 'affected-person-recording-request-required'
+      | 'affected-person-return-state-confirmation-required'
+      | 'affected-person-reference-confirmation-required';
+  }>;
+
+export function getCitizenReviewReturnReadiness(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+): CitizenReviewReturnReadiness {
+  if (!isCitizenReviewCurrentPack(state, view)) return { status: 'blocked', reason: 'current-pack-required' };
+  if (!state.confirmedPack || !activatedBindingMatchesCurrentPack(state, state.confirmedPack)) {
+    return { status: 'blocked', reason: 'official-link-not-activated' };
+  }
+  if (!state.returnDraft.selectedReturnState) return { status: 'blocked', reason: 'return-state-required' };
+  const fragmentLength = state.returnDraft.referenceLastFour.length;
+  if (fragmentLength > 0 && fragmentLength < 4) {
+    return { status: 'blocked', reason: 'reference-fragment-incomplete' };
+  }
+  if (state.role === 'present-helper') {
+    if (!state.returnAuthorization.affectedPersonPresent) {
+      return { status: 'blocked', reason: 'affected-person-present-required' };
+    }
+    if (!state.returnAuthorization.affectedPersonRequestedReturnRecording) {
+      return { status: 'blocked', reason: 'affected-person-recording-request-required' };
+    }
+    if (!state.returnAuthorization.affectedPersonConfirmedReturnState) {
+      return { status: 'blocked', reason: 'affected-person-return-state-confirmation-required' };
+    }
+    if (fragmentLength === 4 && !state.returnAuthorization.affectedPersonConfirmedReferenceFragment) {
+      return { status: 'blocked', reason: 'affected-person-reference-confirmation-required' };
+    }
+  }
+  return { status: 'ready' };
 }
 
 export function recordCitizenReviewReturn(
   state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
   nowIso: string,
 ): CitizenReviewHandoffControllerState {
-  if (!state.confirmedPack || !state.linkActivation || !state.returnDraft.selectedReturnState) return state;
+  if (
+    getCitizenReviewReturnReadiness(state, view).status !== 'ready'
+    || !state.confirmedPack
+    || !state.linkActivation
+    || !state.returnDraft.selectedReturnState
+  ) return state;
   const fragment = state.deviceMode === 'private'
     && state.returnDraft.selectedReturnState === 'acknowledgement-seen'
     && state.returnDraft.referenceLastFour.length === 4
     ? state.returnDraft.referenceLastFour
     : undefined;
-  const latestReturnReceipt = buildCitizenReturnReceipt(state.linkActivation, state.confirmedPack, {
-    selectedReturnState: state.returnDraft.selectedReturnState,
-    localTimestamp: nowIso,
-    ...(fragment ? { referenceLastFour: fragment } : {}),
-    ...(state.role === 'present-helper' ? { helperConfirmation: state.returnAuthorization } : {}),
-  });
-  return { ...state, latestReturnReceipt };
+  try {
+    const latestReturnReceipt = buildCitizenReturnReceipt(state.linkActivation, state.confirmedPack, {
+      selectedReturnState: state.returnDraft.selectedReturnState,
+      localTimestamp: nowIso,
+      ...(fragment ? { referenceLastFour: fragment } : {}),
+      ...(state.role === 'present-helper' ? { helperConfirmation: state.returnAuthorization } : {}),
+    });
+    return { ...state, latestReturnReceipt };
+  } catch {
+    return state;
+  }
 }
 
 export function getCitizenReviewReceiptState(state: CitizenReviewHandoffControllerState) {
@@ -592,51 +781,50 @@ export function getCitizenReviewReceiptState(state: CitizenReviewHandoffControll
 
 export function requestCitizenReceiptDownload(
   state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
 ): Readonly<{ state: CitizenReviewHandoffControllerState; effect: CitizenReviewBrowserEffect | null }> {
   if (
     state.deviceMode !== 'private'
+    || !isCitizenReviewCurrentPack(state, view)
     || !state.confirmedPack
     || !state.latestReturnReceipt
     || !state.packContextSignature
+    || !activatedBindingMatchesCurrentPack(state, state.confirmedPack)
+    || !returnReceiptBindingMatchesCurrentPack(state, state.confirmedPack)
   ) return { state, effect: null };
   const counter = state.effectCounter + 1;
   const token = `receipt-${counter}`;
-  return {
-    state: { ...state, effectCounter: counter },
-    effect: {
-      type: 'download-text',
-      token,
-      guardSignature: getCitizenReviewEffectGuardSignature(state),
-      filename: 'challansakshi-redacted-continuation-receipt.json',
-      mime: 'application/json;charset=utf-8',
-      content: serializeOfficialHandoffReceipt(state.latestReturnReceipt, state.confirmedPack),
-    },
-  };
+  try {
+    return {
+      state: { ...state, effectCounter: counter },
+      effect: {
+        type: 'download-text',
+        token,
+        guardSignature: getCitizenReviewEffectGuardSignature(state),
+        filename: 'challansakshi-redacted-continuation-receipt.json',
+        mime: 'application/json;charset=utf-8',
+        content: serializeOfficialHandoffReceipt(state.latestReturnReceipt, state.confirmedPack),
+      },
+    };
+  } catch {
+    return { state, effect: null };
+  }
 }
 
 export function prepareCitizenReviewExtension(
   state: CitizenReviewHandoffControllerState,
   input: Readonly<{
+    view: CitizenReviewHandoffView;
     release: PublicExtensionRelease;
     language: Language;
     simpleMode: boolean;
     nowMs: number;
   }>,
 ): CitizenReviewHandoffControllerState {
-  if (input.release.status !== 'public-enabled') return { ...state, extensionPreparation: { status: 'idle' } };
-  const helperAllowed = state.role === 'self' || (
-    state.extensionHelperConfirmation.affectedPersonPresent
-    && state.extensionHelperConfirmation.affectedPersonReviewedFields
-    && state.extensionHelperConfirmation.affectedPersonRequestedPreparation
-  );
-  if (
-    state.deviceMode !== 'private'
-    || !state.confirmedPack
-    || !isAuthenticOfficialHandoffPack(state.confirmedPack)
-    || !state.packConfirmation.supportedDesktopConfirmed
-    || !state.packConfirmation.boundedSafetyReviewConfirmed
-    || !helperAllowed
-  ) return { ...state, extensionPreparation: { status: 'failed' } };
+  if (input.release.status !== 'public-enabled') return state;
+  if (getCitizenReviewExtensionReadiness(state, input.view, input.release).status !== 'ready' || !state.confirmedPack) {
+    return { ...state, extensionPreparation: { status: 'failed' } };
+  }
   const source = projectConfirmedExtensionHandoffSource(state.confirmedPack);
   const built = buildRealExtensionHandoffEnvelope(source, {
     language: input.language,
@@ -644,15 +832,75 @@ export function prepareCitizenReviewExtension(
     nowMs: input.nowMs,
   });
   if (built.status !== 'built') return { ...state, extensionPreparation: { status: 'failed' } };
+  const expiresAtMs = Date.parse(built.envelope.expiresAt);
+  if (!Number.isFinite(expiresAtMs) || input.nowMs >= expiresAtMs) {
+    return { ...state, extensionPreparation: { status: 'failed' } };
+  }
   return {
     ...state,
     extensionPreparation: {
       status: 'prepared',
       envelope: built.envelope,
       canonicalEnvelopeJson: canonicalExtensionHandoffEnvelopeJson(built.envelope),
-      expiresAtMs: input.nowMs + EXTENSION_HANDOFF_MAX_LIFETIME_MS,
+      expiresAtMs,
     },
   };
+}
+
+export type CitizenReviewExtensionReadiness =
+  | Readonly<{ status: 'ready'; reason?: never }>
+  | Readonly<{
+    status: 'blocked';
+    reason:
+      | 'release-closed'
+      | 'current-pack-required'
+      | 'private-device-required'
+      | 'supported-desktop-confirmation-required'
+      | 'bounded-safety-review-required'
+      | 'affected-person-present-required'
+      | 'affected-person-field-review-required'
+      | 'affected-person-preparation-request-required';
+  }>;
+
+export function getCitizenReviewExtensionReadiness(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+  release: PublicExtensionRelease,
+): CitizenReviewExtensionReadiness {
+  if (release.status !== 'public-enabled') return { status: 'blocked', reason: 'release-closed' };
+  if (!isCitizenReviewCurrentPack(state, view)) return { status: 'blocked', reason: 'current-pack-required' };
+  if (state.deviceMode !== 'private') return { status: 'blocked', reason: 'private-device-required' };
+  if (!state.extensionConsent.supportedDesktopConfirmed) {
+    return { status: 'blocked', reason: 'supported-desktop-confirmation-required' };
+  }
+  if (!state.extensionConsent.boundedSafetyReviewConfirmed) {
+    return { status: 'blocked', reason: 'bounded-safety-review-required' };
+  }
+  if (state.role === 'present-helper') {
+    if (!state.extensionConsent.affectedPersonPresent) {
+      return { status: 'blocked', reason: 'affected-person-present-required' };
+    }
+    if (!state.extensionConsent.affectedPersonReviewedFields) {
+      return { status: 'blocked', reason: 'affected-person-field-review-required' };
+    }
+    if (!state.extensionConsent.affectedPersonRequestedPreparation) {
+      return { status: 'blocked', reason: 'affected-person-preparation-request-required' };
+    }
+  }
+  return { status: 'ready' };
+}
+
+export function getCitizenReviewCurrentExtensionPreparation(
+  state: CitizenReviewHandoffControllerState,
+  view: CitizenReviewHandoffView,
+  nowMs: number,
+): CitizenReviewExtensionPreparation {
+  if (
+    state.extensionPreparation.status !== 'prepared'
+    || nowMs >= state.extensionPreparation.expiresAtMs
+    || !isCitizenReviewCurrentPack(state, view)
+  ) return { status: 'idle' };
+  return state.extensionPreparation;
 }
 
 export function clearCitizenReviewExtensionPreparation(state: CitizenReviewHandoffControllerState) {
