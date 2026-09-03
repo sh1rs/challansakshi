@@ -424,6 +424,163 @@ const PREPARED_DISPATCH_KEYS = Object.freeze([
   'sourceImportedAtMs',
 ] as const);
 
+const COMPARISON_OPERATOR_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.EqualsEqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.LessThanToken,
+  ts.SyntaxKind.LessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanToken,
+  ts.SyntaxKind.GreaterThanEqualsToken,
+  ts.SyntaxKind.InstanceOfKeyword,
+  ts.SyntaxKind.InKeyword,
+]);
+
+const EXPECTED_MODULE_WRITE_SITES = Object.freeze([
+  'enqueueLifecycle:lifecycleTail',
+  'ensureSessionTrustedAccess:sessionTrustedAccess',
+  'ensureSessionTrustedAccess:sessionTrustedAccess',
+] as const);
+
+const EXPECTED_MODULE_SIGNATURES = Object.freeze([
+  'import ../../lib/extension-handoff-envelope-core { EXTENSION_ENVELOPE_KEYS, '
+    + 'digestCanonicalExtensionHandoffEnvelopeCore, validateExtensionHandoffEnvelopeAgainstAuthority, '
+    + 'CanonicalExtensionHandoffEnvelope, ExtensionEnvelopeValidationAuthority }',
+  'import ./destination-adapters { buildDestinationFillPlan, buildDestinationPreviewPlan, '
+    + 'selectedDestinationAdapterRegistry, selectedDestinationInjectedFunction, EnabledDestinationAdapterV1 }',
+  'import ./fill-page { validateDestinationFillInjectionResult, validateDestinationPreviewInjectionResult, '
+    + 'validateDestinationRepreflightInjectionResult, DestinationPreviewPlanV1 }',
+  'import ./message-contract { WORKER_RESPONSE_SCHEMA, buildFixedWorkerResponse, '
+    + 'buildRejectedWorkerResponse, parseWorkerRequest, validatePopupSender, '
+    + 'validateWorkerResponseForCommand, WorkerCommand, WorkerRequestV1, WorkerResponseV1 }',
+  'import ./safety-ledger { NEEDS_REVIEW_WARNING_LIFETIME_MS, acknowledgeNeedsReview, armUnresolvedLive, '
+    + 'assessSafetyLedgerLoad, nextSafetyLedgerCleanupAt, orphanUnresolvedLive, '
+    + 'pruneSafetyLedgerAfterReconciliation, readSafetyLedger, resetSafetyLedgerForDeviceOwner, '
+    + 'settleSafetyLedger, NeedsReviewSafetyRecordV1, SafetyLedgerReadResult, SafetyLedgerV1, '
+    + 'SettlementIntentV1, UnresolvedLiveSafetyRecordV1 }',
+  'import ./source-probe { createSourceProbePlan, probeChallanSakshiSource, '
+    + 'validateSourcePreviewInjectionResult, validateSourceReprobeInjectionResult, SourcePreviewBindingV1, '
+    + 'SourcePreviewValidationResult, SourceReprobeValidationResult }',
+  'const __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__',
+  'const __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__',
+  'const EXTENSION_SESSION_STATE_KEY',
+  'const SESSION_STATE_SCHEMA',
+  'type DestinationBindingV1',
+  'type StagedSessionStateV1',
+  'type ArmingSessionStateV1',
+  'type ConsumingSessionStateV1',
+  'type SettlingSessionStateV1',
+  'type SessionStateV1',
+  'type SessionValidationResult',
+  'type DataRead',
+  'const STAGED_KEYS',
+  'const ARMING_KEYS',
+  'const CONSUMING_KEYS',
+  'const SETTLING_KEYS',
+  'const DESTINATION_KEYS',
+  'const INTENT_KEYS',
+  'const LIVE_TERMINAL_KEYS',
+  'const WARNING_TERMINAL_KEYS',
+  'const OPAQUE_PATTERN',
+  'const DOCUMENT_ID_PATTERN',
+  'const quarantined',
+  'function readData',
+  'function isOpaque',
+  'function isPositiveTime',
+  'function isTabId',
+  'function isDocumentId',
+  'function readDestination',
+  'function readEnvelope',
+  'function readIntent',
+  'function readAttemptTuple',
+  'function validateSessionState',
+  'type SessionIoResult',
+  'type CanonicalLifecycle',
+  'type AlarmName',
+  'type DeferredResponse',
+  'type RequestResult',
+  'type WorkerPreviewPlanResult',
+  'type WorkerPlanResult',
+  'type BuiltPreviewPlan',
+  'type BuiltFillPlan',
+  'type StagedPreviewTiming',
+  'type PreparedFillDispatch',
+  'const SESSION_EXPIRY_ALARM',
+  'const LEDGER_CLEANUP_ALARM',
+  'const ATTEMPT_WATCHDOG_ALARM',
+  'const OPERATION_WINDOW_MS',
+  'const CATEGORY_PRESENTATION',
+  'const DESTINATION_PURPOSE',
+  'function destinationNameForRoute',
+  'let sessionTrustedAccess',
+  'let lifecycleTail',
+  'const closedInFlightTuples',
+  'function enqueueLifecycle',
+  'function unavailableSession',
+  'function ensureSessionTrustedAccess',
+  'function readSessionContainer',
+  'function readSessionState',
+  'function writeSessionState',
+  'function removeSessionState',
+  'function liveFromSession',
+  'function inFlightTupleKey',
+  'function liveMatches',
+  'function hasUnrelatedBlocker',
+  'function cancellationIntent',
+  'function toSettling',
+  'function readyLedger',
+  'function mutationFailure',
+  'function finishSettlement',
+  'function persistAndFinishSettlement',
+  'function pruneLedger',
+  'function clearAlarm',
+  'function createAlarm',
+  'function scheduleCanonical',
+  'function reconcileLifecycle',
+  'function checkedResponse',
+  'function warningResponse',
+  'function stagedResponse',
+  'function invalidateStaged',
+  'function expireStaged',
+  'function fixedBlocker',
+  'function readActiveTabId',
+  'type TabUrlAuthority',
+  'function tabMatchesUrl',
+  'function actionTabMatches',
+  'function retainedTabMatches',
+  'function sourceTabUrlAuthority',
+  'function destinationTabUrlAuthority',
+  'function nextOperationDeadline',
+  'function runSourcePreview',
+  'function runSourceReprobe',
+  'function sourceBinding',
+  'function enabledAdapterExpiry',
+  'function makePreviewPlan',
+  'function stagedPreviewTiming',
+  'function routeFailure',
+  'function newOpaque',
+  'function sourcePreviewResponse',
+  'function destinationPreviewResponse',
+  'function previewCurrentPage',
+  'function loadReviewedFields',
+  'function clearStagedFields',
+  'function cancelBeforeDispatch',
+  'function completeFill',
+  'function @payload-preparation',
+  'function prepareFillDispatch',
+  'function fillEmptyReviewedFields',
+  'function acknowledgeInspection',
+  'function resetForDeviceOwner',
+  'function processWorkerRequest',
+  'function guardedResponder',
+  'function handleRemovedTab',
+  'function handleReplacedTab',
+  'function readAlarmName',
+  'function registerWorkerListeners',
+  "statement IfStatement if (typeof chrome !== 'undefined') registerWorkerListeners();",
+] as const);
+
 function unwrapPreparationExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
   while (
@@ -670,6 +827,201 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     ))
     : null;
   if (!inner?.body) report('structurally discovered preparation helper must resolve at file scope');
+
+  const moduleBindingNames = (name: ts.BindingName, collected: string[]) => {
+    if (ts.isIdentifier(name)) {
+      collected.push(name.text);
+      return;
+    }
+    for (const element of name.elements) {
+      if (!ts.isOmittedExpression(element)) moduleBindingNames(element.name, collected);
+    }
+  };
+  const moduleStatementSignature = (statement: ts.Statement): string => {
+    if (ts.isImportDeclaration(statement)) {
+      const names: string[] = [];
+      const clause = statement.importClause;
+      if (clause?.name) names.push(clause.name.text);
+      const bindings = clause?.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) names.push(`* as ${bindings.name.text}`);
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const specifier of bindings.elements) {
+          names.push(specifier.propertyName
+            ? `${specifier.propertyName.text} as ${specifier.name.text}`
+            : specifier.name.text);
+        }
+      }
+      const moduleName = ts.isStringLiteral(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text
+        : '@invalid';
+      return `import ${moduleName} { ${names.join(', ')} }`;
+    }
+    if (ts.isVariableStatement(statement)) {
+      const kind = statement.declarationList.flags & ts.NodeFlags.Const
+        ? 'const'
+        : statement.declarationList.flags & ts.NodeFlags.Let ? 'let' : 'var';
+      const names: string[] = [];
+      for (const declaration of statement.declarationList.declarations) {
+        moduleBindingNames(declaration.name, names);
+      }
+      return `${kind} ${names.join(', ')}`;
+    }
+    if (ts.isFunctionDeclaration(statement)) {
+      const name = statement.name?.text ?? '@anonymous';
+      return `function ${innerName !== null && name === innerName ? '@payload-preparation' : name}`;
+    }
+    if (ts.isTypeAliasDeclaration(statement)) return `type ${statement.name.text}`;
+    return `statement ${ts.SyntaxKind[statement.kind]} ${statement.getText(file).replace(/\s+/g, ' ')}`;
+  };
+  if (
+    JSON.stringify(file.statements.map(moduleStatementSignature))
+    !== JSON.stringify([...EXPECTED_MODULE_SIGNATURES])
+  ) report('module scope declarations do not match the closed allowlist');
+
+  const globalObjectReferences: ts.Identifier[] = [];
+  const collectGlobalObjectReferences = (node: ts.Node) => {
+    if (
+      ts.isIdentifier(node)
+      && (node.text === 'globalThis' || node.text === 'self' || node.text === 'window')
+      && !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+      && !(ts.isPropertyAssignment(node.parent) && node.parent.name === node)
+    ) globalObjectReferences.push(node);
+    ts.forEachChild(node, collectGlobalObjectReferences);
+  };
+  collectGlobalObjectReferences(file);
+  const certifiedSelfReference = (identifier: ts.Identifier) => {
+    const location = identifier.parent;
+    return identifier.text === 'self'
+      && ts.isPropertyAccessExpression(location)
+      && !location.questionDotToken
+      && location.expression === identifier
+      && location.name.text === 'location'
+      && ts.isPropertyAccessExpression(location.parent)
+      && !location.parent.questionDotToken
+      && location.parent.name.text === 'origin';
+  };
+  if (
+    globalObjectReferences.length !== 1
+    || !certifiedSelfReference(globalObjectReferences[0]!)
+  ) report('global object references must match certified sites');
+
+  const moduleScopeNames = new Set<string>();
+  for (const statement of file.statements) {
+    if (
+      (ts.isFunctionDeclaration(statement)
+        || ts.isClassDeclaration(statement)
+        || ts.isEnumDeclaration(statement))
+      && statement.name
+    ) moduleScopeNames.add(statement.name.text);
+    else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        const collected: string[] = [];
+        moduleBindingNames(declaration.name, collected);
+        for (const name of collected) moduleScopeNames.add(name);
+      }
+    } else if (ts.isImportDeclaration(statement) && statement.importClause) {
+      if (statement.importClause.name) moduleScopeNames.add(statement.importClause.name.text);
+      const bindings = statement.importClause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) moduleScopeNames.add(bindings.name.text);
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const specifier of bindings.elements) moduleScopeNames.add(specifier.name.text);
+      }
+    }
+  }
+  const unwrapWriteExpression = (expression: ts.Expression): ts.Expression => {
+    let selected = expression;
+    while (
+      ts.isParenthesizedExpression(selected)
+      || ts.isAsExpression(selected)
+      || ts.isTypeAssertionExpression(selected)
+      || ts.isNonNullExpression(selected)
+      || ts.isSatisfiesExpression(selected)
+      || ts.isAwaitExpression(selected)
+    ) selected = selected.expression;
+    return selected;
+  };
+  const writeRootIdentifier = (expression: ts.Expression): ts.Identifier | null => {
+    let selected = unwrapWriteExpression(expression);
+    while (ts.isPropertyAccessExpression(selected) || ts.isElementAccessExpression(selected)) {
+      selected = unwrapWriteExpression(selected.expression);
+    }
+    return ts.isIdentifier(selected) ? selected : null;
+  };
+  const scopeDeclaredNames = new Map<ts.Node, ReadonlySet<string>>();
+  const declaredNamesIn = (scope: ts.Node): ReadonlySet<string> => {
+    const cached = scopeDeclaredNames.get(scope);
+    if (cached) return cached;
+    const names = new Set<string>();
+    const record = (name: ts.BindingName) => {
+      const collected: string[] = [];
+      moduleBindingNames(name, collected);
+      for (const collectedName of collected) names.add(collectedName);
+    };
+    const visitScope = (node: ts.Node) => {
+      if (node !== scope && ts.isFunctionLike(node)) {
+        if (ts.isFunctionDeclaration(node) && node.name) names.add(node.name.text);
+        return;
+      }
+      if (node !== scope && (ts.isClassDeclaration(node) || ts.isEnumDeclaration(node))) {
+        if (node.name) names.add(node.name.text);
+        return;
+      }
+      if ((ts.isVariableDeclaration(node) || ts.isParameter(node)) && node.name) record(node.name);
+      if (ts.isCatchClause(node) && node.variableDeclaration) record(node.variableDeclaration.name);
+      ts.forEachChild(node, visitScope);
+    };
+    ts.forEachChild(scope, visitScope);
+    scopeDeclaredNames.set(scope, names);
+    return names;
+  };
+  const enclosingFunctionName = (node: ts.Node): string => {
+    let selected: ts.Node | undefined = node.parent;
+    while (selected) {
+      if (ts.isFunctionDeclaration(selected) && selected.name) return selected.name.text;
+      selected = selected.parent;
+    }
+    return '@module';
+  };
+  const moduleWriteSites: string[] = [];
+  const classifyFileWrite = (target: ts.Expression, writeNode: ts.Node) => {
+    const root = writeRootIdentifier(target);
+    if (!root) {
+      report('file writes must target resolvable declared bindings');
+      return;
+    }
+    let scope: ts.Node | undefined = writeNode.parent;
+    while (scope && scope !== file) {
+      if (ts.isFunctionLike(scope) && declaredNamesIn(scope).has(root.text)) return;
+      scope = scope.parent;
+    }
+    if (moduleScopeNames.has(root.text)) {
+      moduleWriteSites.push(`${enclosingFunctionName(writeNode)}:${root.text}`);
+      return;
+    }
+    report('file writes must target resolvable declared bindings');
+  };
+  const collectFileWrites = (node: ts.Node) => {
+    if (
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    ) classifyFileWrite(node.left, node);
+    if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+    ) classifyFileWrite(node.operand, node);
+    if (ts.isDeleteExpression(node)) classifyFileWrite(node.expression, node);
+    if (
+      (ts.isForInStatement(node) || ts.isForOfStatement(node))
+      && !ts.isVariableDeclarationList(node.initializer)
+    ) classifyFileWrite(node.initializer, node);
+    ts.forEachChild(node, collectFileWrites);
+  };
+  collectFileWrites(file);
+  if (
+    JSON.stringify([...moduleWriteSites].sort())
+    !== JSON.stringify([...EXPECTED_MODULE_WRITE_SITES])
+  ) report('module mutable writes must match certified sites');
 
   const statements = outer.body.statements;
   let grammarMatches = statements.length === 11;
@@ -928,6 +1280,13 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       ts.forEachChild(node, collectInnerBindings);
     };
     collectInnerBindings(inner);
+    const banInnerBindingPatterns = (node: ts.Node) => {
+      if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+        report('inner binding patterns are forbidden');
+      }
+      ts.forEachChild(node, banInnerBindingPatterns);
+    };
+    banInnerBindingPatterns(inner);
     const declarationForIdentifier = (identifier: ts.Identifier) => {
       const declarations = innerBindings.get(identifier.text) ?? [];
       return declarations.length === 1 ? declarations[0]! : null;
@@ -976,6 +1335,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       'actionTabMatches',
       'runSourceReprobe',
       'stagedPreviewTiming',
+      'invalidateStaged',
       'validateDestinationRepreflightInjectionResult',
       'isPositiveTime',
       'liveFromSession',
@@ -1060,6 +1420,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       actionTabMatches: canonicalFileFunction('actionTabMatches'),
       runSourceReprobe: canonicalFileFunction('runSourceReprobe'),
       stagedPreviewTiming: canonicalFileFunction('stagedPreviewTiming'),
+      invalidateStaged: canonicalFileFunction('invalidateStaged'),
       validateDestinationRepreflightInjectionResult: canonicalImport(
         'validateDestinationRepreflightInjectionResult',
         './fill-page',
@@ -1093,6 +1454,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       || !canonicalHelpers.actionTabMatches
       || !canonicalHelpers.runSourceReprobe
       || !canonicalHelpers.stagedPreviewTiming
+      || !canonicalHelpers.invalidateStaged
       || !canonicalHelpers.validateDestinationRepreflightInjectionResult
       || !canonicalHelpers.isPositiveTime
       || !canonicalHelpers.chrome
@@ -1112,6 +1474,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         !expression
         || !canonicalHelpers.objectFreeze
         || !ts.isCallExpression(expression)
+        || Boolean(expression.questionDotToken)
         || expression.arguments.length !== 1
         || !ts.isPropertyAccessExpression(expression.expression)
         || expression.expression.questionDotToken
@@ -1175,6 +1538,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       canonical
       && expression
       && ts.isCallExpression(expression)
+      && !expression.questionDotToken
       && ts.isIdentifier(expression.expression)
       && expression.expression.text === name
         ? expression
@@ -1828,6 +2192,46 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       || declarationFor(fillPlanInputs?.get('operationNotAfterMs')) !== attemptDeadlineDeclaration
     ) report('inner fillPlan has invalid attempt inputs');
 
+    const sourceProbeCandidates = allInnerDeclarations.filter((declaration) => Boolean(
+      directAwaitedCall(declaration.initializer, 'runSourceReprobe', canonicalHelpers.runSourceReprobe),
+    ));
+    const sourceProbeDeclaration = sourceProbeCandidates.length === 1 ? sourceProbeCandidates[0]! : null;
+    const sourceProbeCall = directAwaitedCall(
+      sourceProbeDeclaration?.initializer,
+      'runSourceReprobe',
+      canonicalHelpers.runSourceReprobe,
+    );
+    if (!sourceProbeDeclaration) {
+      report('inner source re-probe result has an invalid canonical origin');
+    }
+    const preflightCandidates = allInnerDeclarations.filter((declaration) => Boolean(
+      directCall(
+        declaration.initializer,
+        'validateDestinationRepreflightInjectionResult',
+        canonicalHelpers.validateDestinationRepreflightInjectionResult,
+      ),
+    ));
+    const preflightDeclaration = preflightCandidates.length === 1 ? preflightCandidates[0]! : null;
+    const preflightCall = directCall(
+      preflightDeclaration?.initializer,
+      'validateDestinationRepreflightInjectionResult',
+      canonicalHelpers.validateDestinationRepreflightInjectionResult,
+    );
+    if (!preflightDeclaration) {
+      report('inner destination preflight result has an invalid canonical origin');
+    }
+    const destinationRawCandidates = allInnerDeclarations.filter((declaration) => (
+      !declaration.initializer
+      && ts.isIdentifier(declaration.name)
+      && declaration.type?.getText(file) === 'unknown'
+    ));
+    const destinationRawDeclaration = destinationRawCandidates.length === 1
+      ? destinationRawCandidates[0]!
+      : null;
+    if (!destinationRawDeclaration) {
+      report('inner destination raw result has an invalid canonical origin');
+    }
+
     const authoritativeRoles = [
       lifecycleDeclaration,
       stagedDeclaration,
@@ -1840,6 +2244,8 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       fillPlanRoot,
       sourceBindingDeclaration,
       importedAtDeclaration,
+      sourceProbeDeclaration,
+      preflightDeclaration,
       armingDeclaration,
       armedSessionDeclaration,
       liveDeclaration,
@@ -1859,20 +2265,39 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         && ts.isVariableStatement(statement)
         && statement.parent === inner.body;
     };
+    const isDirectSingleLet = (declaration: ts.VariableDeclaration) => {
+      const declarationList = declaration.parent;
+      const statement = declarationList.parent;
+      return ts.isVariableDeclarationList(declarationList)
+        && declarationList.declarations.length === 1
+        && Boolean(declarationList.flags & ts.NodeFlags.Let)
+        && ts.isVariableStatement(statement)
+        && statement.parent === inner.body;
+    };
     let authoritativeRolesValid = Boolean(
       authoritativeRoles.every((declaration) => declaration !== null)
       && new Set(presentAuthoritativeRoles).size === authoritativeRoles.length
-      && presentAuthoritativeRoles.every(isDirectSingleConst),
+      && presentAuthoritativeRoles.every(isDirectSingleConst)
+      && destinationRawDeclaration !== null
+      && isDirectSingleLet(destinationRawDeclaration),
     );
     const authoritativeSet = new Set(presentAuthoritativeRoles);
     const authoritativeOrigin = new Map<ts.VariableDeclaration, ts.VariableDeclaration>();
     for (const declaration of presentAuthoritativeRoles) {
       authoritativeOrigin.set(declaration, declaration);
     }
+    if (destinationRawDeclaration) {
+      authoritativeSet.add(destinationRawDeclaration);
+      authoritativeOrigin.set(destinationRawDeclaration, destinationRawDeclaration);
+    }
     const rootDeclaration = (expression: ts.Expression | undefined) => {
       if (!expression) return null;
       let selected = unwrapPreparationExpression(expression);
-      while (ts.isPropertyAccessExpression(selected) || ts.isElementAccessExpression(selected)) {
+      while (
+        ts.isAwaitExpression(selected)
+        || ts.isPropertyAccessExpression(selected)
+        || ts.isElementAccessExpression(selected)
+      ) {
         selected = unwrapPreparationExpression(selected.expression);
       }
       return ts.isIdentifier(selected) ? declarationForIdentifier(selected) : null;
@@ -1925,14 +2350,12 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       ) include(selected.left);
       return roots;
     };
-    const writeTargets: ts.Expression[] = [];
-    const writes = new Map<ts.VariableDeclaration, number[]>();
-    const recordWrite = (target: ts.Expression, positionNode: ts.Node) => {
-      writeTargets.push(target);
+    const writes = new Map<ts.VariableDeclaration, ts.Node[]>();
+    const recordWrite = (target: ts.Expression, writeNode: ts.Node) => {
       for (const root of writeRoots(target)) {
-        const positions = writes.get(root) ?? [];
-        positions.push(positionNode.getStart(file));
-        writes.set(root, positions);
+        const writeNodes = writes.get(root) ?? [];
+        writeNodes.push(writeNode);
+        writes.set(root, writeNodes);
       }
     };
     const collectWrites = (node: ts.Node) => {
@@ -1954,18 +2377,6 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     };
     collectWrites(inner);
 
-    const inside = (node: ts.Node, ancestor: ts.Node) => {
-      let selected: ts.Node | undefined = node;
-      while (selected) {
-        if (selected === ancestor) return true;
-        if (selected === inner) return false;
-        selected = selected.parent;
-      }
-      return false;
-    };
-    const declarationNameContains = (declaration: ts.VariableDeclaration, node: ts.Node) => (
-      inside(node, declaration.name)
-    );
     const isReferenceIdentifier = (identifier: ts.Identifier) => {
       const parent = identifier.parent;
       if (ts.isPropertyAccessExpression(parent) && parent.name === identifier) return false;
@@ -1979,32 +2390,6 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       if (ts.isBindingElement(parent) && parent.propertyName === identifier) return false;
       return true;
     };
-    const lastAuthoritativeUse = new Map<ts.VariableDeclaration, number>();
-    const collectAuthoritativeUses = (node: ts.Node) => {
-      if (ts.isIdentifier(node) && isReferenceIdentifier(node)) {
-        const declaration = declarationForIdentifier(node);
-        const origin = declaration ? authoritativeOrigin.get(declaration) : null;
-        if (
-          origin
-          && !declarationNameContains(declaration!, node)
-          && !writeTargets.some((target) => inside(node, target))
-        ) {
-          lastAuthoritativeUse.set(
-            origin,
-            Math.max(lastAuthoritativeUse.get(origin) ?? 0, node.getStart(file)),
-          );
-        }
-      }
-      ts.forEachChild(node, collectAuthoritativeUses);
-    };
-    collectAuthoritativeUses(inner);
-    for (const [root, positions] of writes) {
-      const lastUse = lastAuthoritativeUse.get(root) ?? 0;
-      if (positions.some((position) => position > root.end && position <= lastUse)) {
-        authoritativeRolesValid = false;
-      }
-    }
-
     const containsAuthoritativeReference = (node: ts.Node) => {
       let contains = false;
       const visit = (selected: ts.Node) => {
@@ -2023,7 +2408,6 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     };
     const innerCalls: ts.CallExpression[] = [];
     const collectInnerCalls = (node: ts.Node) => {
-      if (node !== inner && ts.isFunctionLike(node)) return;
       if (ts.isCallExpression(node)) innerCalls.push(node);
       ts.forEachChild(node, collectInnerCalls);
     };
@@ -2049,6 +2433,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       const calls = callsNamed(name).sort((left, right) => left.pos - right.pos);
       const valid = canonical
         && calls.length === predicates.length
+        && calls.every((call) => !call.questionDotToken)
         && calls.every((call, index) => predicates[index]!(call));
       if (!valid) {
         canonicalRoleCallsValid = false;
@@ -2115,7 +2500,8 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration),
     ]);
     certifyNamedCalls('runSourceReprobe', canonicalHelpers.runSourceReprobe, [
-      (call) => call.arguments.length === 3
+      (call) => call === sourceProbeCall
+        && call.arguments.length === 3
         && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration)
         && exactDeclarationPath(
           call.arguments[1],
@@ -2136,8 +2522,9 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       'validateDestinationRepreflightInjectionResult',
       canonicalHelpers.validateDestinationRepreflightInjectionResult,
       [
-        (call) => call.arguments.length === 2
-          && ts.isIdentifier(call.arguments[0]!)
+        (call) => call === preflightCall
+          && call.arguments.length === 2
+          && exactDeclarationIdentifier(call.arguments[0], destinationRawDeclaration)
           && exactDeclarationPath(
             call.arguments[1],
             stagedDeclaration,
@@ -2145,6 +2532,53 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
           ),
       ],
     );
+    const invalidationSelectionConditionValid = (expression: ts.Expression | undefined) => {
+      if (!expression || !sourceProbeDeclaration) return false;
+      const leaves: ts.Expression[] = [];
+      const flatten = (candidate: ts.Expression) => {
+        if (
+          ts.isBinaryExpression(candidate)
+          && candidate.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        ) {
+          flatten(candidate.left);
+          flatten(candidate.right);
+        } else leaves.push(candidate);
+      };
+      flatten(expression);
+      const expectedLeaves = [
+        ['status', 'accepted'],
+        ['reason', 'source-binding-mismatch'],
+        ['reason', 'source-document-mismatch'],
+        ['reason', 'invalid-envelope'],
+      ] as const;
+      return leaves.length === expectedLeaves.length && leaves.every((leaf, index) => {
+        const [member, value] = expectedLeaves[index]!;
+        return ts.isBinaryExpression(leaf)
+          && leaf.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+          && exactString(leaf.right, value)
+          && ts.isPropertyAccessExpression(leaf.left)
+          && leaf.left.name.text === member
+          && ts.isIdentifier(leaf.left.expression)
+          && declarationForIdentifier(leaf.left.expression) === sourceProbeDeclaration;
+      });
+    };
+    certifyNamedCalls('invalidateStaged', canonicalHelpers.invalidateStaged, [
+      (call) => call.arguments.length === 2
+        && exactRequestCommand(call.arguments[0])
+        && exactString(call.arguments[1], 'source-unavailable'),
+      (call) => {
+        const selection = call.arguments[1];
+        return call.arguments.length === 2
+          && exactRequestCommand(call.arguments[0])
+          && Boolean(
+            selection
+            && ts.isConditionalExpression(selection)
+            && invalidationSelectionConditionValid(selection.condition)
+            && exactString(selection.whenTrue, 'source-binding-changed')
+            && exactString(selection.whenFalse, 'source-unavailable'),
+          );
+      },
+    ]);
     certifyNamedCalls('isPositiveTime', canonicalHelpers.isPositiveTime, [
       (call) => call.arguments.length === 1
         && exactDeclarationIdentifier(call.arguments[0], adapterExpiryDeclaration),
@@ -2214,6 +2648,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     if (
       !canonicalHelpers.date
       || dateParseCalls.length !== 1
+      || Boolean(dateParseCalls[0]!.questionDotToken)
       || dateParseCalls[0]!.arguments.length !== 1
       || !exactDeclarationPath(
         dateParseCalls[0]!.arguments[0],
@@ -2239,6 +2674,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       !canonicalHelpers.objectFreeze
       || expectedFreezeObjects.some((object) => object === null)
       || freezeCalls.length !== expectedFreezeObjects.length
+      || freezeCalls.some((call) => Boolean(call.questionDotToken))
       || freezeCalls.some((call, index) => call.arguments[0] !== expectedFreezeObjects[index])
     ) canonicalRoleCallsValid = false;
     else {
@@ -2281,6 +2717,7 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       canonicalHelpers.chrome
       && canonicalHelpers.selectedDestinationInjectedFunction
       && executeScriptCall
+      && !executeScriptCall.questionDotToken
       && executeEntries
       && targetEntries
       && exactDeclarationPath(
@@ -2307,21 +2744,41 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     else {
       certifiedCalls.add(executeScriptCall!);
       certifyAggregateTree(executeScriptCall!);
-      let parent: ts.Node = executeScriptCall!;
-      while (parent.parent && parent.parent !== inner) {
-        parent = parent.parent;
-        if (
-          ts.isBinaryExpression(parent)
-          && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
-          && inside(executeScriptCall!, parent.right)
-        ) {
-          certifiedAssignments.add(parent);
-          break;
-        }
+    }
+    const destinationRawWriteNodes = destinationRawDeclaration
+      ? writes.get(destinationRawDeclaration) ?? []
+      : [];
+    const destinationRawWrite = destinationRawWriteNodes.length === 1
+      ? destinationRawWriteNodes[0]!
+      : null;
+    let destinationRawWriteValid = false;
+    if (
+      executeScriptValid
+      && destinationRawWrite
+      && ts.isBinaryExpression(destinationRawWrite)
+      && destinationRawWrite.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && exactDeclarationIdentifier(destinationRawWrite.left, destinationRawDeclaration)
+    ) {
+      let selected: ts.Expression = destinationRawWrite.right;
+      while (ts.isParenthesizedExpression(selected) || ts.isAwaitExpression(selected)) {
+        selected = selected.expression;
+      }
+      if (selected === executeScriptCall) {
+        destinationRawWriteValid = true;
+        certifiedAssignments.add(destinationRawWrite);
       }
     }
+    if (!destinationRawWriteValid) canonicalRoleCallsValid = false;
     if (!canonicalRoleCallsValid) {
       report('inner authoritative call helper is shadowed or noncanonical');
+    }
+    for (const [writtenRoot, writeNodes] of writes) {
+      for (const writeNode of writeNodes) {
+        const exemptDestinationRawWrite = writtenRoot === destinationRawDeclaration
+          && ts.isBinaryExpression(writeNode)
+          && certifiedAssignments.has(writeNode);
+        if (!exemptDestinationRawWrite) authoritativeRolesValid = false;
+      }
     }
 
     const allowedRoleReturns = new Set<ts.ReturnStatement>([
@@ -2330,6 +2787,11 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       consumingFailureReturn,
       preparedReturnStatement,
     ].filter((statement): statement is ts.ReturnStatement => statement !== null));
+    for (const invalidationCall of callsNamed('invalidateStaged')) {
+      if (certifiedCalls.has(invalidationCall) && ts.isReturnStatement(invalidationCall.parent)) {
+        allowedRoleReturns.add(invalidationCall.parent);
+      }
+    }
     const topLevelCertifiedCall = (expression: ts.Expression) => {
       let selected = unwrapPreparationExpression(expression);
       if (ts.isAwaitExpression(selected)) selected = unwrapPreparationExpression(selected.expression);
@@ -2345,6 +2807,15 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         outboundFlowValid = false;
         return;
       }
+      if (node !== inner && ts.isEnumDeclaration(node)) {
+        outboundFlowValid = false;
+        return;
+      }
+      if (
+        ts.isBindingElement(node)
+        && node.initializer
+        && containsAuthoritativeReference(node.initializer)
+      ) outboundFlowValid = false;
       if (
         ts.isVariableDeclaration(node)
         && !ts.isIdentifier(node.name)
@@ -2406,12 +2877,767 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       ts.forEachChild(node, collectOutboundFlow);
     };
     collectOutboundFlow(inner);
+
+    type ValueFlowContext = Readonly<{
+      allowedReturns: ReadonlySet<ts.ReturnStatement>;
+      certifiedFlowCalls: ReadonlySet<ts.CallExpression>;
+      certifiedFlowAggregates: ReadonlySet<ts.Node>;
+      certifiedFlowAssignments: ReadonlySet<ts.BinaryExpression>;
+      declarationReceives: (declaration: ts.VariableDeclaration) => boolean;
+    }>;
+    const isDeclaredNameIdentifier = (identifier: ts.Identifier) => {
+      const parent = identifier.parent;
+      return (ts.isVariableDeclaration(parent) && parent.name === identifier)
+        || (ts.isParameter(parent) && parent.name === identifier)
+        || (ts.isBindingElement(parent) && parent.name === identifier)
+        || (ts.isFunctionDeclaration(parent) && parent.name === identifier)
+        || (ts.isClassDeclaration(parent) && parent.name === identifier)
+        || (ts.isEnumDeclaration(parent) && parent.name === identifier);
+    };
+    const valueFlowTerminatesLegally = (
+      reference: ts.Identifier,
+      context: ValueFlowContext,
+      scope: ts.Node,
+    ): boolean => {
+      let child: ts.Node = reference;
+      let parent: ts.Node | undefined = child.parent;
+      while (parent && child !== scope) {
+        if (
+          ts.isParenthesizedExpression(parent)
+          || ts.isAsExpression(parent)
+          || ts.isTypeAssertionExpression(parent)
+          || ts.isNonNullExpression(parent)
+          || ts.isSatisfiesExpression(parent)
+          || ts.isAwaitExpression(parent)
+        ) {
+          child = parent;
+          parent = parent.parent;
+          continue;
+        }
+        if (ts.isPropertyAccessExpression(parent) && parent.expression === child) {
+          child = parent;
+          parent = parent.parent;
+          continue;
+        }
+        if (ts.isElementAccessExpression(parent)) {
+          if (parent.expression !== child) return false;
+          child = parent;
+          parent = parent.parent;
+          continue;
+        }
+        if (ts.isBinaryExpression(parent)) {
+          const operator = parent.operatorToken.kind;
+          if (COMPARISON_OPERATOR_KINDS.has(operator)) return true;
+          if (operator >= ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment) {
+            if (parent.left === child) return operator === ts.SyntaxKind.EqualsToken;
+            return context.certifiedFlowAssignments.has(parent);
+          }
+          if (
+            operator === ts.SyntaxKind.AmpersandAmpersandToken
+            || operator === ts.SyntaxKind.BarBarToken
+            || operator === ts.SyntaxKind.QuestionQuestionToken
+            || operator === ts.SyntaxKind.CommaToken
+          ) {
+            child = parent;
+            parent = parent.parent;
+            continue;
+          }
+          return false;
+        }
+        if (ts.isPrefixUnaryExpression(parent)) {
+          return parent.operator === ts.SyntaxKind.ExclamationToken;
+        }
+        if (ts.isConditionalExpression(parent)) {
+          if (parent.condition === child) return true;
+          child = parent;
+          parent = parent.parent;
+          continue;
+        }
+        if (ts.isCallExpression(parent)) {
+          return parent.arguments.includes(child as ts.Expression)
+            && context.certifiedFlowCalls.has(parent);
+        }
+        if (ts.isPropertyAssignment(parent) || ts.isShorthandPropertyAssignment(parent)) {
+          return ts.isObjectLiteralExpression(parent.parent)
+            && context.certifiedFlowAggregates.has(parent.parent);
+        }
+        if (ts.isArrayLiteralExpression(parent)) return context.certifiedFlowAggregates.has(parent);
+        if (ts.isVariableDeclaration(parent)) {
+          return parent.initializer === child && context.declarationReceives(parent);
+        }
+        if (ts.isReturnStatement(parent)) return context.allowedReturns.has(parent);
+        if (ts.isIfStatement(parent) || ts.isWhileStatement(parent) || ts.isDoStatement(parent)) {
+          return parent.expression === child;
+        }
+        if (ts.isForStatement(parent)) return parent.condition === child;
+        return false;
+      }
+      return false;
+    };
+    const innerFlowContext: ValueFlowContext = Object.freeze({
+      allowedReturns: allowedRoleReturns,
+      certifiedFlowCalls: certifiedCalls,
+      certifiedFlowAggregates: certifiedAggregates,
+      certifiedFlowAssignments: certifiedAssignments,
+      declarationReceives: (declaration: ts.VariableDeclaration) => (
+        authoritativeOrigin.has(declaration)
+      ),
+    });
+    const collectValueFlow = (node: ts.Node) => {
+      if (
+        ts.isIdentifier(node)
+        && isReferenceIdentifier(node)
+        && !isDeclaredNameIdentifier(node)
+      ) {
+        const declaration = declarationForIdentifier(node);
+        if (
+          declaration
+          && authoritativeOrigin.has(declaration)
+          && !valueFlowTerminatesLegally(node, innerFlowContext, inner)
+        ) outboundFlowValid = false;
+      }
+      ts.forEachChild(node, collectValueFlow);
+    };
+    collectValueFlow(inner);
+
     if (!outboundFlowValid) {
       report('inner authoritative values must not escape certified outbound flow');
       authoritativeRolesValid = false;
     }
     if (!authoritativeRolesValid) {
       report('inner authoritative roles must be immutable direct const declarations');
+    }
+
+    const fillFunction = file.statements.find((statement): statement is ts.FunctionDeclaration => (
+      ts.isFunctionDeclaration(statement) && statement.name?.text === 'fillEmptyReviewedFields'
+    ));
+    if (!fillFunction?.body) report('fill dispatch stage does not match closed payload grammar');
+    else {
+      let fillGrammarValid = true;
+      let fillFlowValid = true;
+      const fillRequest = fillFunction.parameters.length === 2
+        && ts.isIdentifier(fillFunction.parameters[0]!.name)
+        ? fillFunction.parameters[0]!.name
+        : null;
+      if (!fillRequest) fillGrammarValid = false;
+      const inspectFillStructure = (node: ts.Node) => {
+        if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+          report('fill binding patterns are forbidden');
+        }
+        if (
+          node !== fillFunction
+          && (ts.isClassDeclaration(node) || ts.isClassExpression(node) || ts.isEnumDeclaration(node))
+        ) fillFlowValid = false;
+        ts.forEachChild(node, inspectFillStructure);
+      };
+      inspectFillStructure(fillFunction);
+
+      const fillDeclaredNames = new Set<string>();
+      const recordFillDeclaredName = (name: ts.BindingName) => {
+        const collected: string[] = [];
+        moduleBindingNames(name, collected);
+        for (const collectedName of collected) fillDeclaredNames.add(collectedName);
+      };
+      const collectFillDeclaredNames = (node: ts.Node) => {
+        if (ts.isVariableDeclaration(node) || ts.isParameter(node)) {
+          recordFillDeclaredName(node.name);
+        }
+        if (node !== fillFunction && ts.isFunctionDeclaration(node) && node.name) {
+          fillDeclaredNames.add(node.name.text);
+        }
+        if ((ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)) && node.name) {
+          fillDeclaredNames.add(node.name.text);
+        }
+        if (ts.isCatchClause(node) && node.variableDeclaration) {
+          recordFillDeclaredName(node.variableDeclaration.name);
+        }
+        ts.forEachChild(node, collectFillDeclaredNames);
+      };
+      collectFillDeclaredNames(fillFunction);
+      const fillCanonicalFunction = (name: string) => {
+        const bindings = fileBindings.get(name) ?? [];
+        return bindings.length === 1
+          && ts.isFunctionDeclaration(bindings[0]!)
+          && !fillDeclaredNames.has(name);
+      };
+      const fillCanonicalImport = (name: string, moduleName: string) => {
+        const bindings = fileBindings.get(name) ?? [];
+        if (bindings.length !== 1 || !ts.isImportSpecifier(bindings[0]!) || fillDeclaredNames.has(name)) {
+          return false;
+        }
+        const specifier = bindings[0]! as ts.ImportSpecifier;
+        const importDeclaration = specifier.parent.parent.parent;
+        return (!specifier.propertyName || specifier.propertyName.text === name)
+          && specifier.name.text === name
+          && ts.isImportDeclaration(importDeclaration)
+          && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+          && importDeclaration.moduleSpecifier.text === moduleName;
+      };
+      const fillCanonicalGlobal = (name: string) => (
+        (fileBindings.get(name) ?? []).length === 0 && !fillDeclaredNames.has(name)
+      );
+
+      const fillDeclarations: ts.VariableDeclaration[] = [];
+      const fillBindingsByName = new Map<string, ts.VariableDeclaration[]>();
+      const collectFillDeclarations = (node: ts.Node) => {
+        if (node !== fillFunction && ts.isFunctionLike(node)) return;
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+          fillDeclarations.push(node);
+          const named = fillBindingsByName.get(node.name.text) ?? [];
+          named.push(node);
+          fillBindingsByName.set(node.name.text, named);
+        }
+        ts.forEachChild(node, collectFillDeclarations);
+      };
+      collectFillDeclarations(fillFunction);
+      const fillDeclarationForIdentifier = (identifier: ts.Identifier) => {
+        const named = fillBindingsByName.get(identifier.text) ?? [];
+        return named.length === 1 ? named[0]! : null;
+      };
+      const fillExactIdentifier = (
+        expression: ts.Expression | undefined,
+        declaration: ts.VariableDeclaration | null,
+      ) => Boolean(
+        expression
+        && declaration
+        && ts.isIdentifier(expression)
+        && fillDeclarationForIdentifier(expression) === declaration,
+      );
+      const fillExactProperty = (
+        expression: ts.Expression | undefined,
+        declaration: ts.VariableDeclaration | null,
+        member: string,
+      ) => Boolean(
+        expression
+        && declaration
+        && ts.isPropertyAccessExpression(expression)
+        && !expression.questionDotToken
+        && expression.name.text === member
+        && fillExactIdentifier(expression.expression, declaration),
+      );
+      const fillDirectCall = (
+        expression: ts.Expression | undefined,
+        name: string,
+        canonical: boolean,
+      ): ts.CallExpression | null => (
+        canonical
+        && expression
+        && ts.isCallExpression(expression)
+        && !expression.questionDotToken
+        && ts.isIdentifier(expression.expression)
+        && expression.expression.text === name
+          ? expression
+          : null
+      );
+      const fillDirectAwaitedCall = (
+        expression: ts.Expression | undefined,
+        name: string,
+        canonical: boolean,
+      ) => (
+        expression && ts.isAwaitExpression(expression)
+          ? fillDirectCall(expression.expression, name, canonical)
+          : null
+      );
+      const fillTypeText = (declaration: ts.VariableDeclaration) => (
+        declaration.type?.getText(file).replaceAll(' ', '') ?? ''
+      );
+      const fillSingleLet = (declaration: ts.VariableDeclaration) => (
+        ts.isVariableDeclarationList(declaration.parent)
+        && declaration.parent.declarations.length === 1
+        && Boolean(declaration.parent.flags & ts.NodeFlags.Let)
+      );
+      const fillSingleConst = (declaration: ts.VariableDeclaration) => (
+        ts.isVariableDeclarationList(declaration.parent)
+        && declaration.parent.declarations.length === 1
+        && Boolean(declaration.parent.flags & ts.NodeFlags.Const)
+      );
+
+      const preparedFillCandidates = fillDeclarations.filter((declaration) => (
+        fillSingleLet(declaration)
+        && fillTypeText(declaration) === 'PreparedFillDispatch|null'
+        && declaration.initializer?.kind === ts.SyntaxKind.NullKeyword
+      ));
+      const preparedFill = preparedFillCandidates.length === 1 ? preparedFillCandidates[0]! : null;
+      const preparationResultCandidates = fillDeclarations.filter((declaration) => {
+        const call = fillDirectAwaitedCall(
+          declaration.initializer,
+          'prepareFillDispatch',
+          fillCanonicalFunction('prepareFillDispatch'),
+        );
+        return Boolean(
+          fillSingleConst(declaration)
+          && call
+          && call.arguments.length === 1
+          && fillRequest
+          && exactIdentifier(call.arguments[0], fillRequest.text),
+        );
+      });
+      const preparationResultFill = preparationResultCandidates.length === 1
+        ? preparationResultCandidates[0]!
+        : null;
+      const preparationResultFillCall = fillDirectAwaitedCall(
+        preparationResultFill?.initializer,
+        'prepareFillDispatch',
+        fillCanonicalFunction('prepareFillDispatch'),
+      );
+      const fillProjection = (member: string, wantLet: boolean) => {
+        const candidates = fillDeclarations.filter((declaration) => {
+          const initializer = declaration.initializer;
+          return (wantLet ? fillSingleLet(declaration) : fillSingleConst(declaration))
+            && initializer !== undefined
+            && ts.isPropertyAccessExpression(initializer)
+            && !initializer.questionDotToken
+            && initializer.name.text === member
+            && preparedFill !== null
+            && ts.isIdentifier(initializer.expression)
+            && fillDeclarationForIdentifier(initializer.expression) === preparedFill;
+        });
+        return candidates.length === 1 ? candidates[0]! : null;
+      };
+      const consumingFill = fillProjection('consuming', false);
+      const fillPlanFill = fillProjection('fillPlan', false);
+      const sourceImportedAtMsFill = fillProjection('sourceImportedAtMs', false);
+      const sourceAuthorizationFill = (() => {
+        const candidate = fillProjection('sourceAuthorization', true);
+        return candidate && fillTypeText(candidate) === 'SourcePreviewBindingV1|null'
+          ? candidate
+          : null;
+      })();
+      const finalSourceCandidates = fillDeclarations.filter((declaration) => (
+        fillSingleLet(declaration)
+        && Boolean(fillDirectAwaitedCall(
+          declaration.initializer,
+          'runSourceReprobe',
+          fillCanonicalFunction('runSourceReprobe'),
+        ))
+      ));
+      const finalSourceFill = finalSourceCandidates.length === 1 ? finalSourceCandidates[0]! : null;
+      const finalSourceFillCall = fillDirectAwaitedCall(
+        finalSourceFill?.initializer,
+        'runSourceReprobe',
+        fillCanonicalFunction('runSourceReprobe'),
+      );
+      const dispatchFillCandidates = fillDeclarations.filter((declaration) => (
+        fillSingleLet(declaration)
+        && !declaration.initializer
+        && fillTypeText(declaration) === 'Promise<unknown>'
+      ));
+      const dispatchFill = dispatchFillCandidates.length === 1 ? dispatchFillCandidates[0]! : null;
+      if (
+        !preparedFill
+        || !preparationResultFill
+        || !consumingFill
+        || !fillPlanFill
+        || !sourceImportedAtMsFill
+        || !sourceAuthorizationFill
+        || !finalSourceFill
+        || !dispatchFill
+      ) fillGrammarValid = false;
+      const fillOrigins = new Set<ts.VariableDeclaration>(
+        [
+          preparedFill,
+          preparationResultFill,
+          fillPlanFill,
+          sourceAuthorizationFill,
+          sourceImportedAtMsFill,
+          finalSourceFill,
+        ].filter((declaration): declaration is ts.VariableDeclaration => declaration !== null),
+      );
+      const fillReceivers = new Set<ts.VariableDeclaration>([...fillOrigins]);
+      if (consumingFill) fillReceivers.add(consumingFill);
+      const fillRootDeclaration = (expression: ts.Expression | undefined) => {
+        if (!expression) return null;
+        let selected = unwrapPreparationExpression(expression);
+        while (
+          ts.isAwaitExpression(selected)
+          || ts.isPropertyAccessExpression(selected)
+          || ts.isElementAccessExpression(selected)
+        ) {
+          selected = unwrapPreparationExpression(selected.expression);
+        }
+        return ts.isIdentifier(selected) ? fillDeclarationForIdentifier(selected) : null;
+      };
+      for (const declaration of fillDeclarations) {
+        if (fillReceivers.has(declaration)) continue;
+        const root = fillRootDeclaration(declaration.initializer);
+        if (root && fillOrigins.has(root)) fillFlowValid = false;
+      }
+
+      const fillCalls: ts.CallExpression[] = [];
+      const collectFillCalls = (node: ts.Node) => {
+        if (ts.isCallExpression(node)) fillCalls.push(node);
+        ts.forEachChild(node, collectFillCalls);
+      };
+      collectFillCalls(fillFunction);
+      const fillCallsNamed = (name: string) => fillCalls.filter((call) => (
+        ts.isIdentifier(call.expression) && call.expression.text === name
+      ));
+      const fillCertifiedCalls = new Set<ts.CallExpression>();
+      const fillCertifiedAggregates = new Set<ts.Node>();
+      const fillCertifiedAssignments = new Set<ts.BinaryExpression>();
+      const certifyFillAggregateTree = (node: ts.Node) => {
+        if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
+          fillCertifiedAggregates.add(node);
+        }
+        ts.forEachChild(node, certifyFillAggregateTree);
+      };
+      const certifyFillNamedCalls = (
+        name: string,
+        canonical: boolean,
+        predicates: readonly ((call: ts.CallExpression) => boolean)[],
+      ) => {
+        const calls = fillCallsNamed(name).sort((left, right) => left.pos - right.pos);
+        const valid = canonical
+          && calls.length === predicates.length
+          && calls.every((call) => !call.questionDotToken)
+          && calls.every((call, index) => predicates[index]!(call));
+        if (!valid) {
+          fillGrammarValid = false;
+          return;
+        }
+        for (const call of calls) {
+          fillCertifiedCalls.add(call);
+          certifyFillAggregateTree(call);
+        }
+      };
+      const fillRequestCommand = (expression: ts.Expression | undefined) => Boolean(
+        expression
+        && fillRequest
+        && ts.isPropertyAccessExpression(expression)
+        && !expression.questionDotToken
+        && expression.name.text === 'command'
+        && ts.isIdentifier(expression.expression)
+        && expression.expression.text === fillRequest.text,
+      );
+      const fillResponseCall = (
+        expression: ts.Expression | undefined,
+        name: 'buildFixedWorkerResponse' | 'buildRejectedWorkerResponse',
+        reason: string,
+      ) => {
+        const call = fillDirectCall(expression, name, fillCanonicalImport(name, './message-contract'));
+        return Boolean(
+          call
+          && call.arguments.length === 2
+          && fillRequestCommand(call.arguments[0])
+          && exactString(call.arguments[1], reason),
+        );
+      };
+      certifyFillNamedCalls('prepareFillDispatch', fillCanonicalFunction('prepareFillDispatch'), [
+        (call) => call === preparationResultFillCall,
+      ]);
+      if (innerName !== null && fillCallsNamed(innerName).length !== 0) fillGrammarValid = false;
+      certifyFillNamedCalls('writeSessionState', fillCanonicalFunction('writeSessionState'), []);
+      certifyFillNamedCalls('removeSessionState', fillCanonicalFunction('removeSessionState'), []);
+      certifyFillNamedCalls('runSourceReprobe', fillCanonicalFunction('runSourceReprobe'), [
+        (call) => {
+          if (call !== finalSourceFillCall || call.arguments.length !== 3) return false;
+          const probeSubject = call.arguments[0];
+          const frozenProbe = probeSubject
+            && ts.isCallExpression(probeSubject)
+            && !probeSubject.questionDotToken
+            && fillCanonicalGlobal('Object')
+            && ts.isPropertyAccessExpression(probeSubject.expression)
+            && !probeSubject.expression.questionDotToken
+            && ts.isIdentifier(probeSubject.expression.expression)
+            && probeSubject.expression.expression.text === 'Object'
+            && probeSubject.expression.name.text === 'freeze'
+            && probeSubject.arguments.length === 1
+            && ts.isObjectLiteralExpression(probeSubject.arguments[0]!)
+            ? probeSubject.arguments[0]!
+            : null;
+          const probeEntries = exactObjectEntries(
+            frozenProbe ?? null,
+            ['sourceTabId', 'importedAtMs'],
+            true,
+          );
+          return Boolean(
+            probeEntries
+            && fillExactProperty(probeEntries.get('sourceTabId'), sourceAuthorizationFill, 'sourceTabId')
+            && fillExactIdentifier(probeEntries.get('importedAtMs'), sourceImportedAtMsFill)
+            && fillExactProperty(call.arguments[1], consumingFill, 'attemptNotAfterMs')
+            && fillExactIdentifier(call.arguments[2], sourceAuthorizationFill),
+          );
+        },
+      ]);
+      certifyFillNamedCalls('actionTabMatches', fillCanonicalFunction('actionTabMatches'), [
+        (call) => call.arguments.length === 2
+          && fillExactProperty(call.arguments[0], consumingFill, 'destinationTabId')
+          && fillExactProperty(call.arguments[1], fillPlanFill, 'expectedLocation'),
+      ]);
+      const fillCancellationBase = (call: ts.CallExpression) => (
+        call.arguments.length === 2 && fillExactIdentifier(call.arguments[0], consumingFill)
+      );
+      const fillCancellationSelection = (
+        expression: ts.Expression | undefined,
+        rejectedReason: string,
+      ) => Boolean(
+        expression
+        && ts.isConditionalExpression(expression)
+        && ts.isIdentifier(expression.condition)
+        && fillResponseCall(expression.whenTrue, 'buildFixedWorkerResponse', 'expired')
+        && fillResponseCall(expression.whenFalse, 'buildRejectedWorkerResponse', rejectedReason),
+      );
+      certifyFillNamedCalls('cancelBeforeDispatch', fillCanonicalFunction('cancelBeforeDispatch'), [
+        (call) => fillCancellationBase(call)
+          && fillCancellationSelection(call.arguments[1], 'source-binding-changed'),
+        (call) => fillCancellationBase(call)
+          && fillResponseCall(call.arguments[1], 'buildFixedWorkerResponse', 'expired'),
+        (call) => fillCancellationBase(call)
+          && fillResponseCall(call.arguments[1], 'buildRejectedWorkerResponse', 'source-binding-changed'),
+        (call) => fillCancellationBase(call)
+          && fillCancellationSelection(call.arguments[1], 'action-tab-mismatch'),
+      ]);
+      const fillFreezeCalls = fillCalls.filter((call) => (
+        !call.questionDotToken
+        && ts.isPropertyAccessExpression(call.expression)
+        && !call.expression.questionDotToken
+        && ts.isIdentifier(call.expression.expression)
+        && call.expression.expression.text === 'Object'
+        && call.expression.name.text === 'freeze'
+      )).sort((left, right) => left.pos - right.pos);
+      const deferredFreezeObject = fillFreezeCalls.length === 2
+        && fillFreezeCalls[1]!.arguments.length === 1
+        && ts.isObjectLiteralExpression(fillFreezeCalls[1]!.arguments[0]!)
+        ? fillFreezeCalls[1]!.arguments[0] as ts.ObjectLiteralExpression
+        : null;
+      const deferredEntries = exactObjectEntries(deferredFreezeObject, ['deferred'], false);
+      if (
+        !fillCanonicalGlobal('Object')
+        || fillFreezeCalls.length !== 2
+        || fillFreezeCalls[0] !== (finalSourceFillCall?.arguments[0] ?? null)
+        || !deferredEntries
+        || deferredEntries.get('deferred')?.kind !== ts.SyntaxKind.TrueKeyword
+        || !ts.isReturnStatement(fillFreezeCalls[1]!.parent)
+      ) fillGrammarValid = false;
+      else {
+        for (const call of fillFreezeCalls) {
+          fillCertifiedCalls.add(call);
+          certifyFillAggregateTree(call);
+        }
+      }
+      const fillExecuteScriptCalls = fillCalls.filter((call) => {
+        const execute = call.expression;
+        return ts.isPropertyAccessExpression(execute)
+          && !execute.questionDotToken
+          && execute.name.text === 'executeScript'
+          && ts.isPropertyAccessExpression(execute.expression)
+          && !execute.expression.questionDotToken
+          && execute.expression.name.text === 'scripting'
+          && ts.isIdentifier(execute.expression.expression)
+          && execute.expression.expression.text === 'chrome';
+      });
+      const fillExecuteScriptCall = fillExecuteScriptCalls.length === 1
+        ? fillExecuteScriptCalls[0]!
+        : null;
+      const fillExecuteEntries = exactObjectEntries(
+        fillExecuteScriptCall?.arguments.length === 1
+          && ts.isObjectLiteralExpression(fillExecuteScriptCall.arguments[0]!)
+          ? fillExecuteScriptCall.arguments[0]!
+          : null,
+        ['target', 'world', 'func', 'args'],
+        false,
+      );
+      const fillExecuteTarget = fillExecuteEntries?.get('target');
+      const fillTargetEntries = exactObjectEntries(
+        fillExecuteTarget && ts.isObjectLiteralExpression(fillExecuteTarget)
+          ? fillExecuteTarget
+          : null,
+        ['tabId', 'documentIds'],
+        false,
+      );
+      const fillDocumentIds = fillTargetEntries?.get('documentIds');
+      const fillExecuteFunc = fillExecuteEntries?.get('func');
+      const fillExecuteArgs = fillExecuteEntries?.get('args');
+      const fillDispatchAssignment = fillExecuteScriptCall
+        && ts.isBinaryExpression(fillExecuteScriptCall.parent)
+        && fillExecuteScriptCall.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && fillExecuteScriptCall.parent.right === fillExecuteScriptCall
+        && fillExactIdentifier(fillExecuteScriptCall.parent.left, dispatchFill)
+        ? fillExecuteScriptCall.parent
+        : null;
+      const fillExecuteScriptValid = Boolean(
+        fillCanonicalGlobal('chrome')
+        && fillCanonicalImport('selectedDestinationInjectedFunction', './destination-adapters')
+        && fillExecuteScriptCall
+        && !fillExecuteScriptCall.questionDotToken
+        && fillExecuteEntries
+        && fillTargetEntries
+        && fillExactProperty(fillTargetEntries.get('tabId'), consumingFill, 'destinationTabId')
+        && fillDocumentIds
+        && ts.isArrayLiteralExpression(fillDocumentIds)
+        && fillDocumentIds.elements.length === 1
+        && fillExactProperty(fillDocumentIds.elements[0], consumingFill, 'destinationDocumentId')
+        && exactString(fillExecuteEntries.get('world'), 'ISOLATED')
+        && fillExecuteFunc
+        && ts.isNonNullExpression(fillExecuteFunc)
+        && ts.isIdentifier(fillExecuteFunc.expression)
+        && fillExecuteFunc.expression.text === 'selectedDestinationInjectedFunction'
+        && fillExecuteArgs
+        && ts.isArrayLiteralExpression(fillExecuteArgs)
+        && fillExecuteArgs.elements.length === 1
+        && fillExactIdentifier(fillExecuteArgs.elements[0], fillPlanFill)
+        && fillDispatchAssignment !== null,
+      );
+      if (!fillExecuteScriptValid) fillGrammarValid = false;
+      else {
+        fillCertifiedCalls.add(fillExecuteScriptCall!);
+        certifyFillAggregateTree(fillExecuteScriptCall!);
+        fillCertifiedAssignments.add(fillDispatchAssignment!);
+      }
+
+      const fillWriteEntries: Array<{ root: ts.VariableDeclaration; node: ts.Node }> = [];
+      const recordFillWrite = (target: ts.Expression, writeNode: ts.Node) => {
+        const root = fillRootDeclaration(target);
+        if (root) fillWriteEntries.push({ root, node: writeNode });
+      };
+      const collectFillWrites = (node: ts.Node) => {
+        if (
+          ts.isBinaryExpression(node)
+          && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        ) recordFillWrite(node.left, node);
+        if (
+          (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+          && (node.operator === ts.SyntaxKind.PlusPlusToken
+            || node.operator === ts.SyntaxKind.MinusMinusToken)
+        ) recordFillWrite(node.operand, node);
+        if (ts.isDeleteExpression(node)) recordFillWrite(node.expression, node);
+        if (
+          (ts.isForInStatement(node) || ts.isForOfStatement(node))
+          && !ts.isVariableDeclarationList(node.initializer)
+        ) recordFillWrite(node.initializer, node);
+        ts.forEachChild(node, collectFillWrites);
+      };
+      collectFillWrites(fillFunction);
+      const protectedFillTargets = new Set<ts.VariableDeclaration>([...fillOrigins]);
+      if (consumingFill) protectedFillTargets.add(consumingFill);
+      if (dispatchFill) protectedFillTargets.add(dispatchFill);
+      const nullKillTargets = new Set<ts.VariableDeclaration>(
+        [preparedFill, sourceAuthorizationFill, finalSourceFill]
+          .filter((declaration): declaration is ts.VariableDeclaration => declaration !== null),
+      );
+      const dispatchRejectShape = (expression: ts.Expression) => Boolean(
+        ts.isCallExpression(expression)
+        && !expression.questionDotToken
+        && ts.isPropertyAccessExpression(expression.expression)
+        && !expression.expression.questionDotToken
+        && ts.isIdentifier(expression.expression.expression)
+        && expression.expression.expression.text === 'Promise'
+        && expression.expression.name.text === 'reject'
+        && fillCanonicalGlobal('Promise')
+        && fillCanonicalGlobal('Error')
+        && expression.arguments.length === 1
+        && ts.isNewExpression(expression.arguments[0]!)
+        && ts.isIdentifier((expression.arguments[0] as ts.NewExpression).expression)
+        && ((expression.arguments[0] as ts.NewExpression).expression as ts.Identifier).text === 'Error'
+        && ((expression.arguments[0] as ts.NewExpression).arguments?.length ?? 0) === 1
+        && exactString((expression.arguments[0] as ts.NewExpression).arguments?.[0], 'dispatch-failed'),
+      );
+      for (const { root, node } of fillWriteEntries) {
+        if (!protectedFillTargets.has(root)) continue;
+        if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+          fillFlowValid = false;
+          continue;
+        }
+        if (node === fillDispatchAssignment) continue;
+        if (
+          nullKillTargets.has(root)
+          && ts.isIdentifier(node.left)
+          && fillDeclarationForIdentifier(node.left) === root
+          && node.right.kind === ts.SyntaxKind.NullKeyword
+        ) continue;
+        if (
+          root === preparedFill
+          && preparedFill !== null
+          && ts.isIdentifier(node.left)
+          && fillDeclarationForIdentifier(node.left) === preparedFill
+          && ts.isAsExpression(node.right)
+          && node.right.type.getText(file) === 'PreparedFillDispatch'
+          && fillExactIdentifier(node.right.expression, preparationResultFill)
+        ) {
+          fillCertifiedAssignments.add(node);
+          continue;
+        }
+        if (
+          root === dispatchFill
+          && dispatchFill !== null
+          && ts.isIdentifier(node.left)
+          && fillDeclarationForIdentifier(node.left) === dispatchFill
+          && dispatchRejectShape(node.right)
+        ) continue;
+        fillFlowValid = false;
+      }
+
+      const fillAllowedReturns = new Set<ts.ReturnStatement>();
+      const collectFillAllowedReturns = (node: ts.Node) => {
+        if (
+          ts.isReturnStatement(node)
+          && node.expression
+          && ts.isAsExpression(node.expression)
+          && node.expression.type.getText(file) === 'WorkerResponseV1'
+          && fillExactIdentifier(node.expression.expression, preparationResultFill)
+        ) fillAllowedReturns.add(node);
+        ts.forEachChild(node, collectFillAllowedReturns);
+      };
+      collectFillAllowedReturns(fillFunction);
+      const containsFillOriginReference = (node: ts.Node) => {
+        let contains = false;
+        const visit = (selected: ts.Node) => {
+          if (contains) return;
+          if (
+            ts.isIdentifier(selected)
+            && isReferenceIdentifier(selected)
+            && !isDeclaredNameIdentifier(selected)
+          ) {
+            const declaration = fillDeclarationForIdentifier(selected);
+            if (declaration && fillOrigins.has(declaration)) {
+              contains = true;
+              return;
+            }
+          }
+          ts.forEachChild(selected, visit);
+        };
+        visit(node);
+        return contains;
+      };
+      const fillFlowContext: ValueFlowContext = Object.freeze({
+        allowedReturns: fillAllowedReturns,
+        certifiedFlowCalls: fillCertifiedCalls,
+        certifiedFlowAggregates: fillCertifiedAggregates,
+        certifiedFlowAssignments: fillCertifiedAssignments,
+        declarationReceives: (declaration: ts.VariableDeclaration) => (
+          fillReceivers.has(declaration)
+        ),
+      });
+      const collectFillFlow = (node: ts.Node) => {
+        if (node !== fillFunction && ts.isFunctionLike(node)) {
+          if (containsFillOriginReference(node)) fillFlowValid = false;
+          return;
+        }
+        if (
+          ts.isBindingElement(node)
+          && node.initializer
+          && containsFillOriginReference(node.initializer)
+        ) fillFlowValid = false;
+        if (
+          ts.isIdentifier(node)
+          && isReferenceIdentifier(node)
+          && !isDeclaredNameIdentifier(node)
+        ) {
+          const declaration = fillDeclarationForIdentifier(node);
+          if (
+            declaration
+            && fillOrigins.has(declaration)
+            && !valueFlowTerminatesLegally(node, fillFlowContext, fillFunction)
+          ) fillFlowValid = false;
+        }
+        ts.forEachChild(node, collectFillFlow);
+      };
+      collectFillFlow(fillFunction);
+      if (!fillGrammarValid) report('fill dispatch stage does not match closed payload grammar');
+      if (!fillFlowValid) {
+        report('fill dispatch authoritative values must not escape certified outbound flow');
+      }
     }
   }
 
@@ -3776,6 +5002,235 @@ describe('serialized handoff lifecycle', () => {
       extraCanonicalCallMutation,
       'extra canonical authoritative call',
     );
+
+    for (const [label, inserted] of [
+      [
+        'binding default object carrier',
+        [
+          '  const { parked: defaultCarrier = staged } = {} as { parked?: unknown };',
+          '  (request as unknown as { parkedDefault: unknown }).parkedDefault = defaultCarrier;',
+        ].join('\n'),
+      ],
+      [
+        'binding default array carrier',
+        [
+          '  const [slotCarrier = staged] = [] as unknown[];',
+          '  (request as unknown as { parkedSlot: unknown }).parkedSlot = slotCarrier;',
+        ].join('\n'),
+      ],
+    ] as const) {
+      expect.soft(analyzeMutation(insertBeforeArming(inserted, label), label, true), label).toContain(
+        'inner binding patterns are forbidden',
+      );
+    }
+
+    const moduleVaultMutation = replaceExactlyOnce(
+      source,
+      'async function preparePayloadBearingFill(',
+      [
+        'const parkedReaders: Array<() => unknown> = [];',
+        '',
+        'async function preparePayloadBearingFill(',
+      ].join('\n'),
+      'module vault declaration',
+    );
+    expect.soft(analyzeMutation(moduleVaultMutation, 'module vault declaration', true)).toContain(
+      'module scope declarations do not match the closed allowlist',
+    );
+
+    const parkedSourceClosureMutation = replaceExactlyOnce(
+      moduleVaultMutation,
+      '  const arming: ArmingSessionStateV1 = Object.freeze({',
+      [
+        '  parkedReaders.push(() => source);',
+        '  const arming: ArmingSessionStateV1 = Object.freeze({',
+      ].join('\n'),
+      'parked source-reprobe closure',
+    );
+    const parkedSourceClosureIssues = analyzeMutation(
+      parkedSourceClosureMutation,
+      'parked source-reprobe closure',
+      true,
+    );
+    expect.soft(parkedSourceClosureIssues, 'parked source-reprobe closure').toContain(
+      'inner authoritative values must not escape certified outbound flow',
+    );
+    expect.soft(parkedSourceClosureIssues, 'parked source-reprobe closure').toContain(
+      'module scope declarations do not match the closed allowlist',
+    );
+
+    const fillParkedPlansMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        '}\n\nasync function fillEmptyReviewedFields(',
+        [
+          '}',
+          '',
+          'const parkedPlans: unknown[] = [];',
+          '',
+          'async function fillEmptyReviewedFields(',
+        ].join('\n'),
+        'fill vault declaration',
+      ),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+      ].join('\n'),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+        '  parkedPlans.push(fillPlan);',
+      ].join('\n'),
+      'fill vault retention',
+    );
+    const fillParkedPlansIssues = analyzeMutation(fillParkedPlansMutation, 'fill vault retention', true);
+    expect.soft(fillParkedPlansIssues, 'fill vault retention').toContain(
+      'fill dispatch authoritative values must not escape certified outbound flow',
+    );
+    expect.soft(fillParkedPlansIssues, 'fill vault retention').toContain(
+      'module scope declarations do not match the closed allowlist',
+    );
+
+    for (const [label, inserted] of [
+      [
+        'authoritative element-access key sink',
+        '  (globalThis as unknown as Record<string, number>)[staged.envelope.packId] = 1;',
+      ],
+      [
+        'authoritative element-access sink RHS',
+        "  (request as unknown as Record<string, unknown>)['parkedElement'] = staged;",
+      ],
+      [
+        'authoritative enum carrier escape',
+        [
+          '  enum ParkedPayload { A = staged as never }',
+          '  const readParkedEnum = () => ParkedPayload.A;',
+          '  void readParkedEnum;',
+        ].join('\n'),
+      ],
+      [
+        'authoritative delete key sink',
+        '  delete (request as unknown as Record<string, unknown>)[staged.envelope.packId];',
+      ],
+    ] as const) {
+      expectAuthoritativeOutboundRejection(insertBeforeArming(inserted, label), label);
+    }
+
+    const commaSmuggleMutation = replaceExactlyOnce(
+      source,
+      [
+        '    destinationRaw = await chrome.scripting.executeScript({',
+        '      target: { tabId: staged.destination.destinationTabId, frameIds: [0] },',
+        "      world: 'ISOLATED',",
+        '      func: selectedDestinationInjectedFunction!,',
+        '      args: [previewPlan.plan],',
+        '    });',
+      ].join('\n'),
+      [
+        '    destinationRaw = (await chrome.scripting.executeScript({',
+        '      target: { tabId: staged.destination.destinationTabId, frameIds: [0] },',
+        "      world: 'ISOLATED',",
+        '      func: selectedDestinationInjectedFunction!,',
+        '      args: [previewPlan.plan],',
+        '    }), staged);',
+      ].join('\n'),
+      'comma destination-result smuggle',
+    );
+    expectAuthoritativeOutboundRejection(commaSmuggleMutation, 'comma destination-result smuggle');
+
+    const nestedClosureWriteMutation = insertBeforeArming(
+      [
+        '  const bump = () => writeSessionState({',
+        '    schema: SESSION_STATE_SCHEMA,',
+        "    state: 'consuming',",
+        "    generation: 'ffffffffffffffffffffffffffffffff',",
+        "    armNonce: 'ffffffffffffffffffffffffffffffff',",
+        "    packId: 'ffffffffffffffffffffffffffffffff',",
+        "    attemptId: 'ffffffffffffffffffffffffffffffff',",
+        '    replayUntil: 1,',
+        '    attemptNotAfterMs: 1,',
+        '    destinationTabId: 1,',
+        "    destinationDocumentId: 'destination-document-A',",
+        '  });',
+        '  void bump();',
+      ].join('\n'),
+      'nested closure canonical write',
+    );
+    expect.soft(
+      analyzeMutation(nestedClosureWriteMutation, 'nested closure canonical write', true),
+      'nested closure canonical write',
+    ).toContain('inner authoritative call helper is shadowed or noncanonical');
+
+    const optionalCanonicalCallMutation = replaceExactlyOnce(
+      source,
+      '  const live = liveFromSession(arming);',
+      '  const live = liveFromSession?.(arming);',
+      'optional-chained canonical call',
+    );
+    expect.soft(
+      analyzeMutation(optionalCanonicalCallMutation, 'optional-chained canonical call', true),
+      'optional-chained canonical call',
+    ).toContain('inner durability suffix does not match closed grammar');
+
+    const postUsePreviewPlanWriteMutation = insertBeforeArming(
+      '  (previewPlan as unknown as { adapter: unknown }).adapter = 0;',
+      'post-last-use preview-plan property write',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      postUsePreviewPlanWriteMutation,
+      'post-last-use preview-plan property write',
+    );
+
+    const stagedInjectionResultMutation = replaceExactlyOnce(
+      source,
+      [
+        '  const preflight = validateDestinationRepreflightInjectionResult(',
+        '    destinationRaw,',
+        '    staged.destination.destinationDocumentId,',
+        '  );',
+      ].join('\n'),
+      [
+        '  const preflight = validateDestinationRepreflightInjectionResult(',
+        '    staged,',
+        '    staged.destination.destinationDocumentId,',
+        '  );',
+      ].join('\n'),
+      'staged injection-result substitution',
+    );
+    expect.soft(
+      analyzeMutation(stagedInjectionResultMutation, 'staged injection-result substitution', true),
+      'staged injection-result substitution',
+    ).toContain('inner authoritative call helper is shadowed or noncanonical');
+
+    const helperModuleWriteMutation = replaceExactlyOnce(
+      source,
+      '): Promise<SourceReprobeValidationResult | null> {\n  try {',
+      [
+        '): Promise<SourceReprobeValidationResult | null> {',
+        '  sessionTrustedAccess = null;',
+        '  try {',
+      ].join('\n'),
+      'helper-body module mutable write',
+    );
+    expect.soft(
+      analyzeMutation(helperModuleWriteMutation, 'helper-body module mutable write', true),
+      'helper-body module mutable write',
+    ).toContain('module mutable writes must match certified sites');
+
+    const helperUnresolvedWriteMutation = replaceExactlyOnce(
+      source,
+      '): Promise<SourceReprobeValidationResult | null> {\n  try {',
+      [
+        '): Promise<SourceReprobeValidationResult | null> {',
+        '  prepared = null;',
+        '  try {',
+      ].join('\n'),
+      'helper-body unresolved write',
+    );
+    expect.soft(
+      analyzeMutation(helperUnresolvedWriteMutation, 'helper-body unresolved write'),
+      'helper-body unresolved write',
+    ).toContain('file writes must target resolvable declared bindings');
 
     const preparedReturns: string[][] = [];
     const collectPreparedReturns = (node: ts.Node) => {
