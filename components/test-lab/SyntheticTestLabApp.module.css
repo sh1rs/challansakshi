@@ -102,6 +102,64 @@
 .boundaryStrip b { font: 700 16px Georgia, serif; }
 .boundaryStrip span { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 
+.proofLane { margin-top: 40px; overflow: hidden; border: 1px solid #a8bdb4; border-radius: 18px; background: #fff; box-shadow: 0 22px 55px rgb(25 48 46 / 9%); }
+.proofLane [tabindex='-1'] { scroll-margin-top: 18px; }
+.proofLane [tabindex='-1']:focus-visible { outline: 3px solid var(--amber); outline-offset: 5px; border-radius: 4px; }
+.proofBanner { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 22px; background: var(--navy); color: #fff; }
+.proofBanner strong { font: 700 16px Georgia, serif; }
+.proofBanner span { color: #d9e8e8; font-size: 12px; text-align: right; }
+.proofStatus { min-height: 44px; margin: 0; display: flex; align-items: center; padding: 10px 22px; border-bottom: 1px solid var(--line); background: #edf7f3; color: var(--teal-dark); font-size: 13px; font-weight: 800; }
+.proofBeat { padding: 30px clamp(18px, 4vw, 44px); border-bottom: 1px solid var(--line); }
+.proofBeat:last-child { border-bottom: 0; }
+.proofBeat h2,
+.proofBeat h3 { max-width: 850px; margin: 7px 0 0; font: 700 clamp(28px, 4vw, 42px)/1.08 Georgia, "Times New Roman", serif; letter-spacing: -.035em; }
+.proofBeat > p:not(.kicker),
+.proofBeat li { max-width: 850px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.proofPair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 22px; }
+.proofPair article { min-width: 0; padding: 21px; border: 1px solid var(--line); border-radius: 12px; background: #f7faf8; }
+.proofPair span,
+.proofPair strong,
+.proofPair p { display: block; overflow-wrap: anywhere; }
+.proofPair span { color: var(--teal-dark); font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.proofPair strong { margin-top: 8px; font: 700 20px Georgia, serif; }
+.proofPair p { margin: 5px 0 0; color: var(--muted); }
+.proofPair > b { color: #934337; font-size: 26px; }
+.proofProvenance { margin-top: 14px; padding: 12px 14px; border: 1px solid #d7b976; border-radius: 9px; background: #fff8e7; }
+.proofSources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.proofSources article { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.proofSources span,
+.proofSources strong,
+.proofSources small { display: block; overflow-wrap: anywhere; }
+.proofSources span { color: var(--teal-dark); font-size: 10px; font-weight: 850; }
+.proofSources strong { margin-top: 7px; font-size: 16px; }
+.proofSources small { margin-top: 5px; color: var(--muted); }
+.proofSources p { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: #6c5a38; font-size: 12px; line-height: 1.5; }
+.proofOffenceLimit { margin-top: 12px; padding: 16px; border-left: 4px solid var(--amber); background: #fff8e9; }
+.proofOffenceLimit strong,
+.proofOffenceLimit span { display: block; }
+.proofOffenceLimit span { margin-top: 5px; color: var(--teal-dark); font-size: 11px; }
+.proofOffenceLimit p { margin: 8px 0 0; color: #6c5a38; font-size: 12px; }
+.proofConsent,
+.proofHandoff { margin-top: 18px; padding: 20px; border: 1px solid #a8bdb4; border-radius: 12px; background: #eff7f3; }
+.proofConsent p,
+.proofHandoff p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.proofHandoff > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.proofHandoff > div strong { font: 700 21px Georgia, serif; }
+.proofHandoff > div span { padding: 6px 9px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 10px; font-weight: 800; }
+.proofBoundaryGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.proofBoundaryGrid article { padding: 17px; border: 1px solid var(--line); border-radius: 10px; background: #f7faf8; }
+.proofBoundaryGrid strong { font: 700 17px Georgia, serif; }
+.proofBoundaryGrid p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.proofActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.guardrailCases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.guardrailCases article { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #f8faf8; }
+.guardrailCases span,
+.guardrailCases strong { display: block; }
+.guardrailCases span { color: var(--teal-dark); font: 850 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.guardrailCases strong { margin-top: 7px; }
+.guardrailCases p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.analysisProvenance { margin: 14px 0 0; padding: 11px 13px; border: 1px solid #d7b976; border-radius: 8px; background: #fff8e9; color: #654c22; font-size: 12px; }
+
 .suiteSection { padding-top: 78px; }
 .suiteHeading,
 .customHeading,
@@ -272,6 +330,39 @@
 .finalBoundary strong { font: 700 20px Georgia, serif; }
 .finalBoundary p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
 
+.fixturePage { min-height: 100vh; padding: 36px 0 72px; }
+.fixtureMain { width: min(980px, calc(100% - 32px)); margin: 0 auto; }
+.fixtureHeader { padding: 26px; border-radius: 16px 16px 0 0; background: var(--navy); color: #fff; }
+.fixtureHeader h1 { margin-top: 8px; font-size: clamp(36px, 7vw, 60px); }
+.fixtureHeader > p:last-child { max-width: 720px; color: #d9e8e8; line-height: 1.65; }
+.fixtureForm,
+.fixtureInstrumentation { padding: 26px; border: 1px solid var(--line); background: #fff; }
+.fixtureForm { display: grid; gap: 18px; }
+.fixtureForm > section { display: grid; gap: 8px; }
+.fixtureForm label,
+.fixtureInstrumentation label { color: var(--muted); font-size: 13px; font-weight: 780; }
+.fixtureForm select,
+.fixtureForm textarea,
+.fixtureForm input { width: 100%; min-height: 48px; padding: 9px 11px; border: 1px solid #abb9b2; border-radius: 8px; background: #fffefb; color: var(--ink); font-size: 16px; }
+.fixtureForm textarea { min-height: 130px; resize: vertical; }
+.fixtureProtected { margin-top: 8px; padding: 20px; border: 2px dashed #c98962; border-radius: 12px; background: #fff8f3; }
+.fixtureProtected h2,
+.fixtureInstrumentation h2 { margin: 0; font: 700 25px Georgia, serif; }
+.fixtureProtected > p { margin: 7px 0 0; color: #7f302c; font-weight: 800; line-height: 1.55; }
+.fixtureProtected > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.fixtureProtected label { display: grid; gap: 6px; }
+.fixtureProtected button,
+.fixtureInstrumentation button,
+.fixtureProbes a { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 9px 14px; border: 1px solid #bd7772; border-radius: 8px; background: #fff; color: #7f302c; font-weight: 800; text-decoration: none; }
+.fixtureInstrumentation { border-top: 0; border-radius: 0 0 16px 16px; }
+.fixtureInstrumentation > div:first-child { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.fixtureCounters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+.fixtureCounters label { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; }
+.fixtureCounters span { overflow-wrap: anywhere; }
+.fixtureCounters output { min-width: 28px; color: var(--teal-dark); font-weight: 900; text-align: right; }
+.fixtureInstrumentation > output { display: block; min-height: 48px; padding: 12px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 8px; background: #f7faf8; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fixtureProbes { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+
 @media (max-width: 980px) {
   .hero { grid-template-columns: 1fr; }
   .heroProof { max-width: 620px; }
@@ -300,6 +391,15 @@
   .offenceCard { grid-column: auto; }
   .localPreview { grid-template-columns: 1fr; }
   .finalBoundary { grid-template-columns: 1fr; gap: 8px; }
+  .proofBanner { align-items: flex-start; flex-direction: column; }
+  .proofBanner span { text-align: left; }
+  .proofPair,
+  .proofSources,
+  .proofBoundaryGrid,
+  .guardrailCases,
+  .fixtureProtected > div,
+  .fixtureCounters { grid-template-columns: 1fr; }
+  .proofPair > b { transform: rotate(90deg); justify-self: center; }
 }
 
 @media (max-width: 560px) {
@@ -390,6 +490,25 @@
   .privacyNote { font-size: 16px; }
   .localChoose { min-height: 48px; width: 100%; font-size: 16px; }
   .dangerButton { min-height: 48px; font-size: 16px; }
+  .proofStatus,
+  .proofBeat > p:not(.kicker),
+  .proofSources p,
+  .proofOffenceLimit p,
+  .proofConsent p,
+  .proofHandoff p,
+  .proofBoundaryGrid p,
+  .guardrailCases p,
+  .analysisProvenance,
+  .fixtureHeader > p:last-child,
+  .fixtureForm label,
+  .fixtureInstrumentation label { font-size: 16px; }
+  .proofActions { flex-direction: column; }
+  .proofActions > *,
+  .fixtureProbes > * { width: 100%; }
+  .proofBanner span,
+  .proofSources span,
+  .proofSources small,
+  .proofOffenceLimit span { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

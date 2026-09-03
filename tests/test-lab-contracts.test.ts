@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
+import type { ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import SyntheticTestLabApp, * as TestLabModule from '../components/test-lab/SyntheticTestLabApp';
 import { syntheticEvaluationCases } from '../lib/synthetic-evidence-corpus';
+import * as SyntheticLabState from '../lib/synthetic-lab-state';
 
 const componentSource = readFileSync(
   new URL('../components/test-lab/SyntheticTestLabApp.tsx', import.meta.url),
@@ -58,11 +60,59 @@ type SelectionState = {
 
 type SelectionTransition = (
   state: SelectionState,
-  action: { type: 'filter'; filter: SelectionState['filter'] } | { type: 'case'; caseId: string },
+  action:
+    | { type: 'filter'; filter: SelectionState['filter'] }
+    | { type: 'case'; caseId: string }
+    | { type: 'start-proof' },
 ) => SelectionState;
 
 function selectionTransition() {
   return Reflect.get(TestLabModule, 'transitionTestLabSelection') as SelectionTransition | undefined;
+}
+
+function proofApis() {
+  const create = Reflect.get(SyntheticLabState, 'createSyntheticJudgeProofState') as undefined | ((testCase: (typeof syntheticEvaluationCases)[number]) => unknown);
+  const reduce = Reflect.get(SyntheticLabState, 'reduceSyntheticJudgeProofState') as undefined | ((state: unknown, action: Record<string, unknown>) => unknown);
+  const View = Reflect.get(TestLabModule, 'SyntheticJudgeProofView') as undefined | ComponentType<{
+    state: unknown;
+    dispatch: (action: unknown) => void;
+  }>;
+  expect(create).toBeTypeOf('function');
+  expect(reduce).toBeTypeOf('function');
+  expect(View).toBeTypeOf('function');
+  if (!create || !reduce || !View) throw new Error('Missing synthetic proof API.');
+  return { create, reduce, View };
+}
+
+function proofStates() {
+  const { create, reduce, View } = proofApis();
+  const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+  expect(flagship).toBeDefined();
+  if (!flagship) throw new Error('Missing flagship case.');
+  const started = reduce(create(flagship), { type: 'START_90_SECOND_PROOF' });
+  const compared = reduce(started, {
+    type: 'CONFIRM_AND_COMPARE',
+    resultRevisionId: '11111111111111111111111111111111',
+  });
+  const packed = reduce(compared, {
+    type: 'CONFIRM_SYNTHETIC_PACK',
+    packRevisionId: '22222222222222222222222222222222',
+    generatedAt: '2026-09-03T10:30:00.000Z',
+  });
+  const opened = reduce(packed, { type: 'SIMULATE_OFFICIAL_ROUTE_OPEN' });
+  const returned = reduce(opened, { type: 'RECORD_SYNTHETIC_RETURN' });
+  const corrected = reduce(returned, { type: 'CORRECT_IMAGE_OBSERVATIONS' });
+  const complete = reduce(corrected, {
+    type: 'CONFIRM_AND_COMPARE',
+    resultRevisionId: '33333333333333333333333333333333',
+  });
+  const guardrails = reduce(complete, { type: 'SHOW_GUARDRAILS' });
+  const extension = reduce(guardrails, { type: 'OPEN_EXTENSION_SIMULATION' });
+  return { View, started, compared, packed, opened, returned, corrected, complete, guardrails, extension };
+}
+
+function renderProof(View: ComponentType<{ state: unknown; dispatch: (action: unknown) => void }>, state: unknown) {
+  return renderToStaticMarkup(createElement(View, { state, dispatch: () => undefined }));
 }
 
 describe('synthetic Test Lab product contract', () => {
@@ -138,6 +188,27 @@ describe('synthetic Test Lab product contract', () => {
     });
   });
 
+  it('selects case 04 for proof start without duplicating the proof live announcement', () => {
+    const transition = selectionTransition();
+
+    expect(transition).toBeTypeOf('function');
+    if (!transition) return;
+
+    expect(transition({
+      filter: 'inconclusive',
+      selectedId: 'case-05-unclear-evidence',
+      selectionRequest: 4,
+      focusTargetId: 'case-05-unclear-evidence',
+      announcement: 'Previous selection announcement',
+    }, { type: 'start-proof' })).toEqual({
+      filter: 'all',
+      selectedId: 'case-04-category-conflict',
+      selectionRequest: 5,
+      focusTargetId: null,
+      announcement: '',
+    });
+  });
+
   it('makes the Evidence → Explain → Verify → Act sequence explicit without a tall guided header', () => {
     const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
 
@@ -185,6 +256,73 @@ describe('synthetic Test Lab product contract', () => {
 
   it('links the flagship walkthrough to the separate test lab', () => {
     expect(demoSource).toMatch(/href="\/demo\/test-lab"/);
+    expect(renderToStaticMarkup(createElement(SyntheticTestLabApp))).toContain('Start the 90-second proof');
+    expect(demoSource).toContain('Start the 90-second proof');
+  });
+
+  it('renders the exact six-beat proof progressively with one persistent proof live region', () => {
+    const states = proofStates();
+    const stages = [
+      states.started,
+      states.compared,
+      states.packed,
+      states.opened,
+      states.returned,
+      states.corrected,
+      states.complete,
+    ];
+    const combined = stages.map((state) => renderProof(states.View, state)).join('\n');
+
+    for (const contract of [
+      ['challansakshi-proof-case-heading', '1. Review the synthetic pair'],
+      ['challansakshi-proof-evidence-heading', '2. Confirm the source-linked observations'],
+      ['challansakshi-proof-finding-heading', '3. See the bounded finding'],
+      ['challansakshi-proof-handoff-heading', '4. Try the web handoff'],
+      ['challansakshi-proof-return-heading', 'Official handoff simulation'],
+      ['challansakshi-proof-correction-heading', '5. Correct and recompute'],
+      ['challansakshi-proof-reconfirm-heading', 'Reconfirm the corrected observations'],
+      ['challansakshi-proof-boundary-heading', '6. AI extracts. Rules compare. You control the handoff.'],
+    ] as const) {
+      expect(combined).toContain(`id="${contract[0]}"`);
+      expect(combined).toContain(contract[1]);
+    }
+
+    for (const state of stages) {
+      const html = renderProof(states.View, state);
+      expect(html.match(/data-challansakshi-proof-status=/g)).toHaveLength(1);
+      expect(html.match(/aria-live="polite"/g)).toHaveLength(1);
+    }
+    expect(combined).toContain('Pre-authored bundled synthetic observations · no model call in this proof.');
+    expect(combined).toContain('Bundled fictional vehicle-record observation; not independent or official verification.');
+    expect(combined).toContain('Bundled fictional image observation; no live model or government request ran in this proof.');
+    expect(combined).toContain('Synthetic demonstration data');
+    expect(combined).toContain('Web handoff · works everywhere');
+    expect(combined).toContain('Synthetic citizen-recorded example');
+    expect(combined).toContain('No government request is made');
+  });
+
+  it('keeps guardrails ordered and the fictional extension simulation skippable after the timed core', () => {
+    const states = proofStates();
+    const before = renderProof(states.View, states.complete);
+    const guardrails = renderProof(states.View, states.guardrails);
+    const extension = renderProof(states.View, states.extension);
+
+    expect(before).toContain('Show guardrails');
+    expect(before).toContain('Open optional synthetic extension simulation');
+    expect(before).not.toContain('id="challansakshi-proof-extension-heading"');
+    expect(guardrails).toContain('id="challansakshi-proof-guardrails-heading"');
+    expect(guardrails).toContain('Guardrails: abstain when the evidence does not support action');
+    expect(guardrails.indexOf('TL-05')).toBeLessThan(guardrails.indexOf('TL-01'));
+    expect(extension).toContain('id="challansakshi-proof-extension-heading"');
+    expect(extension).toContain('Synthetic extension simulation');
+    expect(extension).toContain('/demo/extension-fixture/source');
+    expect(extension).toContain('/demo/extension-fixture/destination');
+    expect(extension).toContain('Real official adapters remain disabled until verified and approved.');
+  });
+
+  it('provides visible focus indication for every programmatically focused proof heading', () => {
+    expect(styles).toMatch(/\.proofLane\s+\[tabindex=['"]-1['"]\]:focus-visible/);
+    expect(styles).toMatch(/outline:\s*3px solid/);
   });
 
   it('keeps lab controls at 48px and essential copy at 16px on narrow screens', () => {

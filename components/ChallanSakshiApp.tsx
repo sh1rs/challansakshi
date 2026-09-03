@@ -588,7 +588,11 @@ function Landing({ language, onStart, textFirst, imageRevealed, onRevealImage }:
           <div className="hero-actions">
             <Button type="button" onClick={onStart}>{language === 'hi' ? 'काल्पनिक डेमो शुरू करें' : 'Start fictional demo'}</Button>
             <a className="button button-secondary" href="/review">{language === 'hi' ? 'असली चालान की समीक्षा करें' : 'Review a real challan'}</a>
-            <a className="button button-quiet" href="/demo/test-lab">{language === 'hi' ? 'टेस्ट लैब खोलें' : 'Open Test Lab'}</a>
+            <a
+              className="button button-quiet"
+              href="/demo/test-lab"
+              aria-label={language === 'hi' ? '90-सेकंड प्रमाण शुरू करें' : 'Start the 90-second proof'}
+            >{language === 'hi' ? 'टेस्ट लैब खोलें' : 'Open Test Lab'}<small aria-hidden="true"> · {language === 'hi' ? '90-सेकंड प्रमाण' : '90-second proof'}</small></a>
           </div>
           <p className="microcopy"><span aria-hidden="true">◉</span>{language === 'hi' ? 'केवल काल्पनिक डेटा · कोई अपलोड या सरकारी कनेक्शन नहीं' : 'Fictional data only · no uploads or government connection'}</p>
         </div>

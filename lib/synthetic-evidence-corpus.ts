@@ -12,9 +12,15 @@ export interface SyntheticEvaluationCase {
   id: string;
   title: string;
   description: string;
+  analysisProvenance?: string;
   expectedOverall: SyntheticOverallFinding;
   extraction: SyntheticEvidenceExtraction;
 }
+
+export const BUNDLED_SYNTHETIC_ANALYSIS_PROVENANCE = 'Pre-authored bundled synthetic observations · no model call in this proof.' as const;
+export const BUNDLED_SYNTHETIC_RECORD_LIMITATION = 'Bundled fictional vehicle-record observation; not independent or official verification.' as const;
+export const BUNDLED_SYNTHETIC_IMAGE_LIMITATION = 'Bundled fictional image observation; no live model or government request ran in this proof.' as const;
+export const BUNDLED_SYNTHETIC_OFFENCE_LIMITATION = 'The relevant scene area is visible; this does not decide whether an offence occurred.' as const;
 
 function observation(
   value: string,
@@ -77,7 +83,14 @@ function makeCase(
 ): SyntheticEvaluationCase {
   const value = baseExtraction();
   mutate?.(value);
-  return { id, title, description, expectedOverall, extraction: value };
+  return {
+    id,
+    title,
+    description,
+    analysisProvenance: BUNDLED_SYNTHETIC_ANALYSIS_PROVENANCE,
+    expectedOverall,
+    extraction: value,
+  };
 }
 
 export const syntheticEvaluationCases: SyntheticEvaluationCase[] = [
@@ -103,10 +116,59 @@ export const syntheticEvaluationCases: SyntheticEvaluationCase[] = [
   ),
   makeCase(
     'case-04-category-conflict',
-    'Scooter versus motorcycle',
-    'The vehicle record says scooter while the clear image observation says motorcycle.',
+    'Two-wheeler versus four-wheeler',
+    'The fictional vehicle record shows a blue Honda Activa 6G two-wheeler while the fictional enforcement image shows a white Maruti Swift four-wheeler.',
     'potential-evidence-discrepancy',
-    (value) => { value.enforcement_image.vehicle_category.value = 'Motorcycle'; },
+    (value) => {
+      value.challan_document.alleged_offence = observation(
+        'Stopping beyond the marked stop line',
+        'challan_document',
+        'Challan · offence line',
+      );
+      value.vehicle_record.registration.limitation = BUNDLED_SYNTHETIC_RECORD_LIMITATION;
+      value.vehicle_record.vehicle_category = observation(
+        'Two-wheeler',
+        'vehicle_record',
+        'Vehicle record · category',
+        { limitation: BUNDLED_SYNTHETIC_RECORD_LIMITATION },
+      );
+      value.vehicle_record.colour = observation(
+        'Blue',
+        'vehicle_record',
+        'Vehicle record · colour',
+        { limitation: BUNDLED_SYNTHETIC_RECORD_LIMITATION },
+      );
+      value.vehicle_record.make_model = observation(
+        'Honda Activa 6G',
+        'vehicle_record',
+        'Vehicle record · make and model',
+        { limitation: BUNDLED_SYNTHETIC_RECORD_LIMITATION },
+      );
+      value.enforcement_image.vehicle_category = observation(
+        'Four-wheeler',
+        'enforcement_image',
+        'Image · full vehicle',
+        { limitation: BUNDLED_SYNTHETIC_IMAGE_LIMITATION },
+      );
+      value.enforcement_image.colour = observation(
+        'White',
+        'enforcement_image',
+        'Image · body panel',
+        { limitation: BUNDLED_SYNTHETIC_IMAGE_LIMITATION },
+      );
+      value.enforcement_image.make_model = observation(
+        'Maruti Swift',
+        'enforcement_image',
+        'Image · body shape and badging',
+        { limitation: BUNDLED_SYNTHETIC_IMAGE_LIMITATION },
+      );
+      value.enforcement_image.offence_assessable = observation(
+        'yes',
+        'enforcement_image',
+        'Image · marked stop-line area',
+        { limitation: BUNDLED_SYNTHETIC_OFFENCE_LIMITATION },
+      );
+    },
   ),
   makeCase(
     'case-05-unclear-evidence',

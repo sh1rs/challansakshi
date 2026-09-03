@@ -1,3 +1,5 @@
+import type { ActionReadyReviewFacts, ReviewFactSource, VehicleClass } from './public-challan';
+
 export const SYNTHETIC_SCHEMA_VERSION = '2.0' as const;
 
 export const comparisonFields = [
@@ -87,6 +89,7 @@ export interface SyntheticComparisonRow {
     confidence: SyntheticObservationConfidence;
     visibility: SyntheticObservationVisibility;
     evidenceReference: string;
+    limitation: string;
   }>;
   state: SyntheticComparisonState;
   reasonCode:
@@ -352,6 +355,107 @@ function observationIsConclusive(observation: SyntheticObservation): boolean {
     && !unavailableValuePrefixes.some((prefix) => compactValue.startsWith(prefix));
 }
 
+export type SyntheticClassConflictProjectionResult =
+  | Readonly<{ status: 'eligible'; facts: ActionReadyReviewFacts }>
+  | Readonly<{
+    status: 'abstained';
+    reason:
+      | 'invalid-result-revision'
+      | 'confirmation-revision-mismatch'
+      | 'class-facts-not-action-ready';
+  }>;
+
+export type SyntheticClassConflictProjectionInput = Readonly<{
+  extraction: SyntheticEvidenceExtraction;
+  resultRevisionId: string;
+  confirmation: Readonly<{
+    status: 'confirmed';
+    resultRevisionId: string;
+  }>;
+}>;
+
+function isStrictConfirmedObservation(
+  observation: SyntheticObservation,
+  expectedSource: SyntheticSourceDocument,
+): boolean {
+  return observation.source_document === expectedSource
+    && observation.confidence === 'high'
+    && observation.visibility === 'clear'
+    && observation.user_confirmation_required === true
+    && observation.value.trim().length > 0
+    && observation.evidence_reference.trim().length > 0
+    && observation.limitation.trim().length > 0;
+}
+
+function explicitVehicleClass(value: string): Extract<VehicleClass, 'two-wheeler' | 'four-wheeler'> | null {
+  const normalized = collapse(value);
+  if (normalized === 'twowheeler') return 'two-wheeler';
+  if (normalized === 'fourwheeler') return 'four-wheeler';
+  return null;
+}
+
+/**
+ * Projects the one bounded synthetic class-conflict proof into the neutral
+ * revision-bearing fact shape. The caller must first record an exact human
+ * confirmation for this result revision; medium-confidence aliases never pass.
+ */
+export function projectSyntheticClassConflictFacts(
+  input: SyntheticClassConflictProjectionInput,
+): SyntheticClassConflictProjectionResult {
+  if (!/^[0-9a-f]{32}$/.test(input.resultRevisionId)) {
+    return { status: 'abstained', reason: 'invalid-result-revision' };
+  }
+  if (
+    input.confirmation.status !== 'confirmed'
+    || input.confirmation.resultRevisionId !== input.resultRevisionId
+  ) return { status: 'abstained', reason: 'confirmation-revision-mismatch' };
+
+  const recordClassObservation = input.extraction.vehicle_record.vehicle_category;
+  const imageClassObservation = input.extraction.enforcement_image.vehicle_category;
+  const readableRecordObservation = input.extraction.vehicle_record.registration;
+  const recordClass = explicitVehicleClass(recordClassObservation.value);
+  const imageClass = explicitVehicleClass(imageClassObservation.value);
+  if (
+    !isStrictConfirmedObservation(recordClassObservation, 'vehicle_record')
+    || !isStrictConfirmedObservation(imageClassObservation, 'enforcement_image')
+    || !isStrictConfirmedObservation(readableRecordObservation, 'vehicle_record')
+    || unavailableValues.has(collapse(readableRecordObservation.value))
+    || unavailableValuePrefixes.some((prefix) => collapse(readableRecordObservation.value).startsWith(prefix))
+    || !recordClass
+    || !imageClass
+    || recordClass === imageClass
+  ) return { status: 'abstained', reason: 'class-facts-not-action-ready' };
+
+  const fact = <T>(value: T, source: ReviewFactSource, limitation: string) => Object.freeze({
+    value,
+    source,
+    confidence: 'high' as const,
+    limitation,
+    confirmation: 'citizen-confirmed' as const,
+    reviewRevisionId: input.resultRevisionId,
+  });
+  const facts: ActionReadyReviewFacts = Object.freeze({
+    reviewRevisionId: input.resultRevisionId,
+    citizenVehicleClass: fact(
+      recordClass,
+      'independent-vehicle-record',
+      recordClassObservation.limitation,
+    ),
+    observedEvidenceVehicleClass: fact(
+      imageClass,
+      'official-evidence-image',
+      imageClassObservation.limitation,
+    ),
+    independentReadableVehicleRecord: fact(
+      true,
+      'independent-vehicle-record',
+      readableRecordObservation.limitation,
+    ),
+    supportedSignals: Object.freeze(['vehicle-class-conflict'] as const),
+  });
+  return Object.freeze({ status: 'eligible', facts });
+}
+
 function valuesMatch(field: SyntheticComparisonField, recordValue: string, evidenceValue: string): boolean {
   const left = canonicalValue(field, recordValue);
   const right = canonicalValue(field, evidenceValue);
@@ -375,6 +479,7 @@ function sourcesForField(
         confidence: extraction.challan_document.alleged_registration.confidence,
         visibility: extraction.challan_document.alleged_registration.visibility,
         evidenceReference: extraction.challan_document.alleged_registration.evidence_reference,
+        limitation: extraction.challan_document.alleged_registration.limitation,
       },
       {
         label: 'Vehicle record',
@@ -384,6 +489,7 @@ function sourcesForField(
         confidence: extraction.vehicle_record.registration.confidence,
         visibility: extraction.vehicle_record.registration.visibility,
         evidenceReference: extraction.vehicle_record.registration.evidence_reference,
+        limitation: extraction.vehicle_record.registration.limitation,
       },
       {
         label: 'Enforcement image',
@@ -393,6 +499,7 @@ function sourcesForField(
         confidence: enforcement.confidence,
         visibility: enforcement.visibility,
         evidenceReference: enforcement.evidence_reference,
+        limitation: enforcement.limitation,
       },
     ];
   }
@@ -411,6 +518,7 @@ function sourcesForField(
       confidence: reference.confidence,
       visibility: reference.visibility,
       evidenceReference: reference.evidence_reference,
+      limitation: reference.limitation,
     },
     {
       label: 'Enforcement image',
@@ -420,6 +528,7 @@ function sourcesForField(
       confidence: enforcement.confidence,
       visibility: enforcement.visibility,
       evidenceReference: enforcement.evidence_reference,
+      limitation: enforcement.limitation,
     },
   ];
 }
@@ -437,6 +546,7 @@ function compareField(
     confidence: source.confidence,
     visibility: source.visibility,
     evidenceReference: source.evidenceReference,
+    limitation: source.limitation,
   }));
   const shared = {
     field,
@@ -661,7 +771,7 @@ export function buildSyntheticActionPack(
     'SOURCE-LINKED COMPARISON',
     ...result.rows.flatMap((row) => [
       `${row.label}: ${row.state}`,
-      ...row.sources.map((source) => `  ${source.label}: ${safePackText(source.value)} · ${source.confidence} confidence · ${source.visibility} · ${safePackText(source.evidenceReference)}`),
+      ...row.sources.map((source) => `  ${source.label}: ${safePackText(source.value)} · ${source.confidence} confidence · ${source.visibility} · ${safePackText(source.evidenceReference)} · Limit: ${safePackText(source.limitation)}`),
       `  Why: ${safePackText(row.reason)}`,
     ]),
     '',

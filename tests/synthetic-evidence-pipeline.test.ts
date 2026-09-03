@@ -9,6 +9,7 @@ import {
   type SyntheticObservation,
   type SyntheticSourceDocument,
 } from '../lib/synthetic-evidence-pipeline';
+import * as SyntheticPipeline from '../lib/synthetic-evidence-pipeline';
 import {
   syntheticEvaluationCases,
   runSyntheticEvaluationCorpus,
@@ -353,5 +354,197 @@ describe('deterministic test laboratory corpus', () => {
 
     expect(report).toMatchObject({ total: 10, passed: 10, failed: 0 });
     expect(report.cases.every((item) => item.passed)).toBe(true);
+  });
+
+  it('uses one coherent two-wheeler versus four-wheeler case with complete source limits', () => {
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+
+    expect(flagship).toBeDefined();
+    expect(flagship).toMatchObject({
+      title: 'Two-wheeler versus four-wheeler',
+      analysisProvenance: 'Pre-authored bundled synthetic observations · no model call in this proof.',
+      expectedOverall: 'potential-evidence-discrepancy',
+    });
+    expect(flagship?.extraction.vehicle_record).toMatchObject({
+      vehicle_category: {
+        value: 'Two-wheeler',
+        source_document: 'vehicle_record',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+      },
+      colour: {
+        value: 'Blue',
+        source_document: 'vehicle_record',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+      },
+      make_model: {
+        value: 'Honda Activa 6G',
+        source_document: 'vehicle_record',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+      },
+    });
+    expect(flagship?.extraction.enforcement_image).toMatchObject({
+      vehicle_category: {
+        value: 'Four-wheeler',
+        source_document: 'enforcement_image',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional image observation; no live model or government request ran in this proof.',
+      },
+      colour: {
+        value: 'White',
+        source_document: 'enforcement_image',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional image observation; no live model or government request ran in this proof.',
+      },
+      make_model: {
+        value: 'Maruti Swift',
+        source_document: 'enforcement_image',
+        confidence: 'high',
+        visibility: 'clear',
+        limitation: 'Bundled fictional image observation; no live model or government request ran in this proof.',
+      },
+      offence_assessable: {
+        value: 'yes',
+        evidence_reference: 'Image · marked stop-line area',
+        limitation: 'The relevant scene area is visible; this does not decide whether an offence occurred.',
+      },
+    });
+    expect(flagship?.extraction.challan_document.alleged_offence.value)
+      .toBe('Stopping beyond the marked stop line');
+  });
+
+  it('preserves every source limitation in the public comparison trace and text pack', () => {
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+    expect(flagship).toBeDefined();
+    if (!flagship) return;
+
+    const result = compareSyntheticEvidence(flagship.extraction);
+    const category = result.rows.find((row) => row.field === 'vehicle_category');
+    expect(category?.sources).toEqual([
+      expect.objectContaining({
+        sourceDocument: 'vehicle_record',
+        limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+      }),
+      expect.objectContaining({
+        sourceDocument: 'enforcement_image',
+        limitation: 'Bundled fictional image observation; no live model or government request ran in this proof.',
+      }),
+    ]);
+
+    const pack = buildSyntheticActionPack(
+      flagship.extraction,
+      result,
+      decideSyntheticResolutionPath(result),
+    );
+    expect(pack).toContain('Bundled fictional vehicle-record observation; not independent or official verification.');
+    expect(pack).toContain('Bundled fictional image observation; no live model or government request ran in this proof.');
+  });
+
+  it('projects only a confirmed same-revision high-and-clear explicit class conflict', () => {
+    const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: {
+      extraction: SyntheticEvidenceExtraction;
+      resultRevisionId: string;
+      confirmation: { status: 'confirmed'; resultRevisionId: string };
+    }) => { status: string; facts?: { supportedSignals: readonly string[] } });
+    expect(project).toBeTypeOf('function');
+    if (!project) return;
+
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+    expect(flagship).toBeDefined();
+    if (!flagship) return;
+    const resultRevisionId = '11111111111111111111111111111111';
+
+    expect(project({
+      extraction: flagship.extraction,
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId },
+    })).toMatchObject({
+      status: 'eligible',
+      facts: {
+        reviewRevisionId: resultRevisionId,
+        citizenVehicleClass: {
+          value: 'two-wheeler',
+          source: 'independent-vehicle-record',
+          confidence: 'high',
+          confirmation: 'citizen-confirmed',
+          reviewRevisionId: resultRevisionId,
+        },
+        observedEvidenceVehicleClass: {
+          value: 'four-wheeler',
+          source: 'official-evidence-image',
+          confidence: 'high',
+          confirmation: 'citizen-confirmed',
+          reviewRevisionId: resultRevisionId,
+        },
+        independentReadableVehicleRecord: {
+          value: true,
+          source: 'independent-vehicle-record',
+          confidence: 'high',
+          confirmation: 'citizen-confirmed',
+          reviewRevisionId: resultRevisionId,
+        },
+        supportedSignals: ['vehicle-class-conflict'],
+      },
+    });
+
+    const medium = structuredClone(flagship.extraction);
+    medium.enforcement_image.vehicle_category.confidence = 'medium';
+    expect(project({
+      extraction: medium,
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId },
+    })).toEqual({ status: 'abstained', reason: 'class-facts-not-action-ready' });
+
+    expect(project({
+      extraction: flagship.extraction,
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId: '22222222222222222222222222222222' },
+    })).toEqual({ status: 'abstained', reason: 'confirmation-revision-mismatch' });
+  });
+
+  it('abstains when any class-conflict source, reference, limit, readability, or confirmation gate is weakened', () => {
+    const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: {
+      extraction: SyntheticEvidenceExtraction;
+      resultRevisionId: string;
+      confirmation: { status: 'confirmed'; resultRevisionId: string };
+    }) => { status: string; reason?: string });
+    expect(project).toBeTypeOf('function');
+    if (!project) return;
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+    expect(flagship).toBeDefined();
+    if (!flagship) return;
+    const resultRevisionId = '11111111111111111111111111111111';
+    const mutations: Array<(draft: SyntheticEvidenceExtraction) => void> = [
+      (draft) => { draft.vehicle_record.vehicle_category.visibility = 'partial'; },
+      (draft) => { draft.vehicle_record.vehicle_category.evidence_reference = ''; },
+      (draft) => { draft.vehicle_record.vehicle_category.limitation = ''; },
+      (draft) => { draft.vehicle_record.vehicle_category.source_document = 'enforcement_image'; },
+      (draft) => { draft.vehicle_record.vehicle_category.user_confirmation_required = false as true; },
+      (draft) => { draft.enforcement_image.vehicle_category.confidence = 'medium'; },
+      (draft) => { draft.enforcement_image.vehicle_category.evidence_reference = ''; },
+      (draft) => { draft.enforcement_image.vehicle_category.limitation = ''; },
+      (draft) => { draft.vehicle_record.registration.value = 'Unreadable'; },
+      (draft) => { draft.vehicle_record.registration.visibility = 'unclear'; },
+      (draft) => { draft.vehicle_record.registration.confidence = 'medium'; },
+      (draft) => { draft.vehicle_record.registration.evidence_reference = ''; },
+      (draft) => { draft.vehicle_record.registration.limitation = ''; },
+    ];
+
+    for (const mutate of mutations) {
+      const draft = structuredClone(flagship.extraction);
+      mutate(draft);
+      expect(project({
+        extraction: draft,
+        resultRevisionId,
+        confirmation: { status: 'confirmed', resultRevisionId },
+      })).toEqual({ status: 'abstained', reason: 'class-facts-not-action-ready' });
+    }
   });
 });

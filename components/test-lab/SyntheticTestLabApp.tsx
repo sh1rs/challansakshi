@@ -26,8 +26,14 @@ import {
 } from '../../lib/synthetic-evidence-pipeline';
 import {
   createSyntheticLabCaseState,
+  createSyntheticJudgeProofState,
+  reduceSyntheticJudgeProofState,
   reduceSyntheticLabCaseState,
+  type SyntheticJudgeProofAction,
+  type SyntheticJudgeProofState,
 } from '../../lib/synthetic-lab-state';
+import { generateOpaqueExtensionId } from '../../lib/extension-handoff-contract';
+import { SYNTHETIC_EXTENSION_FIXTURE } from '../../lib/synthetic-extension-fixture-contract';
 import {
   formatSyntheticLabImageSize,
   validateSyntheticLabImage,
@@ -47,7 +53,8 @@ export type TestLabSelectionState = {
 
 export type TestLabSelectionAction =
   | { type: 'filter'; filter: FilterId }
-  | { type: 'case'; caseId: string };
+  | { type: 'case'; caseId: string }
+  | { type: 'start-proof' };
 
 const fieldLabels = {
   registration: 'Registration',
@@ -86,6 +93,16 @@ export function transitionTestLabSelection(
   state: TestLabSelectionState,
   action: TestLabSelectionAction,
 ): TestLabSelectionState {
+  if (action.type === 'start-proof') {
+    return {
+      filter: 'all',
+      selectedId: 'case-04-category-conflict',
+      selectionRequest: state.selectionRequest + 1,
+      focusTargetId: null,
+      announcement: '',
+    };
+  }
+
   if (action.type === 'case') {
     if (!syntheticEvaluationCases.some((item) => item.id === action.caseId)) return state;
     return {
@@ -170,6 +187,7 @@ function ResultPanel({ result, headingId }: { result: SyntheticComparisonResult;
                   <b>{source.label}</b>
                   <span>{source.value || 'Not observed'}</span>
                   <small>{source.evidenceReference} · {source.confidence} · {source.visibility}</small>
+                  {source.limitation ? <small><b>Limit:</b> {source.limitation}</small> : null}
                 </li>
               ))}
             </ul>
@@ -361,7 +379,7 @@ export function TestCaseWorkbench({ testCase }: { testCase: SyntheticEvaluationC
               <label><span>Visibility</span><select aria-label="Offence-area observation visibility" className={styles.fieldSelect} value={state.draft.enforcement_image.offence_assessable.visibility} onChange={(event) => edit('enforcement_image', 'offence_assessable', 'visibility', event.target.value)}><option value="clear">Clear</option><option value="partial">Partial</option><option value="unclear">Unclear</option><option value="not-visible">Not visible</option></select></label>
               <label><span>Observation confidence</span><select aria-label="Offence-area observation confidence" className={styles.fieldSelect} value={state.draft.enforcement_image.offence_assessable.confidence} onChange={(event) => edit('enforcement_image', 'offence_assessable', 'confidence', event.target.value)}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
             </div>
-            <p className={styles.limit}>This asks only whether the relevant visual area exists. It does not ask AI whether an offence occurred.</p>
+            <p className={styles.limit}>{state.draft.enforcement_image.offence_assessable.limitation || 'This asks only whether the relevant visual area exists. It does not ask AI whether an offence occurred.'}</p>
           </fieldset>
         </div>
         <aside className={styles.extractionLimitations}>
@@ -370,6 +388,7 @@ export function TestCaseWorkbench({ testCase }: { testCase: SyntheticEvaluationC
             ? <ul>{state.draft.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
             : <p>No extraction-wide limitation was supplied. Field-level limits still apply.</p>}
         </aside>
+        <p className={styles.analysisProvenance}><b>Analysis provenance:</b> {testCase.analysisProvenance ?? 'Manual browser-local observations · no model call ran.'}</p>
       </section>
 
       <section className={styles.explainSection} aria-labelledby={`${idPrefix}-explain-heading`}>
@@ -419,6 +438,255 @@ export function TestCaseWorkbench({ testCase }: { testCase: SyntheticEvaluationC
       </section>
     </section>
   );
+}
+
+function proofRevisionId(): string | null {
+  try {
+    return generateOpaqueExtensionId();
+  } catch {
+    return null;
+  }
+}
+
+export function SyntheticJudgeProofView({
+  state,
+  dispatch,
+}: {
+  state: SyntheticJudgeProofState;
+  dispatch: (action: SyntheticJudgeProofAction) => void;
+}) {
+  const sourceFixture = SYNTHETIC_EXTENSION_FIXTURE.source;
+  const destinationFixture = SYNTHETIC_EXTENSION_FIXTURE.destination;
+  const showCoreComplete = ['complete', 'guardrails', 'extension'].includes(state.stage);
+  const showFinding = Boolean(state.result && !showCoreComplete);
+  const guardrailCases = state.guardrailCaseIds
+    .map((caseId) => syntheticEvaluationCases.find((item) => item.id === caseId))
+    .filter((item): item is SyntheticEvaluationCase => Boolean(item));
+  const confirmObservations = () => {
+    const resultRevisionId = proofRevisionId();
+    if (resultRevisionId) dispatch({ type: 'CONFIRM_AND_COMPARE', resultRevisionId });
+  };
+  const confirmPack = () => {
+    const packRevisionId = proofRevisionId();
+    if (packRevisionId) {
+      dispatch({
+        type: 'CONFIRM_SYNTHETIC_PACK',
+        packRevisionId,
+        generatedAt: new Date().toISOString(),
+      });
+    }
+  };
+
+  return (
+    <section className={styles.proofLane} aria-label="90-second synthetic proof">
+      <div className={styles.proofBanner} role="note">
+        <strong>Synthetic demonstration data</strong>
+        <span>Fictional observations only · no official fetch, form, filing, payment, or decision</span>
+      </div>
+      <p
+        className={styles.proofStatus}
+        data-challansakshi-proof-status="v1"
+        aria-live="polite"
+        aria-atomic="true"
+      >{state.announcement}</p>
+
+      {state.stage !== 'idle' ? (
+        <>
+          <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-case-heading">
+            <p className={styles.kicker}>BEAT 1 · FICTIONAL PAIR</p>
+            <h2 id="challansakshi-proof-case-heading" tabIndex={-1}>1. Review the synthetic pair</h2>
+            <p>{state.description}</p>
+            <div className={styles.proofPair}>
+              <article>
+                <span>FICTIONAL VEHICLE RECORD</span>
+                <strong>{state.draft.vehicle_record.colour.value} {state.draft.vehicle_record.make_model.value}</strong>
+                <p>{state.draft.vehicle_record.vehicle_category.value}</p>
+              </article>
+              <b aria-hidden="true">≠</b>
+              <article>
+                <span>FICTIONAL ENFORCEMENT IMAGE</span>
+                <strong>{state.draft.enforcement_image.colour.value} {state.draft.enforcement_image.make_model.value}</strong>
+                <p>{state.draft.enforcement_image.vehicle_category.value}</p>
+              </article>
+            </div>
+          </section>
+
+          <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-evidence-heading">
+            <p className={styles.kicker}>BEAT 2 · SOURCE TRACE</p>
+            <h3 id="challansakshi-proof-evidence-heading" tabIndex={-1}>2. Confirm the source-linked observations</h3>
+            <p className={styles.proofProvenance}><b>Analysis provenance:</b> {state.analysisProvenance}</p>
+            <div className={styles.proofSources}>
+              {(['vehicle_category', 'colour', 'make_model'] as const).flatMap((field) => [
+                { label: 'Vehicle record', observation: state.draft.vehicle_record[field] },
+                { label: 'Enforcement image', observation: state.draft.enforcement_image[field] },
+              ]).map(({ label, observation }) => (
+                <article key={`${label}-${observation.evidence_reference}`}>
+                  <span>{label} · {observation.evidence_reference}</span>
+                  <strong>{observation.value}</strong>
+                  <small>{observation.confidence} confidence · {observation.visibility}</small>
+                  <p><b>Limit:</b> {observation.limitation}</p>
+                </article>
+              ))}
+            </div>
+            <aside className={styles.proofOffenceLimit}>
+              <strong>{state.draft.challan_document.alleged_offence.value}</strong>
+              <span>{state.draft.enforcement_image.offence_assessable.evidence_reference}</span>
+              <p>{state.draft.enforcement_image.offence_assessable.limitation}</p>
+            </aside>
+            {state.stage === 'review-pair' ? (
+              <button className={styles.confirmButton} type="button" onClick={confirmObservations}>
+                I reviewed these fictional observations · Compare
+              </button>
+            ) : null}
+          </section>
+        </>
+      ) : null}
+
+      {showFinding && state.result ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-finding-heading">
+          <p className={styles.kicker}>BEAT 3 · BOUNDED RESULT</p>
+          <h3 id="challansakshi-proof-finding-heading" tabIndex={-1}>3. See the bounded finding</h3>
+          <ResultPanel result={state.result} headingId="challansakshi-proof-result-heading" />
+          {state.stage === 'finding' ? (
+            <div className={styles.proofConsent}>
+              <p>The comparison and the fictional field pack are separate. Confirm the reviewed facts before the simulation is created.</p>
+              <button className={styles.confirmButton} type="button" onClick={confirmPack}>
+                Confirm synthetic field pack
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {state.simulation ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-handoff-heading">
+          <p className={styles.kicker}>BEAT 4 · USER-CONTROLLED HANDOFF</p>
+          <h3 id="challansakshi-proof-handoff-heading" tabIndex={-1}>4. Try the web handoff</h3>
+          <article className={styles.proofHandoff}>
+            <div>
+              <strong>Web handoff · works everywhere</strong>
+              <span>{state.simulation.permanentLabel}</span>
+            </div>
+            <p>{state.simulation.description}</p>
+            <p><b>Mapped fictional category:</b> {state.simulation.legacyIssueSimulation?.label ?? 'No category mapped'}</p>
+            <p>No government request is made. This action changes only local synthetic proof state.</p>
+            {state.stage === 'handoff' ? (
+              <button className={styles.primaryButton} type="button" onClick={() => dispatch({ type: 'SIMULATE_OFFICIAL_ROUTE_OPEN' })}>
+                Simulate opening the official review route
+              </button>
+            ) : null}
+          </article>
+        </section>
+      ) : null}
+
+      {state.routeSimulation ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-return-heading">
+          <p className={styles.kicker}>LOCAL SIMULATION · NO NAVIGATION</p>
+          <h3 id="challansakshi-proof-return-heading" tabIndex={-1}>Official handoff simulation</h3>
+          <p>No official URL is stored in this state and no government request is made.</p>
+          {state.stage === 'return' ? (
+            <button className={styles.primaryButton} type="button" onClick={() => dispatch({ type: 'RECORD_SYNTHETIC_RETURN' })}>
+              Record synthetic return
+            </button>
+          ) : null}
+        </section>
+      ) : null}
+
+      {state.returnSimulation ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-correction-heading">
+          <p className={styles.kicker}>BEAT 5 · INVALIDATE AND RECOMPUTE</p>
+          <h3 id="challansakshi-proof-correction-heading" tabIndex={-1}>5. Correct and recompute</h3>
+          <p><b>{state.returnSimulation.permanentLabel}.</b> This local example is unverified and is not an official acknowledgement.</p>
+          <button className={styles.primaryButton} type="button" onClick={() => dispatch({ type: 'CORRECT_IMAGE_OBSERVATIONS' })}>
+            Correct the image observations
+          </button>
+        </section>
+      ) : null}
+
+      {state.stage === 'reconfirm' ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-reconfirm-heading">
+          <p className={styles.kicker}>EARLIER RESULT CLEARED</p>
+          <h3 id="challansakshi-proof-reconfirm-heading" tabIndex={-1}>Reconfirm the corrected observations</h3>
+          <p>The fictional image now reads Blue Honda Activa 6G · Two-wheeler. The earlier confirmation, field pack, route simulation, and return are gone.</p>
+          <button className={styles.confirmButton} type="button" onClick={confirmObservations}>
+            Reconfirm corrected observations · Compare again
+          </button>
+        </section>
+      ) : null}
+
+      {showCoreComplete && state.result ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-boundary-heading">
+          <p className={styles.kicker}>BEAT 6 · PRODUCT BOUNDARY</p>
+          <h3 id="challansakshi-proof-boundary-heading" tabIndex={-1}>6. AI extracts. Rules compare. You control the handoff.</h3>
+          <ResultPanel result={state.result} headingId="challansakshi-proof-consistent-result-heading" />
+          <div className={styles.proofBoundaryGrid}>
+            <article><strong>AI extracts</strong><p>Only source-linked observations, confidence, and limitations.</p></article>
+            <article><strong>Rules compare</strong><p>Deterministic rules return discrepancy, inconclusive, or consistent.</p></article>
+            <article><strong>You control the handoff</strong><p>You confirm facts and choose whether to leave ChallanSakshi.</p></article>
+          </div>
+          <div className={styles.proofActions}>
+            <a className={styles.primaryButton} href="/review">Review a real challan in the browser</a>
+            <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'SHOW_GUARDRAILS' })}>Show guardrails</button>
+            <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'OPEN_EXTENSION_SIMULATION' })}>Open optional synthetic extension simulation</button>
+          </div>
+        </section>
+      ) : null}
+
+      {guardrailCases.length > 0 ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-guardrails-heading">
+          <p className={styles.kicker}>UNDER-TWO-MINUTE CONTINUATION</p>
+          <h3 id="challansakshi-proof-guardrails-heading" tabIndex={-1}>Guardrails: abstain when the evidence does not support action</h3>
+          <div className={styles.guardrailCases}>
+            {guardrailCases.map((testCase) => (
+              <article key={testCase.id}>
+                <span>{shortCaseId(testCase.id)}</span>
+                <strong>{testCase.title}</strong>
+                <p>{outcomeLabels[testCase.expectedOverall]} · no grievance field pack</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {state.extensionSimulationVisible ? (
+        <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-extension-heading">
+          <p className={styles.kicker}>OPTIONAL · AFTER THE CORE PROOF</p>
+          <h3 id="challansakshi-proof-extension-heading" tabIndex={-1}>Synthetic extension simulation</h3>
+          <p>Use only the conspicuously fictional loopback fixtures. Real official adapters remain disabled until verified and approved.</p>
+          <p>Only the fictional category and reviewed description are allowed. CAPTCHA, OTP, Aadhaar, credentials, payment, attachments, declarations, and Submit stay untouched.</p>
+          <div className={styles.proofActions}>
+            <a className={styles.secondaryButton} href={sourceFixture.path}>Open fictional source fixture</a>
+            <a className={styles.secondaryButton} href={destinationFixture.path}>Open fictional destination fixture</a>
+          </div>
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
+function SyntheticJudgeProofLane() {
+  const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+  if (!flagship) throw new Error('The flagship synthetic proof case is unavailable.');
+  const [state, dispatch] = useReducer(
+    reduceSyntheticJudgeProofState,
+    flagship,
+    createSyntheticJudgeProofState,
+  );
+
+  useEffect(() => {
+    dispatch({ type: 'START_90_SECOND_PROOF' });
+  }, []);
+
+  useEffect(() => {
+    if (state.focusRequest === 0 || !state.focusTargetId) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(state.focusTargetId ?? '')?.focus({ preventScroll: true });
+      document.getElementById(state.focusTargetId ?? '')?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [state.focusRequest, state.focusTargetId]);
+
+  return <SyntheticJudgeProofView state={state} dispatch={dispatch} />;
 }
 
 function LocalCustomVector() {
@@ -532,6 +800,7 @@ export default function SyntheticTestLabApp() {
   const [selectionRequest, setSelectionRequest] = useState(0);
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
   const [selectionAnnouncement, setSelectionAnnouncement] = useState('');
+  const [proofRequest, setProofRequest] = useState(0);
   const selectedWorkbenchRef = useRef<HTMLDivElement>(null);
   const selected = syntheticEvaluationCases.find((item) => item.id === selectedId) ?? syntheticEvaluationCases[0];
   const filteredCases = syntheticEvaluationCases.filter((item) => filter === 'all' || item.expectedOverall === filter);
@@ -571,6 +840,10 @@ export default function SyntheticTestLabApp() {
     setFocusTargetId(next.focusTargetId);
     setSelectionAnnouncement(next.announcement);
   };
+  const startProof = () => {
+    applySelectionAction({ type: 'start-proof' });
+    setProofRequest((current) => current + 1);
+  };
   const chooseFilter = (nextFilter: FilterId) => applySelectionAction({ type: 'filter', filter: nextFilter });
   const chooseCase = (caseId: string) => applySelectionAction({ type: 'case', caseId });
 
@@ -585,7 +858,8 @@ export default function SyntheticTestLabApp() {
             <h1>Synthetic Evidence Test Lab</h1>
             <p className={styles.heroLead}>Run 10 fictional cases, then edit any observation to see the deterministic result update.</p>
             <div className={styles.heroActions}>
-              <button className={styles.primaryButton} type="button" onClick={runSuite}>Run all 10 cases</button>
+              <button className={styles.primaryButton} type="button" onClick={startProof}>Start the 90-second proof</button>
+              <button className={styles.secondaryButton} type="button" onClick={runSuite}>Run all 10 cases</button>
               <a className={styles.secondaryButton} href="/demo">Open flagship walkthrough</a>
             </div>
           </div>
@@ -602,6 +876,8 @@ export default function SyntheticTestLabApp() {
           <p><b>Rules decide findings.</b><span>AI never chooses the result or legal outcome.</span></p>
           <p><b>Edits clear results.</b><span>Changed facts require fresh human confirmation.</span></p>
         </section>
+
+        {proofRequest > 0 ? <SyntheticJudgeProofLane key={proofRequest} /> : null}
 
         <section className={styles.suiteSection} aria-labelledby="suite-heading">
           <div className={styles.suiteHeading}>
@@ -643,7 +919,7 @@ export default function SyntheticTestLabApp() {
               })}
             </div>
             <div className={styles.selectedWorkbench} ref={selectedWorkbenchRef}>
-              <TestCaseWorkbench key={selected.id} testCase={selected} />
+              <TestCaseWorkbench key={`${selected.id}-${selectionRequest}`} testCase={selected} />
             </div>
           </div>
         </section>
