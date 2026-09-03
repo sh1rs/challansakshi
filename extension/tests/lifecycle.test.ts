@@ -970,7 +970,14 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       'writeSessionState',
       'newOpaque',
       'nextOperationDeadline',
+      'fixedBlocker',
       'makePreviewPlan',
+      'routeFailure',
+      'actionTabMatches',
+      'runSourceReprobe',
+      'stagedPreviewTiming',
+      'validateDestinationRepreflightInjectionResult',
+      'isPositiveTime',
       'liveFromSession',
       'readyLedger',
       'armUnresolvedLive',
@@ -980,6 +987,8 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       'Object',
       'Date',
       'SESSION_STATE_SCHEMA',
+      'chrome',
+      'selectedDestinationInjectedFunction',
     ]);
     const innerShadows = new Set<string>();
     const recordBindingName = (name: ts.BindingName) => {
@@ -1045,7 +1054,17 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       writeSessionState: canonicalFileFunction('writeSessionState'),
       newOpaque: canonicalFileFunction('newOpaque'),
       nextOperationDeadline: canonicalFileFunction('nextOperationDeadline'),
+      fixedBlocker: canonicalFileFunction('fixedBlocker'),
       makePreviewPlan: canonicalFileFunction('makePreviewPlan'),
+      routeFailure: canonicalFileFunction('routeFailure'),
+      actionTabMatches: canonicalFileFunction('actionTabMatches'),
+      runSourceReprobe: canonicalFileFunction('runSourceReprobe'),
+      stagedPreviewTiming: canonicalFileFunction('stagedPreviewTiming'),
+      validateDestinationRepreflightInjectionResult: canonicalImport(
+        'validateDestinationRepreflightInjectionResult',
+        './fill-page',
+      ),
+      isPositiveTime: canonicalFileFunction('isPositiveTime'),
       liveFromSession: canonicalFileFunction('liveFromSession'),
       readyLedger: canonicalFileFunction('readyLedger'),
       armUnresolvedLive: canonicalImport('armUnresolvedLive', './safety-ledger'),
@@ -1055,6 +1074,11 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       objectFreeze: canonicalGlobal('Object'),
       date: canonicalGlobal('Date'),
       sessionSchema: canonicalFileVariable('SESSION_STATE_SCHEMA'),
+      chrome: canonicalGlobal('chrome'),
+      selectedDestinationInjectedFunction: canonicalImport(
+        'selectedDestinationInjectedFunction',
+        './destination-adapters',
+      ),
     });
     if (!canonicalHelpers.objectFreeze) {
       report('Object.freeze intrinsic is shadowed or noncanonical');
@@ -1062,6 +1086,18 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     if (!canonicalHelpers.writeSessionState) {
       report('inner session write helper is shadowed or noncanonical');
     }
+    if (
+      !canonicalHelpers.fixedBlocker
+      || !canonicalHelpers.makePreviewPlan
+      || !canonicalHelpers.routeFailure
+      || !canonicalHelpers.actionTabMatches
+      || !canonicalHelpers.runSourceReprobe
+      || !canonicalHelpers.stagedPreviewTiming
+      || !canonicalHelpers.validateDestinationRepreflightInjectionResult
+      || !canonicalHelpers.isPositiveTime
+      || !canonicalHelpers.chrome
+      || !canonicalHelpers.selectedDestinationInjectedFunction
+    ) report('inner authoritative call helper is shadowed or noncanonical');
     if (
       !canonicalHelpers.liveFromSession
       || !canonicalHelpers.readyLedger
@@ -1985,50 +2021,328 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       visit(node);
       return contains;
     };
-    const callPath = (expression: ts.LeftHandSideExpression) => {
-      const members: string[] = [];
-      let selected: ts.Expression = unwrapPreparationExpression(expression);
-      while (ts.isPropertyAccessExpression(selected)) {
-        members.unshift(selected.name.text);
-        selected = unwrapPreparationExpression(selected.expression);
-      }
-      if (!ts.isIdentifier(selected)) return null;
-      members.unshift(selected.text);
-      return members.join('.');
+    const innerCalls: ts.CallExpression[] = [];
+    const collectInnerCalls = (node: ts.Node) => {
+      if (node !== inner && ts.isFunctionLike(node)) return;
+      if (ts.isCallExpression(node)) innerCalls.push(node);
+      ts.forEachChild(node, collectInnerCalls);
     };
-    const approvedRoleCalls = new Set([
-      'Object.freeze',
-      'Date.parse',
-      'fixedBlocker',
-      'makePreviewPlan',
-      'routeFailure',
-      'actionTabMatches',
-      'sourceBinding',
-      'runSourceReprobe',
-      'stagedPreviewTiming',
-      'validateDestinationRepreflightInjectionResult',
-      'isPositiveTime',
-      'nextOperationDeadline',
-      'newOpaque',
-      'buildDestinationFillPlan',
-      'writeSessionState',
-      'liveFromSession',
-      'readyLedger',
-      'armUnresolvedLive',
-      'cancelBeforeDispatch',
-      'buildFixedWorkerResponse',
-      'buildRejectedWorkerResponse',
-      'chrome.scripting.executeScript',
+    collectInnerCalls(inner);
+    const callsNamed = (name: string) => innerCalls.filter((call) => (
+      ts.isIdentifier(call.expression) && call.expression.text === name
+    ));
+    const certifiedCalls = new Set<ts.CallExpression>();
+    const certifiedAggregates = new Set<ts.ObjectLiteralExpression | ts.ArrayLiteralExpression>();
+    const certifiedAssignments = new Set<ts.BinaryExpression>();
+    let canonicalRoleCallsValid = true;
+    const certifyAggregateTree = (node: ts.Node) => {
+      if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
+        certifiedAggregates.add(node);
+      }
+      ts.forEachChild(node, certifyAggregateTree);
+    };
+    const certifyNamedCalls = (
+      name: string,
+      canonical: boolean,
+      predicates: readonly ((call: ts.CallExpression) => boolean)[],
+    ) => {
+      const calls = callsNamed(name).sort((left, right) => left.pos - right.pos);
+      const valid = canonical
+        && calls.length === predicates.length
+        && calls.every((call, index) => predicates[index]!(call));
+      if (!valid) {
+        canonicalRoleCallsValid = false;
+        return;
+      }
+      for (const call of calls) {
+        certifiedCalls.add(call);
+        certifyAggregateTree(call);
+      }
+    };
+    const exactRequestProperty = (expression: ts.Expression | undefined, member: string) => Boolean(
+      expression
+      && innerRequest
+      && ts.isPropertyAccessExpression(expression)
+      && !expression.questionDotToken
+      && expression.name.text === member
+      && ts.isIdentifier(expression.expression)
+      && expression.expression.text === innerRequest.text
+    );
+    const callFromDeclaration = (
+      declaration: ts.VariableDeclaration | null,
+      name: string,
+      canonical: boolean,
+    ) => directCall(declaration?.initializer, name, canonical);
+
+    const blockerCalls = callsNamed('fixedBlocker');
+    certifyNamedCalls('fixedBlocker', canonicalHelpers.fixedBlocker, [
+      (call) => call === blockerCalls[0]
+        && call.arguments.length === 2
+        && exactRequestCommand(call.arguments[0])
+        && exactDeclarationIdentifier(call.arguments[1], lifecycleDeclaration),
     ]);
+    const previewPlanCall = callFromDeclaration(
+      previewPlanDeclaration,
+      'makePreviewPlan',
+      canonicalHelpers.makePreviewPlan,
+    );
+    certifyNamedCalls('makePreviewPlan', canonicalHelpers.makePreviewPlan, [
+      (call) => call === previewPlanCall
+        && call.arguments.length === 2
+        && exactDeclarationPath(call.arguments[0], stagedDeclaration, ['envelope'])
+        && exactDeclarationPath(call.arguments[1], stagedDeclaration, ['effectiveExpiresAtMs']),
+    ]);
+    certifyNamedCalls('routeFailure', canonicalHelpers.routeFailure, [
+      (call) => call.arguments.length === 2
+        && exactRequestCommand(call.arguments[0])
+        && exactDeclarationIdentifier(call.arguments[1], previewPlanDeclaration),
+      (call) => call.arguments.length === 2
+        && exactRequestCommand(call.arguments[0])
+        && exactDeclarationIdentifier(call.arguments[1], fillPlanRoot),
+    ]);
+    certifyNamedCalls('actionTabMatches', canonicalHelpers.actionTabMatches, [
+      (call) => call.arguments.length === 2
+        && exactRequestProperty(call.arguments[0], 'actionTabId')
+        && exactDeclarationPath(
+          call.arguments[1],
+          previewPlanDeclaration,
+          ['adapter', 'expectedLocation'],
+        ),
+    ]);
+    certifyNamedCalls('sourceBinding', canonicalHelpers.sourceBinding, [
+      (call) => call === sourceBindingCall
+        && call.arguments.length === 1
+        && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration),
+    ]);
+    certifyNamedCalls('runSourceReprobe', canonicalHelpers.runSourceReprobe, [
+      (call) => call.arguments.length === 3
+        && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration)
+        && exactDeclarationPath(
+          call.arguments[1],
+          previewPlanDeclaration,
+          ['plan', 'operationNotAfterMs'],
+        )
+        && exactDeclarationIdentifier(call.arguments[2], sourceBindingDeclaration),
+    ]);
+    certifyNamedCalls('stagedPreviewTiming', canonicalHelpers.stagedPreviewTiming, [
+      (call) => call.arguments.length === 2
+        && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration)
+        && exactDeclarationIdentifier(call.arguments[1], previewPlanDeclaration),
+      (call) => call.arguments.length === 2
+        && exactDeclarationIdentifier(call.arguments[0], stagedDeclaration)
+        && exactDeclarationIdentifier(call.arguments[1], previewPlanDeclaration),
+    ]);
+    certifyNamedCalls(
+      'validateDestinationRepreflightInjectionResult',
+      canonicalHelpers.validateDestinationRepreflightInjectionResult,
+      [
+        (call) => call.arguments.length === 2
+          && ts.isIdentifier(call.arguments[0]!)
+          && exactDeclarationPath(
+            call.arguments[1],
+            stagedDeclaration,
+            ['destination', 'destinationDocumentId'],
+          ),
+      ],
+    );
+    certifyNamedCalls('isPositiveTime', canonicalHelpers.isPositiveTime, [
+      (call) => call.arguments.length === 1
+        && exactDeclarationIdentifier(call.arguments[0], adapterExpiryDeclaration),
+    ]);
+    const deadlineCall = callFromDeclaration(
+      attemptDeadlineDeclaration,
+      'nextOperationDeadline',
+      canonicalHelpers.nextOperationDeadline,
+    );
+    certifyNamedCalls('nextOperationDeadline', canonicalHelpers.nextOperationDeadline, [
+      (call) => call === deadlineCall,
+    ]);
+    const nonceCall = callFromDeclaration(nonceDeclaration, 'newOpaque', canonicalHelpers.newOpaque);
+    const attemptIdCall = callFromDeclaration(
+      attemptIdDeclaration,
+      'newOpaque',
+      canonicalHelpers.newOpaque,
+    );
+    certifyNamedCalls('newOpaque', canonicalHelpers.newOpaque, [
+      (call) => call === nonceCall,
+      (call) => call === attemptIdCall,
+    ]);
+    certifyNamedCalls(
+      'buildDestinationFillPlan',
+      canonicalHelpers.buildDestinationFillPlan,
+      [(call) => call === fillPlanCall],
+    );
+    certifyNamedCalls('writeSessionState', canonicalHelpers.writeSessionState, [
+      (call) => call === armedSessionWrite,
+      (call) => call === consumedWrite,
+    ]);
+    certifyNamedCalls('liveFromSession', canonicalHelpers.liveFromSession, [
+      (call) => call === liveCall,
+    ]);
+    certifyNamedCalls('readyLedger', canonicalHelpers.readyLedger, [
+      (call) => call === readyLedgerCall,
+    ]);
+    certifyNamedCalls('armUnresolvedLive', canonicalHelpers.armUnresolvedLive, [
+      (call) => call === armedLedgerCall,
+    ]);
+    const firstCancellationCall = cancellationAwait
+      ? directCall(
+        cancellationAwait.expression,
+        'cancelBeforeDispatch',
+        canonicalHelpers.cancelBeforeDispatch,
+      )
+      : null;
+    const secondCancellationCall = directCall(
+      consumingFailureReturn?.expression,
+      'cancelBeforeDispatch',
+      canonicalHelpers.cancelBeforeDispatch,
+    );
+    certifyNamedCalls('cancelBeforeDispatch', canonicalHelpers.cancelBeforeDispatch, [
+      (call) => call === firstCancellationCall
+        && exactCancellationCall(call, armingDeclaration),
+      (call) => call === secondCancellationCall
+        && exactCancellationCall(call, armingDeclaration),
+    ]);
+
+    const dateParseCalls = innerCalls.filter((call) => (
+      ts.isPropertyAccessExpression(call.expression)
+      && !call.expression.questionDotToken
+      && ts.isIdentifier(call.expression.expression)
+      && call.expression.expression.text === 'Date'
+      && call.expression.name.text === 'parse'
+    ));
+    if (
+      !canonicalHelpers.date
+      || dateParseCalls.length !== 1
+      || dateParseCalls[0]!.arguments.length !== 1
+      || !exactDeclarationPath(
+        dateParseCalls[0]!.arguments[0],
+        previewPlanDeclaration,
+        ['adapter', 'expiresAt'],
+      )
+    ) canonicalRoleCallsValid = false;
+    else certifiedCalls.add(dateParseCalls[0]!);
+
+    const freezeCalls = innerCalls.filter((call) => (
+      ts.isPropertyAccessExpression(call.expression)
+      && !call.expression.questionDotToken
+      && ts.isIdentifier(call.expression.expression)
+      && call.expression.expression.text === 'Object'
+      && call.expression.name.text === 'freeze'
+    ));
+    const expectedFreezeObjects = [
+      directFrozenObject(armingDeclaration?.initializer),
+      directFrozenObject(consumingDeclaration?.initializer),
+      suffixPreparedEntries,
+    ];
+    if (
+      !canonicalHelpers.objectFreeze
+      || expectedFreezeObjects.some((object) => object === null)
+      || freezeCalls.length !== expectedFreezeObjects.length
+      || freezeCalls.some((call, index) => call.arguments[0] !== expectedFreezeObjects[index])
+    ) canonicalRoleCallsValid = false;
+    else {
+      for (const call of freezeCalls) {
+        certifiedCalls.add(call);
+        certifyAggregateTree(call);
+      }
+    }
+
+    const executeScriptCalls = innerCalls.filter((call) => {
+      const execute = call.expression;
+      return ts.isPropertyAccessExpression(execute)
+        && !execute.questionDotToken
+        && execute.name.text === 'executeScript'
+        && ts.isPropertyAccessExpression(execute.expression)
+        && !execute.expression.questionDotToken
+        && execute.expression.name.text === 'scripting'
+        && ts.isIdentifier(execute.expression.expression)
+        && execute.expression.expression.text === 'chrome';
+    });
+    const executeScriptCall = executeScriptCalls.length === 1 ? executeScriptCalls[0]! : null;
+    const executeEntries = exactObjectEntries(
+      executeScriptCall?.arguments.length === 1
+        && ts.isObjectLiteralExpression(executeScriptCall.arguments[0]!)
+        ? executeScriptCall.arguments[0]!
+        : null,
+      ['target', 'world', 'func', 'args'],
+      false,
+    );
+    const executeTarget = executeEntries?.get('target');
+    const targetEntries = exactObjectEntries(
+      executeTarget && ts.isObjectLiteralExpression(executeTarget) ? executeTarget : null,
+      ['tabId', 'frameIds'],
+      false,
+    );
+    const frameIds = targetEntries?.get('frameIds');
+    const executeFunc = executeEntries?.get('func');
+    const executeArgs = executeEntries?.get('args');
+    const executeScriptValid = Boolean(
+      canonicalHelpers.chrome
+      && canonicalHelpers.selectedDestinationInjectedFunction
+      && executeScriptCall
+      && executeEntries
+      && targetEntries
+      && exactDeclarationPath(
+        targetEntries.get('tabId'),
+        stagedDeclaration,
+        ['destination', 'destinationTabId'],
+      )
+      && frameIds
+      && ts.isArrayLiteralExpression(frameIds)
+      && frameIds.elements.length === 1
+      && ts.isNumericLiteral(frameIds.elements[0]!)
+      && frameIds.elements[0]!.text === '0'
+      && exactString(executeEntries.get('world'), 'ISOLATED')
+      && executeFunc
+      && ts.isNonNullExpression(executeFunc)
+      && ts.isIdentifier(executeFunc.expression)
+      && executeFunc.expression.text === 'selectedDestinationInjectedFunction'
+      && executeArgs
+      && ts.isArrayLiteralExpression(executeArgs)
+      && executeArgs.elements.length === 1
+      && exactDeclarationPath(executeArgs.elements[0], previewPlanDeclaration, ['plan'])
+    );
+    if (!executeScriptValid) canonicalRoleCallsValid = false;
+    else {
+      certifiedCalls.add(executeScriptCall!);
+      certifyAggregateTree(executeScriptCall!);
+      let parent: ts.Node = executeScriptCall!;
+      while (parent.parent && parent.parent !== inner) {
+        parent = parent.parent;
+        if (
+          ts.isBinaryExpression(parent)
+          && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          && inside(executeScriptCall!, parent.right)
+        ) {
+          certifiedAssignments.add(parent);
+          break;
+        }
+      }
+    }
+    if (!canonicalRoleCallsValid) {
+      report('inner authoritative call helper is shadowed or noncanonical');
+    }
+
     const allowedRoleReturns = new Set<ts.ReturnStatement>([
       armingFailureReturn,
       cancellationReturn,
       consumingFailureReturn,
       preparedReturnStatement,
     ].filter((statement): statement is ts.ReturnStatement => statement !== null));
-    const collectEscapes = (node: ts.Node) => {
+    const topLevelCertifiedCall = (expression: ts.Expression) => {
+      let selected = unwrapPreparationExpression(expression);
+      if (ts.isAwaitExpression(selected)) selected = unwrapPreparationExpression(selected.expression);
+      return ts.isCallExpression(selected) && certifiedCalls.has(selected);
+    };
+    let outboundFlowValid = true;
+    const collectOutboundFlow = (node: ts.Node) => {
       if (node !== inner && ts.isFunctionLike(node)) {
-        if (containsAuthoritativeReference(node)) authoritativeRolesValid = false;
+        if (containsAuthoritativeReference(node)) outboundFlowValid = false;
+        return;
+      }
+      if (node !== inner && (ts.isClassDeclaration(node) || ts.isClassExpression(node))) {
+        outboundFlowValid = false;
         return;
       }
       if (
@@ -2036,36 +2350,66 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         && !ts.isIdentifier(node.name)
         && node.initializer
         && containsAuthoritativeReference(node.initializer)
-      ) authoritativeRolesValid = false;
+      ) outboundFlowValid = false;
       if (
         ts.isVariableDeclaration(node)
         && !authoritativeSet.has(node)
         && node.initializer
-      ) {
-        const selected = unwrapPreparationExpression(node.initializer);
-        if (
-          (ts.isObjectLiteralExpression(selected) || ts.isArrayLiteralExpression(selected))
-          && containsAuthoritativeReference(selected)
-        ) authoritativeRolesValid = false;
-      }
+        && containsAuthoritativeReference(node.initializer)
+        && !topLevelCertifiedCall(node.initializer)
+      ) outboundFlowValid = false;
       if (
-        ts.isCallExpression(node)
-        && node.arguments.some(containsAuthoritativeReference)
-        && !approvedRoleCalls.has(callPath(node.expression) ?? '')
-      ) authoritativeRolesValid = false;
+        ts.isBinaryExpression(node)
+        && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        && containsAuthoritativeReference(node.right)
+        && !certifiedAssignments.has(node)
+      ) outboundFlowValid = false;
+      if (
+        (ts.isForInStatement(node) || ts.isForOfStatement(node))
+        && (
+          containsAuthoritativeReference(node.expression)
+          || containsAuthoritativeReference(node.initializer)
+        )
+      ) outboundFlowValid = false;
+      if (
+        (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node))
+        && containsAuthoritativeReference(node)
+        && !certifiedAggregates.has(node)
+      ) outboundFlowValid = false;
+      if (
+        (ts.isTemplateExpression(node) || ts.isTaggedTemplateExpression(node))
+        && containsAuthoritativeReference(node)
+      ) outboundFlowValid = false;
+      if (
+        (ts.isCallExpression(node) || ts.isNewExpression(node))
+        && containsAuthoritativeReference(node)
+        && !(ts.isCallExpression(node) && certifiedCalls.has(node))
+      ) outboundFlowValid = false;
       if (
         (ts.isSpreadElement(node) || ts.isSpreadAssignment(node))
         && containsAuthoritativeReference(node.expression)
-      ) authoritativeRolesValid = false;
+        && !certifiedAggregates.has(node.parent as ts.ObjectLiteralExpression | ts.ArrayLiteralExpression)
+      ) outboundFlowValid = false;
       if (
         ts.isReturnStatement(node)
         && node.expression
         && containsAuthoritativeReference(node.expression)
         && !allowedRoleReturns.has(node)
-      ) authoritativeRolesValid = false;
-      ts.forEachChild(node, collectEscapes);
+      ) outboundFlowValid = false;
+      if (
+        (ts.isThrowStatement(node) || ts.isYieldExpression(node))
+        && containsAuthoritativeReference(node)
+      ) {
+        outboundFlowValid = false;
+      }
+      ts.forEachChild(node, collectOutboundFlow);
     };
-    collectEscapes(inner);
+    collectOutboundFlow(inner);
+    if (!outboundFlowValid) {
+      report('inner authoritative values must not escape certified outbound flow');
+      authoritativeRolesValid = false;
+    }
     if (!authoritativeRolesValid) {
       report('inner authoritative roles must be immutable direct const declarations');
     }
@@ -3274,6 +3618,165 @@ describe('serialized handoff lifecycle', () => {
       );
     }
 
+    const expectAuthoritativeOutboundRejection = (mutated: string, label: string) => {
+      expect.soft(analyzeMutation(mutated, label, true), label).toContain(
+        'inner authoritative values must not escape certified outbound flow',
+      );
+    };
+    const insertBeforeArming = (inserted: string, label: string) => replaceExactlyOnce(
+      source,
+      '  const arming: ArmingSessionStateV1 = Object.freeze({',
+      `${inserted}\n  const arming: ArmingSessionStateV1 = Object.freeze({`,
+      label,
+    );
+
+    for (const [label, inserted] of [
+      [
+        'authoritative request property RHS',
+        '  (request as unknown as { parked: unknown }).parked = staged;',
+      ],
+      [
+        'authoritative for-of carrier',
+        [
+          '  for (const survivor of [staged]) {',
+          '    (request as unknown as { parked: unknown }).parked = survivor;',
+          '  }',
+        ].join('\n'),
+      ],
+      [
+        'authoritative aggregate across await',
+        [
+          '  void Object.freeze({',
+          '    parked: staged,',
+          '    resumed: await clearAlarm(SESSION_EXPIRY_ALARM),',
+          '  });',
+        ].join('\n'),
+      ],
+      [
+        'authoritative class storage',
+        [
+          '  class PayloadVault {',
+          '    static parked = lifecycle;',
+          '    [staged!.envelope.packId]() { return staged; }',
+          '  }',
+          '  void PayloadVault;',
+        ].join('\n'),
+      ],
+      ['authoritative call sink', '  void JSON.stringify(staged);'],
+      [
+        'authoritative constructor sink',
+        '  void new (class { constructor(_value: unknown) {} })(staged);',
+      ],
+      [
+        'authoritative tagged-template sink',
+        [
+          '  void String.raw(',
+          "    { raw: [''] } as unknown as TemplateStringsArray,",
+          '    staged as unknown as string,',
+          '  );',
+        ].join('\n'),
+      ],
+      ['authoritative dynamic-import sink', '  void import(staged as unknown as string);'],
+      [
+        'authoritative aggregate carriers',
+        [
+          '  void [staged];',
+          '  void { parked: staged };',
+          '  void { ...(staged as unknown as Record<string, unknown>) };',
+          '  void `${staged as unknown as string}`;',
+        ].join('\n'),
+      ],
+      [
+        'authoritative return throw finally sinks',
+        [
+          '  try {',
+          '    if (request.actionTabId < 0) return staged as unknown as WorkerResponseV1;',
+          '    if (request.actionTabId < -1) throw lifecycle;',
+          '  } finally {',
+          '    await Promise.resolve();',
+          '  }',
+        ].join('\n'),
+      ],
+      [
+        'authoritative closure capture',
+        [
+          '  const retainStaged = () => staged;',
+          '  void retainStaged;',
+        ].join('\n'),
+      ],
+      [
+        'authoritative direct assignment RHS',
+        [
+          '  let parkedDirect: unknown;',
+          '  parkedDirect = staged;',
+          '  void parkedDirect;',
+        ].join('\n'),
+      ],
+      [
+        'authoritative alias assignment RHS',
+        [
+          '  const renamedDurableCarrier = staged;',
+          '  let parkedAlias: unknown;',
+          '  parkedAlias = renamedDurableCarrier;',
+          '  void parkedAlias;',
+        ].join('\n'),
+      ],
+      [
+        'authoritative projection assignment RHS',
+        [
+          '  const renamedEnvelopeCarrier = staged.envelope;',
+          '  let parkedProjection: unknown;',
+          '  parkedProjection = renamedEnvelopeCarrier;',
+          '  void parkedProjection;',
+        ].join('\n'),
+      ],
+    ] as const) {
+      expectAuthoritativeOutboundRejection(insertBeforeArming(inserted, label), label);
+    }
+
+    const shadowPrefixHelper = (name: string) => replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        [
+          "): Promise<WorkerResponseV1 | PreparedFillDispatch> {",
+          '  const lifecycle = await reconcileLifecycle();',
+        ].join('\n'),
+        [
+          "): Promise<WorkerResponseV1 | PreparedFillDispatch> {",
+          `  const canonical${name[0]!.toUpperCase()}${name.slice(1)} = ${name};`,
+          '  {',
+          `    const ${name} = canonical${name[0]!.toUpperCase()}${name.slice(1)};`,
+          '    const lifecycle = await reconcileLifecycle();',
+        ].join('\n'),
+        `${name} outbound shadow declaration`,
+      ),
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
+      [
+        '    sourceImportedAtMs,',
+        '  });',
+        '  }',
+        '}',
+        '',
+        'async function prepareFillDispatch(',
+      ].join('\n'),
+      `${name} outbound shadow scope`,
+    );
+    for (const helper of ['fixedBlocker', 'actionTabMatches', 'runSourceReprobe'] as const) {
+      expect.soft(
+        analyzeMutation(shadowPrefixHelper(helper), `${helper} outbound shadow`, true),
+        `${helper} outbound shadow`,
+      ).toContain('inner authoritative call helper is shadowed or noncanonical');
+    }
+
+    const extraCanonicalCallMutation = insertBeforeArming(
+      '  void fixedBlocker(request.command, lifecycle);',
+      'extra canonical authoritative call',
+    );
+    expectAuthoritativeOutboundRejection(
+      extraCanonicalCallMutation,
+      'extra canonical authoritative call',
+    );
+
     const preparedReturns: string[][] = [];
     const collectPreparedReturns = (node: ts.Node) => {
       if (
@@ -3345,7 +3848,7 @@ describe('serialized handoff lifecycle', () => {
       visit(statement);
     }
     expect(forbiddenAwaits).toEqual([]);
-  }, 120_000);
+  }, 240_000);
 
   it('requires an exact own-data source tab URL before the source probe', async () => {
     const harness = makeChromeHarness();
