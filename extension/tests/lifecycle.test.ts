@@ -414,15 +414,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-type PreparationProvenance =
-  | Readonly<{ kind: 'bundle-root' }>
-  | Readonly<{
-    kind: 'bundle-member';
-    member: 'consuming' | 'fillPlan' | 'sourceAuthorization' | 'sourceImportedAtMs';
-  }>
-  | Readonly<{ kind: 'safe-literal' }>
-  | Readonly<{ kind: 'unknown'; reason: string }>;
-
 const PREPARED_DISPATCH_KEYS = Object.freeze([
   'status',
   'consuming',
@@ -430,7 +421,6 @@ const PREPARED_DISPATCH_KEYS = Object.freeze([
   'sourceAuthorization',
   'sourceImportedAtMs',
 ] as const);
-const PREPARED_DISPATCH_MEMBERS = new Set(PREPARED_DISPATCH_KEYS.slice(1));
 
 function unwrapPreparationExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
@@ -442,16 +432,6 @@ function unwrapPreparationExpression(expression: ts.Expression): ts.Expression {
     || ts.isSatisfiesExpression(current)
   ) current = current.expression;
   return current;
-}
-
-function directFunction(file: ts.SourceFile, name: string): ts.FunctionDeclaration | null {
-  let found: ts.FunctionDeclaration | null = null;
-  const visit = (node: ts.Node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = node;
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return found;
 }
 
 function directCallName(expression: ts.Expression): string | null {
@@ -534,243 +514,361 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     true,
     ts.ScriptKind.TS,
   );
-  const inner = directFunction(file, 'preparePayloadBearingFill');
-  const outer = directFunction(file, 'prepareFillDispatch');
   const issues: string[] = [];
-  if (!inner?.body || !outer?.body) return ['both fill-preparation helpers must exist with bodies'];
-
-  type Binding = {
-    declaration: ts.VariableDeclaration;
-    scopeEnd: number;
-    provenance: PreparationProvenance;
-    nullAssignments: number[];
+  const report = (message: string) => {
+    if (!issues.includes(message)) issues.push(message);
   };
-  const bindings = new Map<string, Binding>();
-  const collectBindings = (node: ts.Node) => {
-    if (ts.isFunctionLike(node) && node !== outer) return;
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-      let scope: ts.Node | undefined = node.parent;
-      while (scope && scope !== outer.body && !ts.isBlock(scope)) scope = scope.parent;
-      if (bindings.has(node.name.text)) issues.push(`duplicate outer binding ${node.name.text}`);
-      bindings.set(node.name.text, {
-        declaration: node,
-        scopeEnd: (scope ?? outer.body!).end,
-        provenance: Object.freeze({ kind: 'unknown', reason: 'unclassified initializer' }),
-        nullAssignments: [],
-      });
-    }
-    ts.forEachChild(node, collectBindings);
-  };
-  collectBindings(outer);
+  const outer = file.statements.find((statement): statement is ts.FunctionDeclaration => (
+    ts.isFunctionDeclaration(statement) && statement.name?.text === 'prepareFillDispatch'
+  ));
+  if (!outer?.body) return ['outer fill-preparation helper must exist at file scope'];
+  const requestParameter = outer.parameters.length === 1 && ts.isIdentifier(outer.parameters[0]!.name)
+    ? outer.parameters[0]!.name
+    : null;
+  if (!requestParameter) report('outer helper must have one direct request parameter');
 
-  const classifyExpression = (expression: ts.Expression): PreparationProvenance => {
-    const selected = unwrapPreparationExpression(expression);
-    if (
-      ts.isStringLiteral(selected)
-      || ts.isNumericLiteral(selected)
-      || selected.kind === ts.SyntaxKind.NullKeyword
-      || selected.kind === ts.SyntaxKind.TrueKeyword
-      || selected.kind === ts.SyntaxKind.FalseKeyword
-    ) return Object.freeze({ kind: 'safe-literal' });
-    if (ts.isAwaitExpression(selected)) {
-      return directCallName(selected.expression) === 'preparePayloadBearingFill'
-        ? Object.freeze({ kind: 'bundle-root' })
-        : Object.freeze({ kind: 'unknown', reason: 'awaited value is not the closed preparation helper' });
-    }
-    if (ts.isIdentifier(selected)) {
-      if (selected.text === 'request') return Object.freeze({ kind: 'safe-literal' });
-      return bindings.get(selected.text)?.provenance
-        ?? Object.freeze({ kind: 'unknown', reason: 'value does not originate in the closed bundle' });
-    }
-    if (ts.isPropertyAccessExpression(selected)) {
-      const base = classifyExpression(selected.expression);
-      if (base.kind === 'bundle-root') {
-        return PREPARED_DISPATCH_MEMBERS.has(selected.name.text as never)
-          ? Object.freeze({
-            kind: 'bundle-member',
-            member: selected.name.text as Exclude<typeof PREPARED_DISPATCH_KEYS[number], 'status'>,
-          })
-          : Object.freeze({
-            kind: 'unknown',
-            reason: `nonpermitted bundle member "${selected.name.text}"`,
-          });
-      }
-      if (base.kind === 'bundle-member') {
-        return Object.freeze({
-          kind: 'unknown',
-          reason: `nonpermitted derivation from bundle member "${base.member}"`,
-        });
-      }
-      return base.kind === 'unknown'
-        ? base
-        : Object.freeze({ kind: 'safe-literal' });
-    }
-    if (ts.isObjectLiteralExpression(selected)) {
-      for (const property of selected.properties) {
-        if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
-          return Object.freeze({ kind: 'unknown', reason: 'non-data object member' });
-        }
-        const value = ts.isPropertyAssignment(property) ? property.initializer : property.name;
-        const child = classifyExpression(value);
-        if (child.kind === 'unknown' || child.kind === 'bundle-root') return child;
-      }
-      return Object.freeze({ kind: 'safe-literal' });
-    }
-    return Object.freeze({ kind: 'unknown', reason: 'value does not derive from a permitted origin' });
-  };
-
-  for (let pass = 0; pass < bindings.size + 1; pass += 1) {
-    let changed = false;
-    for (const binding of bindings.values()) {
-      const declaredAsBundle = binding.declaration.type?.getText(file).includes('PreparedFillDispatch')
-        && binding.declaration.initializer?.kind === ts.SyntaxKind.NullKeyword;
-      const next = declaredAsBundle
-        ? Object.freeze({ kind: 'bundle-root' } as const)
-        : binding.declaration.initializer
-          ? classifyExpression(binding.declaration.initializer)
-          : Object.freeze({ kind: 'unknown', reason: 'binding has no initializer' } as const);
-      if (JSON.stringify(next) !== JSON.stringify(binding.provenance)) {
-        binding.provenance = next;
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
-
-  const awaitCalls: Array<{ name: string | null; position: number }> = [];
-  const collectFlow = (node: ts.Node) => {
-    if (ts.isFunctionLike(node) && node !== outer) return;
-    if (ts.isAwaitExpression(node)) {
-      awaitCalls.push({ name: directCallName(node.expression), position: node.getStart(file) });
-    }
-    if (
-      ts.isBinaryExpression(node)
-      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isIdentifier(node.left)
-    ) {
-      const binding = bindings.get(node.left.text);
-      if (binding) {
-        const assigned = classifyExpression(node.right);
-        if (node.right.kind === ts.SyntaxKind.NullKeyword) {
-          binding.nullAssignments.push(node.getEnd());
-        } else if (assigned.kind !== binding.provenance.kind) {
-          issues.push(`${node.left.text} is reassigned from an incompatible origin`);
-        }
-      }
-    }
-    ts.forEachChild(node, collectFlow);
-  };
-  collectFlow(outer);
-  const payloadHelperAwaits = awaitCalls.filter((call) => call.name === 'preparePayloadBearingFill');
-  const alarmAwaits = awaitCalls.filter((call) => call.name === 'clearAlarm' || call.name === 'createAlarm');
-  if (payloadHelperAwaits.length !== 1) issues.push('outer helper must await the payload helper exactly once');
-  if (alarmAwaits.length !== 3) issues.push('outer helper must own exactly three canonical alarm awaits');
-  for (const call of awaitCalls) {
-    if (!['preparePayloadBearingFill', 'clearAlarm', 'createAlarm'].includes(call.name ?? '')) {
-      issues.push('outer helper awaits a value outside the closed preparation/alarm flow');
-    }
-  }
-  const firstAlarm = Math.min(...alarmAwaits.map((call) => call.position));
-  if (!Number.isFinite(firstAlarm)) issues.push('outer helper has no canonical alarm boundary');
-
-  const isBindingReference = (node: ts.Identifier, declaration: ts.VariableDeclaration) => {
-    if (node === declaration.name) return false;
-    if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) return false;
-    if (
-      (ts.isPropertyAssignment(node.parent) || ts.isShorthandPropertyAssignment(node.parent))
-      && node.parent.name === node
-      && !ts.isShorthandPropertyAssignment(node.parent)
-    ) return false;
-    return true;
-  };
-  for (const [name, binding] of bindings) {
-    const crossesAlarm = binding.declaration.getStart(file) < firstAlarm && binding.scopeEnd > firstAlarm;
-    if (binding.provenance.kind === 'unknown') {
-      issues.push(`${name}: ${binding.provenance.reason}`);
-      if (crossesAlarm) issues.push(`${name}: nonpermitted origin crosses an alarm await`);
-      continue;
-    }
-    if (binding.provenance.kind !== 'bundle-root' || !crossesAlarm) continue;
-    const kill = binding.nullAssignments.filter((position) => position < firstAlarm).at(-1);
-    if (kill === undefined) {
-      issues.push(`${name}: bundle root is not killed before the first alarm await`);
-      continue;
-    }
-    let readAfterKill = false;
-    const visitReferences = (node: ts.Node) => {
-      if (ts.isFunctionLike(node) && node !== outer) return;
-      if (
-        ts.isIdentifier(node)
-        && node.text === name
-        && node.getStart(file) > kill
-        && isBindingReference(node, binding.declaration)
-      ) readAfterKill = true;
-      ts.forEachChild(node, visitReferences);
-    };
-    visitReferences(outer);
-    if (readAfterKill) issues.push(`${name}: bundle root is read after its pre-alarm kill`);
-  }
-
-  const visitNestedCaptures = (node: ts.Node) => {
+  const directAwaits: ts.AwaitExpression[] = [];
+  const assignmentNodes: ts.BinaryExpression[] = [];
+  const localNames = new Set<string>();
+  const visitOuter = (node: ts.Node) => {
     if (ts.isFunctionLike(node) && node !== outer) {
-      const visitIdentifiers = (child: ts.Node) => {
-        if (ts.isIdentifier(child)) {
-          const provenance = bindings.get(child.text)?.provenance;
-          if (provenance?.kind === 'bundle-root' || provenance?.kind === 'unknown') {
-            issues.push(`${child.text}: nonpermitted outer origin captured by nested function`);
-          }
-        }
-        ts.forEachChild(child, visitIdentifiers);
-      };
-      visitIdentifiers(node);
+      report('outer nested functions are forbidden');
       return;
     }
-    ts.forEachChild(node, visitNestedCaptures);
-  };
-  visitNestedCaptures(outer);
-
-  const outerReturns: ts.ReturnStatement[] = [];
-  const collectOuterReturns = (node: ts.Node) => {
-    if (ts.isFunctionLike(node) && node !== outer) return;
-    if (ts.isReturnStatement(node)) outerReturns.push(node);
-    ts.forEachChild(node, collectOuterReturns);
-  };
-  collectOuterReturns(outer);
-  for (const statement of outerReturns) {
-    if (!statement.expression) {
-      issues.push('outer helper has a valueless return');
-      continue;
+    if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+      report('outer binding patterns are forbidden');
     }
-    const object = frozenObject(statement.expression);
-    const status = object?.properties.find((property) => propertyName(property) === 'status');
-    const statusValue = status && ts.isPropertyAssignment(status)
-      ? unwrapPreparationExpression(status.initializer)
-      : null;
-    if (statusValue && ts.isStringLiteral(statusValue) && statusValue.text === 'prepared') continue;
-    if (directCallName(statement.expression) === 'cancelBeforeDispatch') continue;
-    const provenance = classifyExpression(statement.expression);
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      localNames.add(node.name.text);
+    }
+    if (ts.isAwaitExpression(node)) directAwaits.push(node);
     if (
-      provenance.kind === 'unknown'
-      || provenance.kind === 'bundle-member'
-      || (provenance.kind === 'bundle-root' && statement.getStart(file) >= firstAlarm)
-    ) issues.push('outer helper returns nonpermitted bundle data');
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    ) assignmentNodes.push(node);
+    if (
+      ts.isPrefixUnaryExpression(node)
+      && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+    ) report('outer mutation syntax is forbidden');
+    if (ts.isPostfixUnaryExpression(node)) report('outer mutation syntax is forbidden');
+    if (ts.isDeleteExpression(node)) report('outer mutation syntax is forbidden');
+    if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node)) {
+      report('outer spread syntax is forbidden');
+    }
+    if (
+      ts.isElementAccessExpression(node)
+      || (ts.isPropertyAccessExpression(node) && node.questionDotToken)
+      || (ts.isCallExpression(node) && node.questionDotToken)
+      || (ts.isComputedPropertyName(node))
+    ) report('outer computed or optional syntax is forbidden');
+    ts.forEachChild(node, visitOuter);
+  };
+  visitOuter(outer);
+
+  const callExpression = (expression: ts.Expression): ts.CallExpression | null => {
+    const selected = unwrapPreparationExpression(expression);
+    return ts.isCallExpression(selected) ? selected : null;
+  };
+  const singleDeclaration = (
+    statement: ts.Statement | undefined,
+    declarationKind: 'const' | 'let',
+  ): ts.VariableDeclaration | null => {
+    if (!statement || !ts.isVariableStatement(statement) || statement.declarationList.declarations.length !== 1) {
+      return null;
+    }
+    const isExpectedKind = declarationKind === 'const'
+      ? Boolean(statement.declarationList.flags & ts.NodeFlags.Const)
+      : Boolean(statement.declarationList.flags & ts.NodeFlags.Let);
+    return isExpectedKind ? statement.declarationList.declarations[0]! : null;
+  };
+  const exactIdentifier = (expression: ts.Expression | undefined, name: string | null) => (
+    Boolean(expression && name && ts.isIdentifier(expression) && expression.text === name)
+  );
+  const exactProperty = (
+    expression: ts.Expression | undefined,
+    owner: string | null,
+    member: string,
+  ) => Boolean(
+    expression
+    && owner
+    && ts.isPropertyAccessExpression(expression)
+    && !expression.questionDotToken
+    && ts.isIdentifier(expression.expression)
+    && expression.expression.text === owner
+    && expression.name.text === member,
+  );
+  const exactString = (expression: ts.Expression | undefined, value: string) => (
+    Boolean(expression && ts.isStringLiteral(expression) && expression.text === value)
+  );
+
+  const preparationAwaits = directAwaits.filter((awaited) => {
+    const call = callExpression(awaited.expression);
+    return Boolean(
+      requestParameter
+      && call
+      && ts.isIdentifier(call.expression)
+      && call.arguments.length === 1
+      && exactIdentifier(call.arguments[0], requestParameter.text)
+      && ts.isVariableDeclaration(awaited.parent)
+      && awaited.parent.initializer === awaited
+      && ts.isIdentifier(awaited.parent.name),
+    );
+  });
+  if (preparationAwaits.length !== 1) report('outer helper must have one structural preparation await');
+  const preparationAwait = preparationAwaits[0] ?? null;
+  const preparationCall = preparationAwait ? callExpression(preparationAwait.expression) : null;
+  const innerName = preparationCall && ts.isIdentifier(preparationCall.expression)
+    ? preparationCall.expression.text
+    : null;
+  const inner = innerName
+    ? file.statements.find((statement): statement is ts.FunctionDeclaration => (
+      ts.isFunctionDeclaration(statement) && statement.name?.text === innerName
+    ))
+    : null;
+  if (!inner?.body) report('structurally discovered preparation helper must resolve at file scope');
+
+  const statements = outer.body.statements;
+  let grammarMatches = statements.length === 11;
+  const rootDeclaration = singleDeclaration(statements[0], 'let');
+  const rootName = rootDeclaration && ts.isIdentifier(rootDeclaration.name)
+    ? rootDeclaration.name.text
+    : null;
+  grammarMatches &&= Boolean(
+    rootName
+    && rootDeclaration?.type?.getText(file).replaceAll(' ', '') === 'PreparedFillDispatch|null'
+    && rootDeclaration.initializer?.kind === ts.SyntaxKind.NullKeyword,
+  );
+
+  const preparationBlock = statements[1] && ts.isBlock(statements[1]) ? statements[1] : null;
+  grammarMatches &&= preparationBlock?.statements.length === 3;
+  const resultDeclaration = singleDeclaration(preparationBlock?.statements[0], 'const');
+  const resultName = resultDeclaration && ts.isIdentifier(resultDeclaration.name)
+    ? resultDeclaration.name.text
+    : null;
+  grammarMatches &&= Boolean(
+    resultName
+    && resultDeclaration?.initializer === preparationAwait,
+  );
+
+  const guard = preparationBlock?.statements[1];
+  let guardedReturn: ts.ReturnStatement | null = null;
+  if (guard && ts.isIfStatement(guard) && !guard.elseStatement && ts.isBlock(guard.thenStatement)) {
+    const condition = guard.expression;
+    const left = ts.isBinaryExpression(condition)
+      && condition.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      ? unwrapPreparationExpression(condition.left)
+      : null;
+    const right = ts.isBinaryExpression(condition)
+      && condition.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      ? condition.right
+      : null;
+    const missingStatus = left && ts.isPrefixUnaryExpression(left)
+      && left.operator === ts.SyntaxKind.ExclamationToken
+      ? unwrapPreparationExpression(left.operand)
+      : null;
+    grammarMatches &&= Boolean(
+      missingStatus
+      && ts.isBinaryExpression(missingStatus)
+      && missingStatus.operatorToken.kind === ts.SyntaxKind.InKeyword
+      && exactString(missingStatus.left, 'status')
+      && exactIdentifier(missingStatus.right, resultName)
+      && right
+      && ts.isBinaryExpression(right)
+      && right.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+      && exactProperty(right.left, resultName, 'status')
+      && exactString(right.right, 'prepared')
+      && guard.thenStatement.statements.length === 1
+      && ts.isReturnStatement(guard.thenStatement.statements[0]),
+    );
+    guardedReturn = guard.thenStatement.statements.length === 1
+      && ts.isReturnStatement(guard.thenStatement.statements[0])
+      ? guard.thenStatement.statements[0]
+      : null;
+  } else {
+    grammarMatches = false;
   }
+  grammarMatches &&= Boolean(
+    guardedReturn?.expression
+    && ts.isAsExpression(guardedReturn.expression)
+    && guardedReturn.expression.type.getText(file) === 'WorkerResponseV1'
+    && exactIdentifier(guardedReturn.expression.expression, resultName),
+  );
+
+  const transferStatement = preparationBlock?.statements[2];
+  const transfer = transferStatement && ts.isExpressionStatement(transferStatement)
+    && ts.isBinaryExpression(transferStatement.expression)
+    ? transferStatement.expression
+    : null;
+  grammarMatches &&= Boolean(
+    transfer
+    && transfer.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    && exactIdentifier(transfer.left, rootName)
+    && ts.isAsExpression(transfer.right)
+    && transfer.right.type.getText(file) === 'PreparedFillDispatch'
+    && exactIdentifier(transfer.right.expression, resultName),
+  );
+
+  const memberNames = new Map<string, string>();
+  for (const [index, member] of PREPARED_DISPATCH_KEYS.slice(1).entries()) {
+    const declaration = singleDeclaration(statements[index + 2], 'const');
+    const localName = declaration && ts.isIdentifier(declaration.name) ? declaration.name.text : null;
+    if (localName) memberNames.set(member, localName);
+    grammarMatches &&= Boolean(localName && exactProperty(declaration?.initializer, rootName, member));
+  }
+
+  const killStatement = statements[6];
+  const kill = killStatement && ts.isExpressionStatement(killStatement)
+    && ts.isBinaryExpression(killStatement.expression)
+    ? killStatement.expression
+    : null;
+  grammarMatches &&= Boolean(
+    kill
+    && kill.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    && exactIdentifier(kill.left, rootName)
+    && kill.right.kind === ts.SyntaxKind.NullKeyword,
+  );
+
+  const exactAwaitStatement = (
+    statement: ts.Statement | undefined,
+    callee: string,
+    argument: string,
+  ): ts.AwaitExpression | null => {
+    if (!statement || !ts.isExpressionStatement(statement) || !ts.isAwaitExpression(statement.expression)) {
+      return null;
+    }
+    const call = callExpression(statement.expression.expression);
+    return call
+      && ts.isIdentifier(call.expression)
+      && call.expression.text === callee
+      && call.arguments.length === 1
+      && exactIdentifier(call.arguments[0], argument)
+      ? statement.expression
+      : null;
+  };
+  const clearSession = exactAwaitStatement(statements[7], 'clearAlarm', 'SESSION_EXPIRY_ALARM');
+  const clearWatchdog = exactAwaitStatement(statements[8], 'clearAlarm', 'ATTEMPT_WATCHDOG_ALARM');
+  grammarMatches &&= Boolean(clearSession && clearWatchdog);
+
+  const watchdog = statements[9];
+  let createWatchdog: ts.AwaitExpression | null = null;
+  let watchdogReturn: ts.ReturnStatement | null = null;
+  if (watchdog && ts.isIfStatement(watchdog) && !watchdog.elseStatement && ts.isBlock(watchdog.thenStatement)) {
+    const condition = unwrapPreparationExpression(watchdog.expression);
+    const negated = ts.isPrefixUnaryExpression(condition)
+      && condition.operator === ts.SyntaxKind.ExclamationToken
+      ? unwrapPreparationExpression(condition.operand)
+      : null;
+    createWatchdog = negated && ts.isAwaitExpression(negated) ? negated : null;
+    const createCall = createWatchdog ? callExpression(createWatchdog.expression) : null;
+    grammarMatches &&= Boolean(
+      createCall
+      && ts.isIdentifier(createCall.expression)
+      && createCall.expression.text === 'createAlarm'
+      && createCall.arguments.length === 2
+      && exactIdentifier(createCall.arguments[0], 'ATTEMPT_WATCHDOG_ALARM')
+      && exactProperty(createCall.arguments[1], memberNames.get('consuming') ?? null, 'attemptNotAfterMs')
+      && watchdog.thenStatement.statements.length === 1
+      && ts.isReturnStatement(watchdog.thenStatement.statements[0]),
+    );
+    watchdogReturn = watchdog.thenStatement.statements.length === 1
+      && ts.isReturnStatement(watchdog.thenStatement.statements[0])
+      ? watchdog.thenStatement.statements[0]
+      : null;
+  } else {
+    grammarMatches = false;
+  }
+  const cancellation = watchdogReturn?.expression ? callExpression(watchdogReturn.expression) : null;
+  const rejection = cancellation?.arguments[1] ? callExpression(cancellation.arguments[1]) : null;
+  const requestCommand = rejection?.arguments[0]
+    && ts.isPropertyAccessExpression(rejection.arguments[0])
+    && !rejection.arguments[0].questionDotToken
+    && requestParameter
+    && ts.isIdentifier(rejection.arguments[0].expression)
+    && rejection.arguments[0].expression.text === requestParameter.text
+    && rejection.arguments[0].name.text === 'command'
+    ? rejection.arguments[0].expression
+    : null;
+  grammarMatches &&= Boolean(
+    cancellation
+    && ts.isIdentifier(cancellation.expression)
+    && cancellation.expression.text === 'cancelBeforeDispatch'
+    && cancellation.arguments.length === 2
+    && exactIdentifier(cancellation.arguments[0], memberNames.get('consuming') ?? null)
+    && rejection
+    && ts.isIdentifier(rejection.expression)
+    && rejection.expression.text === 'buildRejectedWorkerResponse'
+    && rejection.arguments.length === 2
+    && requestCommand
+    && exactString(rejection.arguments[1], 'operation-failed'),
+  );
 
   const outerReturn = preparedReturn(file, outer);
-  if (!outerReturn || JSON.stringify([...outerReturn.keys()]) !== JSON.stringify(PREPARED_DISPATCH_KEYS)) {
-    issues.push('outer success return must be the exact closed prepared bundle');
-  } else {
+  const finalStatement = statements[10];
+  grammarMatches &&= Boolean(
+    finalStatement
+    && ts.isReturnStatement(finalStatement)
+    && finalStatement.expression
+    && ts.isCallExpression(finalStatement.expression)
+    && outerReturn
+    && JSON.stringify([...outerReturn.keys()]) === JSON.stringify(PREPARED_DISPATCH_KEYS),
+  );
+  if (outerReturn) {
     const status = unwrapPreparationExpression(outerReturn.get('status')!);
-    if (!ts.isStringLiteral(status) || status.text !== 'prepared') {
-      issues.push('outer success status must be the prepared literal');
-    }
+    grammarMatches &&= ts.isStringLiteral(status) && status.text === 'prepared';
     for (const member of PREPARED_DISPATCH_KEYS.slice(1)) {
-      const provenance = classifyExpression(outerReturn.get(member)!);
-      if (provenance.kind !== 'bundle-member' || provenance.member !== member) {
-        issues.push(`outer ${member} must originate from the corresponding closed bundle member`);
-      }
+      grammarMatches &&= exactIdentifier(outerReturn.get(member), memberNames.get(member) ?? null);
     }
   }
+
+  const allowedAssignments = new Set<ts.BinaryExpression>();
+  if (transfer) allowedAssignments.add(transfer);
+  if (kill) allowedAssignments.add(kill);
+  const parameterNames = new Set(outer.parameters.flatMap((parameter) => (
+    ts.isIdentifier(parameter.name) ? [parameter.name.text] : []
+  )));
+  for (const assignment of assignmentNodes) {
+    const directLocal = ts.isIdentifier(assignment.left)
+      && localNames.has(assignment.left.text)
+      && !parameterNames.has(assignment.left.text);
+    if (!directLocal) report('outer assignment target must be a declared direct local');
+    if (!allowedAssignments.has(assignment)) {
+      report('outer assignments are limited to direct root transfer and null kill');
+    }
+  }
+
+  const expectedAwaits = new Set([
+    preparationAwait,
+    clearSession,
+    clearWatchdog,
+    createWatchdog,
+  ].filter((value): value is ts.AwaitExpression => value !== null));
+  if (directAwaits.length !== 4 || directAwaits.some((awaited) => !expectedAwaits.has(awaited))) {
+    report('outer helper must contain exactly the four classified awaits');
+  }
+  const expectedRequestReads = new Set<ts.Identifier>();
+  const preparationRequest = preparationCall?.arguments[0];
+  if (preparationRequest && ts.isIdentifier(preparationRequest)) expectedRequestReads.add(preparationRequest);
+  if (requestCommand) expectedRequestReads.add(requestCommand);
+  const actualRequestReads: ts.Identifier[] = [];
+  const collectRequestReads = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== outer) return;
+    if (
+      requestParameter
+      && ts.isIdentifier(node)
+      && node.text === requestParameter.text
+      && node !== requestParameter
+    ) actualRequestReads.push(node);
+    ts.forEachChild(node, collectRequestReads);
+  };
+  collectRequestReads(outer);
+  if (
+    actualRequestReads.length !== expectedRequestReads.size
+    || actualRequestReads.some((read) => !expectedRequestReads.has(read))
+  ) report('outer request reads are limited to preparation input and fixed rejection command');
+
+  if (!grammarMatches) report('outer statements do not match closed preparation grammar');
+  if (!inner?.body) return issues;
 
   const innerReturn = preparedReturn(file, inner);
   if (!innerReturn || JSON.stringify([...innerReturn.keys()]) !== JSON.stringify(PREPARED_DISPATCH_KEYS)) {
@@ -1028,10 +1126,37 @@ describe('serialized handoff lifecycle', () => {
       expect(found, `${name} must exist`).toBeDefined();
       return found!;
     };
-    const payloadPreparation = namedFunction('preparePayloadBearingFill');
     const preparation = namedFunction('prepareFillDispatch');
+    const preparationRequest = preparation.parameters.length === 1
+      && ts.isIdentifier(preparation.parameters[0]!.name)
+      ? preparation.parameters[0]!.name.text
+      : null;
+    const preparationCallees: string[] = [];
+    const findPreparationCallee = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== preparation) return;
+      if (ts.isAwaitExpression(node)) {
+        const call = unwrapPreparationExpression(node.expression);
+        if (
+          ts.isCallExpression(call)
+          && ts.isIdentifier(call.expression)
+          && call.arguments.length === 1
+          && preparationRequest
+          && ts.isIdentifier(call.arguments[0])
+          && call.arguments[0].text === preparationRequest
+          && ts.isVariableDeclaration(node.parent)
+          && node.parent.initializer === node
+        ) preparationCallees.push(call.expression.text);
+      }
+      ts.forEachChild(node, findPreparationCallee);
+    };
+    findPreparationCallee(preparation);
+    expect(preparationCallees).toHaveLength(1);
+    const payloadPreparation = file.statements.find((statement): statement is ts.FunctionDeclaration => (
+      ts.isFunctionDeclaration(statement) && statement.name?.text === preparationCallees[0]
+    ));
+    expect(payloadPreparation, 'structurally discovered preparation helper must exist').toBeDefined();
     const fill = namedFunction('fillEmptyReviewedFields');
-    expect(payloadPreparation.body).toBeDefined();
+    expect(payloadPreparation!.body).toBeDefined();
     expect(preparation.body).toBeDefined();
     expect(fill.body).toBeDefined();
     expect(analyzePayloadFreeFillPreparation(source)).toEqual([]);
@@ -1047,10 +1172,7 @@ describe('serialized handoff lifecycle', () => {
     expect(renamedAliasMutation).not.toBe(source);
     const mutationIssues = analyzePayloadFreeFillPreparation(renamedAliasMutation);
     expect(mutationIssues).toContain(
-      'freshlyNamedCarrier: nonpermitted bundle member "envelope"',
-    );
-    expect(mutationIssues).toContain(
-      'freshlyNamedCarrier: nonpermitted origin crosses an alarm await',
+      'outer statements do not match closed preparation grammar',
     );
     const nestedPayloadMutation = source.replace(
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
@@ -1062,7 +1184,7 @@ describe('serialized handoff lifecycle', () => {
     );
     expect(nestedPayloadMutation).not.toBe(source);
     expect(analyzePayloadFreeFillPreparation(nestedPayloadMutation)).toContain(
-      'freshlyNamedValues: nonpermitted derivation from bundle member "fillPlan"',
+      'outer statements do not match closed preparation grammar',
     );
     const returnedPayloadMutation = source.replace(
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
@@ -1076,8 +1198,153 @@ describe('serialized handoff lifecycle', () => {
     );
     expect(returnedPayloadMutation).not.toBe(source);
     expect(analyzePayloadFreeFillPreparation(returnedPayloadMutation)).toContain(
-      'outer helper returns nonpermitted bundle data',
+      'outer statements do not match closed preparation grammar',
     );
+    const objectDestructuringMutation = source
+      .replace(
+        '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+        [
+          '  const { envelope: objectCarrier } = prepared as unknown as { envelope: unknown };',
+          '  prepared = null;',
+          '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+        ].join('\n'),
+      )
+      .replace(
+        '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);',
+        '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);\n  void objectCarrier;',
+      );
+    expect(objectDestructuringMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(objectDestructuringMutation)).toContain(
+      'outer binding patterns are forbidden',
+    );
+    const arrayDestructuringMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  const [arrayCarrier] = prepared as unknown as readonly [unknown];',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(arrayDestructuringMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(arrayDestructuringMutation)).toContain(
+      'outer binding patterns are forbidden',
+    );
+    const propertySinkMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  (request as unknown as { parked: unknown }).parked =',
+        '    (prepared as unknown as { envelope: unknown }).envelope;',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(propertySinkMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(propertySinkMutation)).toContain(
+      'outer assignment target must be a declared direct local',
+    );
+    const elementSinkMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        "  (request as unknown as Record<string, unknown>)['parked'] =",
+        '    (prepared as unknown as { envelope: unknown }).envelope;',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(elementSinkMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(elementSinkMutation)).toContain(
+      'outer assignment target must be a declared direct local',
+    );
+    const nestedCaptureMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  const captureRoot = () => prepared;',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(nestedCaptureMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(nestedCaptureMutation)).toContain(
+      'outer nested functions are forbidden',
+    );
+    const extraInnerMemberMutation = source.replace(
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
+      [
+        '    sourceImportedAtMs,',
+        '    parkedEnvelope: staged.envelope,',
+        '  });',
+        '}',
+        '',
+        'async function prepareFillDispatch(',
+      ].join('\n'),
+    );
+    expect(extraInnerMemberMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(extraInnerMemberMutation)).toContain(
+      'inner success return must be the exact closed prepared bundle',
+    );
+    const extraOuterMemberMutation = source.replace(
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function fillEmptyReviewedFields(',
+      [
+        '    sourceImportedAtMs,',
+        '    parkedValues: fillPlan.values,',
+        '  });',
+        '}',
+        '',
+        'async function fillEmptyReviewedFields(',
+      ].join('\n'),
+    );
+    expect(extraOuterMemberMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(extraOuterMemberMutation)).toContain(
+      'outer statements do not match closed preparation grammar',
+    );
+    const renamedInnerMutation = source.replaceAll(
+      'preparePayloadBearingFill',
+      'structurallyRenamedPreparation',
+    );
+    expect(renamedInnerMutation).not.toBe(source);
+    expect.soft(analyzePayloadFreeFillPreparation(renamedInnerMutation)).toEqual([]);
+    for (const [label, insertedSyntax] of [
+      [
+        'call sink',
+        '  capturePayload((prepared as unknown as { envelope: unknown }).envelope);',
+      ],
+      [
+        'aggregate held across await',
+        [
+          '  void {',
+          '    parked: (prepared as unknown as { envelope: unknown }).envelope,',
+          '    resumed: await clearAlarm(SESSION_EXPIRY_ALARM),',
+          '  };',
+        ].join('\n'),
+      ],
+      [
+        'try finally pending completion',
+        [
+          '  try {',
+          '    void prepared;',
+          '  } finally {',
+          '    await clearAlarm(SESSION_EXPIRY_ALARM);',
+          '  }',
+        ].join('\n'),
+      ],
+      [
+        'class static storage',
+        [
+          '  class PayloadStore {',
+          '    static parked = (prepared as unknown as { envelope: unknown }).envelope;',
+          '  }',
+        ].join('\n'),
+      ],
+    ] as const) {
+      const implicitStorageMutation = source.replace(
+        '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+        [insertedSyntax, '  prepared = null;', '  await clearAlarm(SESSION_EXPIRY_ALARM);'].join('\n'),
+      );
+      expect(implicitStorageMutation, `${label} insertion anchor`).not.toBe(source);
+      expect(analyzePayloadFreeFillPreparation(implicitStorageMutation), label).toContain(
+        'outer statements do not match closed preparation grammar',
+      );
+    }
 
     const preparedReturns: string[][] = [];
     const collectPreparedReturns = (node: ts.Node) => {
@@ -1095,7 +1362,7 @@ describe('serialized handoff lifecycle', () => {
       }
       ts.forEachChild(node, collectPreparedReturns);
     };
-    collectPreparedReturns(payloadPreparation);
+    collectPreparedReturns(payloadPreparation!);
     expect(preparedReturns).toEqual([[
       'status',
       'consuming',
@@ -1104,7 +1371,7 @@ describe('serialized handoff lifecycle', () => {
       'sourceImportedAtMs',
     ]]);
 
-    const payloadStatements = payloadPreparation.body!.statements;
+    const payloadStatements = payloadPreparation!.body!.statements;
     const consumingWriteIndex = payloadStatements.findIndex((statement) => (
       statement.getText(file).includes('await writeSessionState(consuming)')
     ));
