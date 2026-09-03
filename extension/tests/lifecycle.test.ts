@@ -874,59 +874,261 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
   if (!innerReturn || JSON.stringify([...innerReturn.keys()]) !== JSON.stringify(PREPARED_DISPATCH_KEYS)) {
     issues.push('inner success return must be the exact closed prepared bundle');
   } else {
-    const innerBindings = new Map<string, ts.VariableDeclaration>();
+    const innerBindings = new Map<string, ts.VariableDeclaration[]>();
     const collectInnerBindings = (node: ts.Node) => {
       if (ts.isFunctionLike(node) && node !== inner) return;
       if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-        innerBindings.set(node.name.text, node);
+        const declarations = innerBindings.get(node.name.text) ?? [];
+        declarations.push(node);
+        innerBindings.set(node.name.text, declarations);
       }
       ts.forEachChild(node, collectInnerBindings);
     };
     collectInnerBindings(inner);
-    const declarationFor = (expression: ts.Expression) => {
-      const selected = unwrapPreparationExpression(expression);
-      return ts.isIdentifier(selected) ? innerBindings.get(selected.text) ?? null : null;
+    const declarationForIdentifier = (identifier: ts.Identifier) => {
+      const declarations = innerBindings.get(identifier.text) ?? [];
+      return declarations.length === 1 ? declarations[0]! : null;
     };
+    const declarationFor = (expression: ts.Expression | undefined) => (
+      expression && ts.isIdentifier(expression) ? declarationForIdentifier(expression) : null
+    );
+    const directFrozenObject = (expression: ts.Expression | undefined) => {
+      if (
+        !expression
+        || !ts.isCallExpression(expression)
+        || expression.arguments.length !== 1
+        || !ts.isPropertyAccessExpression(expression.expression)
+        || expression.expression.questionDotToken
+        || !ts.isIdentifier(expression.expression.expression)
+        || expression.expression.expression.text !== 'Object'
+        || expression.expression.name.text !== 'freeze'
+        || !ts.isObjectLiteralExpression(expression.arguments[0]!)
+      ) return null;
+      return expression.arguments[0]!;
+    };
+    const ordinaryPropertyExpression = (
+      object: ts.ObjectLiteralExpression | null,
+      key: string,
+    ): ts.Expression | null => {
+      if (!object) return null;
+      const properties = object.properties.filter((property) => (
+        property.name && ts.isIdentifier(property.name) && property.name.text === key
+      ));
+      if (properties.length !== 1) return null;
+      const property = properties[0]!;
+      if (ts.isPropertyAssignment(property)) return property.initializer;
+      if (ts.isShorthandPropertyAssignment(property)) return property.name;
+      return null;
+    };
+    const exactObjectEntries = (
+      object: ts.ObjectLiteralExpression | null,
+      keys: readonly string[],
+      allowShorthand: boolean,
+    ): ReadonlyMap<string, ts.Expression> | null => {
+      if (!object || object.properties.length !== keys.length) return null;
+      const entries = new Map<string, ts.Expression>();
+      for (const [index, key] of keys.entries()) {
+        const property = object.properties[index];
+        if (
+          !property
+          || !property.name
+          || !ts.isIdentifier(property.name)
+          || property.name.text !== key
+        ) return null;
+        if (ts.isPropertyAssignment(property)) entries.set(key, property.initializer);
+        else if (allowShorthand && ts.isShorthandPropertyAssignment(property)) {
+          entries.set(key, property.name);
+        } else return null;
+      }
+      return entries;
+    };
+    const syntaxPath = (expression: ts.Expression, allowOptional: boolean) => {
+      const members: string[] = [];
+      let cursor: ts.Expression = expression;
+      while (ts.isPropertyAccessExpression(cursor)) {
+        if (!allowOptional && cursor.questionDotToken) return null;
+        members.unshift(cursor.name.text);
+        cursor = cursor.expression;
+      }
+      return ts.isIdentifier(cursor) ? Object.freeze({ root: cursor, members }) : null;
+    };
+    const exactDeclarationPath = (
+      expression: ts.Expression | undefined,
+      declaration: ts.VariableDeclaration | null,
+      members: readonly string[],
+    ) => {
+      if (!expression || !declaration) return false;
+      const path = syntaxPath(expression, false);
+      return Boolean(
+        path
+        && declarationForIdentifier(path.root) === declaration
+        && JSON.stringify(path.members) === JSON.stringify(members),
+      );
+    };
+    const isStagedRoleDeclaration = (declaration: ts.VariableDeclaration | null) => {
+      if (!declaration?.initializer || !ts.isConditionalExpression(declaration.initializer)) return false;
+      const conditional = declaration.initializer;
+      const condition = conditional.condition;
+      if (
+        !ts.isBinaryExpression(condition)
+        || condition.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+        || !ts.isStringLiteral(condition.right)
+        || condition.right.text !== 'staged'
+        || conditional.whenFalse.kind !== ts.SyntaxKind.NullKeyword
+      ) return false;
+      const conditionPath = syntaxPath(condition.left, true);
+      const selectedPath = syntaxPath(conditional.whenTrue, false);
+      return Boolean(
+        conditionPath
+        && selectedPath
+        && conditionPath.root.text === selectedPath.root.text
+        && JSON.stringify(conditionPath.members) === JSON.stringify(['session', 'state'])
+        && JSON.stringify(selectedPath.members) === JSON.stringify(['session']),
+      );
+    };
+
     const consumingDeclaration = declarationFor(innerReturn.get('consuming')!);
-    const consumingObject = consumingDeclaration?.initializer
-      ? frozenObject(consumingDeclaration.initializer)
-      : null;
-    const consumingKeys = consumingObject?.properties.map(propertyName) ?? [];
+    const consumingKeys = [
+      'schema', 'state', 'generation', 'armNonce', 'packId', 'attemptId', 'replayUntil',
+      'attemptNotAfterMs', 'destinationTabId', 'destinationDocumentId',
+    ] as const;
+    const consumingEntries = exactObjectEntries(
+      directFrozenObject(consumingDeclaration?.initializer),
+      consumingKeys,
+      false,
+    );
+
+    const allInnerDeclarations = [...innerBindings.values()].flat();
+    const armingCandidates = allInnerDeclarations.filter((declaration) => {
+      if (declaration.type?.getText(file) !== 'ArmingSessionStateV1') return false;
+      const armingObject = directFrozenObject(declaration.initializer);
+      const state = ordinaryPropertyExpression(armingObject, 'state');
+      return Boolean(state && ts.isStringLiteral(state) && state.text === 'arming');
+    });
+    const armingDeclaration = armingCandidates.length === 1 ? armingCandidates[0]! : null;
+    const armingObject = directFrozenObject(armingDeclaration?.initializer);
+    if (!armingDeclaration) report('inner arming root must resolve uniquely by declaration role');
+
+    const consumingOrigins: Readonly<Record<typeof consumingKeys[number], boolean>> = Object.freeze({
+      schema: Boolean(
+        consumingEntries?.get('schema')
+        && ts.isIdentifier(consumingEntries.get('schema')!)
+        && (consumingEntries.get('schema') as ts.Identifier).text === 'SESSION_STATE_SCHEMA',
+      ),
+      state: Boolean(
+        consumingEntries?.get('state')
+        && ts.isStringLiteral(consumingEntries.get('state')!)
+        && (consumingEntries.get('state') as ts.StringLiteral).text === 'consuming',
+      ),
+      generation: exactDeclarationPath(consumingEntries?.get('generation'), armingDeclaration, ['generation']),
+      armNonce: exactDeclarationPath(consumingEntries?.get('armNonce'), armingDeclaration, ['armNonce']),
+      packId: exactDeclarationPath(consumingEntries?.get('packId'), armingDeclaration, ['envelope', 'packId']),
+      attemptId: exactDeclarationPath(consumingEntries?.get('attemptId'), armingDeclaration, ['attemptId']),
+      replayUntil: exactDeclarationPath(
+        consumingEntries?.get('replayUntil'), armingDeclaration, ['replayUntil'],
+      ),
+      attemptNotAfterMs: exactDeclarationPath(
+        consumingEntries?.get('attemptNotAfterMs'), armingDeclaration, ['attemptNotAfterMs'],
+      ),
+      destinationTabId: exactDeclarationPath(
+        consumingEntries?.get('destinationTabId'),
+        armingDeclaration,
+        ['destination', 'destinationTabId'],
+      ),
+      destinationDocumentId: exactDeclarationPath(
+        consumingEntries?.get('destinationDocumentId'),
+        armingDeclaration,
+        ['destination', 'destinationDocumentId'],
+      ),
+    });
     if (
       consumingDeclaration?.type?.getText(file) !== 'ConsumingSessionStateV1'
-      || JSON.stringify(consumingKeys) !== JSON.stringify([
-        'schema', 'state', 'generation', 'armNonce', 'packId', 'attemptId', 'replayUntil',
-        'attemptNotAfterMs', 'destinationTabId', 'destinationDocumentId',
-      ])
-    ) issues.push('inner consuming member must originate from the exact payload-free tuple');
+      || !consumingEntries
+    ) report('inner consuming member must originate from the exact payload-free tuple');
+    for (const property of consumingKeys) {
+      if (!consumingOrigins[property]) {
+        report(`inner consuming tuple property "${property}" has an invalid origin`);
+      }
+    }
 
-    const fillPlan = unwrapPreparationExpression(innerReturn.get('fillPlan')!);
+    const sourceBindingDeclaration = declarationFor(innerReturn.get('sourceAuthorization'));
+    const sourceBindingCall = sourceBindingDeclaration?.initializer
+      && ts.isCallExpression(sourceBindingDeclaration.initializer)
+      ? sourceBindingDeclaration.initializer
+      : null;
+    const sourceBindingArgument = sourceBindingCall?.arguments.length === 1
+      && ts.isIdentifier(sourceBindingCall.arguments[0]!)
+      ? sourceBindingCall.arguments[0]
+      : null;
+    const stagedDeclaration = sourceBindingArgument
+      ? declarationForIdentifier(sourceBindingArgument)
+      : null;
+    const sourceAuthorizationValid = Boolean(
+      sourceBindingDeclaration?.type?.getText(file) === 'SourcePreviewBindingV1'
+      && sourceBindingCall
+      && ts.isIdentifier(sourceBindingCall.expression)
+      && sourceBindingCall.expression.text === 'sourceBinding'
+      && sourceBindingArgument
+      && isStagedRoleDeclaration(stagedDeclaration),
+    );
+    if (!sourceAuthorizationValid) {
+      report('inner sourceAuthorization has an invalid staged origin');
+    }
+
+    const importedAtDeclaration = declarationFor(innerReturn.get('sourceImportedAtMs'));
+    if (!exactDeclarationPath(
+      importedAtDeclaration?.initializer,
+      sourceAuthorizationValid ? stagedDeclaration : null,
+      ['importedAtMs'],
+    )) report('inner sourceImportedAtMs has an invalid staged origin');
+
+    const fillPlan = innerReturn.get('fillPlan')!;
     const fillPlanRoot = ts.isPropertyAccessExpression(fillPlan)
+      && !fillPlan.questionDotToken
       && fillPlan.name.text === 'plan'
-      && ts.isIdentifier(unwrapPreparationExpression(fillPlan.expression))
-      ? innerBindings.get((unwrapPreparationExpression(fillPlan.expression) as ts.Identifier).text)
+      && ts.isIdentifier(fillPlan.expression)
+      ? declarationForIdentifier(fillPlan.expression)
       : null;
-    if (
-      !fillPlanRoot?.initializer
-      || directCallName(fillPlanRoot.initializer) !== 'buildDestinationFillPlan'
-    ) issues.push('inner fillPlan must originate from the closed fill-plan builder');
-
-    const sourceBindingDeclaration = declarationFor(innerReturn.get('sourceAuthorization')!);
-    if (
-      sourceBindingDeclaration?.type?.getText(file) !== 'SourcePreviewBindingV1'
-      || !sourceBindingDeclaration.initializer
-      || directCallName(sourceBindingDeclaration.initializer) !== 'sourceBinding'
-    ) issues.push('inner sourceAuthorization must originate from the minimum source binding');
-
-    const importedAtDeclaration = declarationFor(innerReturn.get('sourceImportedAtMs')!);
-    const importedAtInitializer = importedAtDeclaration?.initializer
-      ? unwrapPreparationExpression(importedAtDeclaration.initializer)
+    const fillPlanCall = fillPlanRoot?.initializer && ts.isCallExpression(fillPlanRoot.initializer)
+      ? fillPlanRoot.initializer
       : null;
+    const fillPlanInputs = exactObjectEntries(
+      fillPlanCall?.arguments.length === 1 && ts.isObjectLiteralExpression(fillPlanCall.arguments[0]!)
+        ? fillPlanCall.arguments[0]!
+        : null,
+      ['envelope', 'effectiveExpiresAtMs', 'operationNotAfterMs', 'attemptId'],
+      true,
+    );
+    const fillPlanShapeValid = Boolean(
+      fillPlanCall
+      && ts.isIdentifier(fillPlanCall.expression)
+      && fillPlanCall.expression.text === 'buildDestinationFillPlan'
+      && fillPlanInputs,
+    );
+    if (!fillPlanShapeValid) report('inner fillPlan must originate from the closed fill-plan builder');
     if (
-      !importedAtInitializer
-      || !ts.isPropertyAccessExpression(importedAtInitializer)
-      || importedAtInitializer.name.text !== 'importedAtMs'
-    ) issues.push('inner sourceImportedAtMs must originate from the imported-time scalar');
+      !fillPlanShapeValid
+      || !exactDeclarationPath(
+        fillPlanInputs?.get('envelope'), sourceAuthorizationValid ? stagedDeclaration : null, ['envelope'],
+      )
+      || !exactDeclarationPath(
+        fillPlanInputs?.get('effectiveExpiresAtMs'),
+        sourceAuthorizationValid ? stagedDeclaration : null,
+        ['effectiveExpiresAtMs'],
+      )
+    ) report('inner fillPlan has invalid staged inputs');
+
+    const armingAttemptId = declarationFor(ordinaryPropertyExpression(armingObject, 'attemptId') ?? undefined);
+    const armingAttemptDeadline = declarationFor(
+      ordinaryPropertyExpression(armingObject, 'attemptNotAfterMs') ?? undefined,
+    );
+    if (
+      !fillPlanShapeValid
+      || !armingAttemptId
+      || !armingAttemptDeadline
+      || declarationFor(fillPlanInputs?.get('attemptId')) !== armingAttemptId
+      || declarationFor(fillPlanInputs?.get('operationNotAfterMs')) !== armingAttemptDeadline
+    ) report('inner fillPlan has invalid attempt inputs');
   }
 
   return issues;
@@ -1161,32 +1363,200 @@ describe('serialized handoff lifecycle', () => {
     expect(fill.body).toBeDefined();
     expect(analyzePayloadFreeFillPreparation(source)).toEqual([]);
 
-    const renamedAliasMutation = source.replace(
+    const replaceExactlyOnce = (
+      input: string,
+      anchor: string,
+      replacement: string,
+      label: string,
+    ) => {
+      expect(input.split(anchor), `${label} anchor count`).toHaveLength(2);
+      const mutated = input.replace(anchor, replacement);
+      expect(mutated, `${label} insertion anchor`).not.toBe(input);
+      return mutated;
+    };
+    const analyzeMutation = (mutated: string, label: string) => {
+      const parsed = ts.createSourceFile(
+        `${label}.mutation.ts`,
+        mutated,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      const diagnostics = (parsed as ts.SourceFile & {
+        readonly parseDiagnostics: readonly ts.Diagnostic[];
+      }).parseDiagnostics;
+      expect.soft(diagnostics, `${label} parse diagnostics`).toEqual([]);
+      return analyzePayloadFreeFillPreparation(mutated);
+    };
+
+    const armingNames: string[] = [];
+    const collectArmingRoot = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== payloadPreparation) return;
+      if (
+        ts.isVariableDeclaration(node)
+        && ts.isIdentifier(node.name)
+        && node.type?.getText(file) === 'ArmingSessionStateV1'
+      ) armingNames.push(node.name.text);
+      ts.forEachChild(node, collectArmingRoot);
+    };
+    collectArmingRoot(payloadPreparation!);
+    expect(armingNames).toHaveLength(1);
+    const armingName = armingNames[0]!;
+    const schemaOriginMutation = replaceExactlyOnce(
+      source,
+      [
+        '  const consuming: ConsumingSessionStateV1 = Object.freeze({',
+        '    schema: SESSION_STATE_SCHEMA,',
+      ].join('\n'),
+      [
+        '  const consuming: ConsumingSessionStateV1 = Object.freeze({',
+        `    schema: ${armingName}.schema,`,
+      ].join('\n'),
+      'consuming schema origin',
+    );
+    expect.soft(analyzeMutation(schemaOriginMutation, 'consuming schema origin')).toContain(
+      'inner consuming tuple property "schema" has an invalid origin',
+    );
+    const stateOriginMutation = replaceExactlyOnce(
+      source,
+      [
+        '  const consuming: ConsumingSessionStateV1 = Object.freeze({',
+        '    schema: SESSION_STATE_SCHEMA,',
+        "    state: 'consuming',",
+      ].join('\n'),
+      [
+        '  const consuming: ConsumingSessionStateV1 = Object.freeze({',
+        '    schema: SESSION_STATE_SCHEMA,',
+        "    state: 'arming',",
+      ].join('\n'),
+      'consuming state origin',
+    );
+    expect.soft(analyzeMutation(stateOriginMutation, 'consuming state origin')).toContain(
+      'inner consuming tuple property "state" has an invalid origin',
+    );
+    for (const [property, validOrigin, invalidOrigin] of [
+      ['generation', `${armingName}.generation`, `${armingName}.envelope.packId`],
+      ['armNonce', `${armingName}.armNonce`, `${armingName}.attemptId`],
+      ['packId', `${armingName}.envelope.packId`, `${armingName}.generation`],
+      ['attemptId', `${armingName}.attemptId`, `${armingName}.envelope.resultRevisionId`],
+      ['replayUntil', `${armingName}.replayUntil`, `${armingName}.attemptNotAfterMs`],
+      ['attemptNotAfterMs', `${armingName}.attemptNotAfterMs`, `${armingName}.replayUntil`],
+      ['destinationTabId', `${armingName}.destination.destinationTabId`, `${armingName}.sourceTabId`],
+      [
+        'destinationDocumentId',
+        `${armingName}.destination.destinationDocumentId`,
+        `${armingName}.sourceDocumentId`,
+      ],
+    ] as const) {
+      const label = `consuming ${property} origin`;
+      const originMutation = replaceExactlyOnce(
+        source,
+        `    ${property}: ${validOrigin},`,
+        `    ${property}: ${invalidOrigin},`,
+        label,
+      );
+      expect.soft(analyzeMutation(originMutation, label), label).toContain(
+        `inner consuming tuple property "${property}" has an invalid origin`,
+      );
+    }
+
+    const alternateSourceBindingMutation = replaceExactlyOnce(
+      source,
+      '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+      [
+        '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(',
+        '    lifecycle.session as StagedSessionStateV1,',
+        '  );',
+      ].join('\n'),
+      'alternate source-binding staged root',
+    );
+    expect.soft(
+      analyzeMutation(alternateSourceBindingMutation, 'alternate source-binding staged root'),
+    ).toContain('inner sourceAuthorization has an invalid staged origin');
+
+    const alternateImportedTimeMutation = replaceExactlyOnce(
+      source,
+      '  const sourceImportedAtMs = staged.importedAtMs;',
+      [
+        '  const sourceImportedAtMs =',
+        '    (lifecycle.session as StagedSessionStateV1).importedAtMs;',
+      ].join('\n'),
+      'alternate imported-time staged root',
+    );
+    expect.soft(
+      analyzeMutation(alternateImportedTimeMutation, 'alternate imported-time staged root'),
+    ).toContain('inner sourceImportedAtMs has an invalid staged origin');
+
+    const alternateFillStagedInputsMutation = replaceExactlyOnce(
+      source,
+      [
+        '    envelope: staged.envelope,',
+        '    effectiveExpiresAtMs: staged.effectiveExpiresAtMs,',
+      ].join('\n'),
+      [
+        '    envelope: (lifecycle.session as StagedSessionStateV1).envelope,',
+        '    effectiveExpiresAtMs:',
+        '      (lifecycle.session as StagedSessionStateV1).effectiveExpiresAtMs,',
+      ].join('\n'),
+      'alternate fill-plan staged inputs',
+    );
+    expect.soft(
+      analyzeMutation(alternateFillStagedInputsMutation, 'alternate fill-plan staged inputs'),
+    ).toContain('inner fillPlan has invalid staged inputs');
+
+    const alternateFillAttemptInputsMutation = replaceExactlyOnce(
+      source,
+      [
+        '  const fillBuilt = buildDestinationFillPlan({',
+        '    envelope: staged.envelope,',
+        '    effectiveExpiresAtMs: staged.effectiveExpiresAtMs,',
+        '    operationNotAfterMs: attemptNotAfterMs,',
+        '    attemptId,',
+      ].join('\n'),
+      [
+        '  const alternateAttemptDeadline = staged.effectiveExpiresAtMs;',
+        '  const alternateAttemptId = staged.envelope.resultRevisionId;',
+        '  const fillBuilt = buildDestinationFillPlan({',
+        '    envelope: staged.envelope,',
+        '    effectiveExpiresAtMs: staged.effectiveExpiresAtMs,',
+        '    operationNotAfterMs: alternateAttemptDeadline,',
+        '    attemptId: alternateAttemptId,',
+      ].join('\n'),
+      'alternate fill-plan attempt inputs',
+    );
+    expect.soft(
+      analyzeMutation(alternateFillAttemptInputsMutation, 'alternate fill-plan attempt inputs'),
+    ).toContain('inner fillPlan has invalid attempt inputs');
+
+    const renamedAliasMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  const freshlyNamedCarrier = (prepared as unknown as { envelope: unknown }).envelope;',
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'renamed alias',
     );
-    expect(renamedAliasMutation).not.toBe(source);
-    const mutationIssues = analyzePayloadFreeFillPreparation(renamedAliasMutation);
+    const mutationIssues = analyzeMutation(renamedAliasMutation, 'renamed alias');
     expect(mutationIssues).toContain(
       'outer statements do not match closed preparation grammar',
     );
-    const nestedPayloadMutation = source.replace(
+    const nestedPayloadMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  const freshlyNamedValues = prepared.fillPlan.values;',
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'nested fill-plan values',
     );
-    expect(nestedPayloadMutation).not.toBe(source);
-    expect(analyzePayloadFreeFillPreparation(nestedPayloadMutation)).toContain(
+    expect(analyzeMutation(nestedPayloadMutation, 'nested fill-plan values')).toContain(
       'outer statements do not match closed preparation grammar',
     );
-    const returnedPayloadMutation = source.replace(
+    const returnedPayloadMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  if (request.actionTabId < 0) {',
@@ -1195,41 +1565,44 @@ describe('serialized handoff lifecycle', () => {
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'direct payload return',
     );
-    expect(returnedPayloadMutation).not.toBe(source);
-    expect(analyzePayloadFreeFillPreparation(returnedPayloadMutation)).toContain(
+    expect(analyzeMutation(returnedPayloadMutation, 'direct payload return')).toContain(
       'outer statements do not match closed preparation grammar',
     );
-    const objectDestructuringMutation = source
-      .replace(
+    const objectDestructuringMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
         '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
         [
           '  const { envelope: objectCarrier } = prepared as unknown as { envelope: unknown };',
           '  prepared = null;',
           '  await clearAlarm(SESSION_EXPIRY_ALARM);',
         ].join('\n'),
-      )
-      .replace(
-        '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);',
-        '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);\n  void objectCarrier;',
-      );
-    expect(objectDestructuringMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(objectDestructuringMutation)).toContain(
+        'object destructuring declaration',
+      ),
+      '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);',
+      '  await clearAlarm(ATTEMPT_WATCHDOG_ALARM);\n  void objectCarrier;',
+      'object destructuring read',
+    );
+    expect.soft(analyzeMutation(objectDestructuringMutation, 'object destructuring')).toContain(
       'outer binding patterns are forbidden',
     );
-    const arrayDestructuringMutation = source.replace(
+    const arrayDestructuringMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  const [arrayCarrier] = prepared as unknown as readonly [unknown];',
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'array destructuring',
     );
-    expect(arrayDestructuringMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(arrayDestructuringMutation)).toContain(
+    expect.soft(analyzeMutation(arrayDestructuringMutation, 'array destructuring')).toContain(
       'outer binding patterns are forbidden',
     );
-    const propertySinkMutation = source.replace(
+    const propertySinkMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  (request as unknown as { parked: unknown }).parked =',
@@ -1237,12 +1610,13 @@ describe('serialized handoff lifecycle', () => {
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'request property sink',
     );
-    expect(propertySinkMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(propertySinkMutation)).toContain(
+    expect.soft(analyzeMutation(propertySinkMutation, 'request property sink')).toContain(
       'outer assignment target must be a declared direct local',
     );
-    const elementSinkMutation = source.replace(
+    const elementSinkMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         "  (request as unknown as Record<string, unknown>)['parked'] =",
@@ -1250,24 +1624,26 @@ describe('serialized handoff lifecycle', () => {
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'request element sink',
     );
-    expect(elementSinkMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(elementSinkMutation)).toContain(
+    expect.soft(analyzeMutation(elementSinkMutation, 'request element sink')).toContain(
       'outer assignment target must be a declared direct local',
     );
-    const nestedCaptureMutation = source.replace(
+    const nestedCaptureMutation = replaceExactlyOnce(
+      source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
       [
         '  const captureRoot = () => prepared;',
         '  prepared = null;',
         '  await clearAlarm(SESSION_EXPIRY_ALARM);',
       ].join('\n'),
+      'nested closure capture',
     );
-    expect(nestedCaptureMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(nestedCaptureMutation)).toContain(
+    expect.soft(analyzeMutation(nestedCaptureMutation, 'nested closure capture')).toContain(
       'outer nested functions are forbidden',
     );
-    const extraInnerMemberMutation = source.replace(
+    const extraInnerMemberMutation = replaceExactlyOnce(
+      source,
       '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
       [
         '    sourceImportedAtMs,',
@@ -1277,12 +1653,13 @@ describe('serialized handoff lifecycle', () => {
         '',
         'async function prepareFillDispatch(',
       ].join('\n'),
+      'extra inner success member',
     );
-    expect(extraInnerMemberMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(extraInnerMemberMutation)).toContain(
+    expect.soft(analyzeMutation(extraInnerMemberMutation, 'extra inner success member')).toContain(
       'inner success return must be the exact closed prepared bundle',
     );
-    const extraOuterMemberMutation = source.replace(
+    const extraOuterMemberMutation = replaceExactlyOnce(
+      source,
       '    sourceImportedAtMs,\n  });\n}\n\nasync function fillEmptyReviewedFields(',
       [
         '    sourceImportedAtMs,',
@@ -1292,9 +1669,9 @@ describe('serialized handoff lifecycle', () => {
         '',
         'async function fillEmptyReviewedFields(',
       ].join('\n'),
+      'extra outer success member',
     );
-    expect(extraOuterMemberMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(extraOuterMemberMutation)).toContain(
+    expect.soft(analyzeMutation(extraOuterMemberMutation, 'extra outer success member')).toContain(
       'outer statements do not match closed preparation grammar',
     );
     const renamedInnerMutation = source.replaceAll(
@@ -1302,7 +1679,7 @@ describe('serialized handoff lifecycle', () => {
       'structurallyRenamedPreparation',
     );
     expect(renamedInnerMutation).not.toBe(source);
-    expect.soft(analyzePayloadFreeFillPreparation(renamedInnerMutation)).toEqual([]);
+    expect.soft(analyzeMutation(renamedInnerMutation, 'renamed inner helper')).toEqual([]);
     for (const [label, insertedSyntax] of [
       [
         'call sink',
@@ -1321,7 +1698,7 @@ describe('serialized handoff lifecycle', () => {
         'try finally pending completion',
         [
           '  try {',
-          '    void prepared;',
+          '    return (prepared as unknown as { envelope: WorkerResponseV1 }).envelope;',
           '  } finally {',
           '    await clearAlarm(SESSION_EXPIRY_ALARM);',
           '  }',
@@ -1336,12 +1713,13 @@ describe('serialized handoff lifecycle', () => {
         ].join('\n'),
       ],
     ] as const) {
-      const implicitStorageMutation = source.replace(
+      const implicitStorageMutation = replaceExactlyOnce(
+        source,
         '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
         [insertedSyntax, '  prepared = null;', '  await clearAlarm(SESSION_EXPIRY_ALARM);'].join('\n'),
+        label,
       );
-      expect(implicitStorageMutation, `${label} insertion anchor`).not.toBe(source);
-      expect(analyzePayloadFreeFillPreparation(implicitStorageMutation), label).toContain(
+      expect(analyzeMutation(implicitStorageMutation, label), label).toContain(
         'outer statements do not match closed preparation grammar',
       );
     }
