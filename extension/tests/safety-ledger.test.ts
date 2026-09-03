@@ -31,6 +31,7 @@ const PACK_C = '33333333333333333333333333333333';
 const NONCE_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REPLAY_UNTIL = 1_800_000_000_000;
 const WARNING_EXPIRES_AT = REPLAY_UNTIL + NEEDS_REVIEW_WARNING_LIFETIME_MS;
+const NON_DATE_EPOCH_MS = Number.MAX_SAFE_INTEGER;
 
 const emptyLedger = (): SafetyLedgerV1 => ({
   schema: SAFETY_LEDGER_SCHEMA,
@@ -252,6 +253,22 @@ describe('closed payload-free ledger validation', () => {
       index.toString(16).padStart(32, '0'), REPLAY_UNTIL + index,
     ));
     expect(validateSafetyLedger({ schema: SAFETY_LEDGER_SCHEMA, records }).status).toBe('ready');
+  });
+
+  it('rejects Date-unrepresentable safe integers in every persisted record time position', () => {
+    const invalidRecords = [
+      live(PACK_A, NON_DATE_EPOCH_MS),
+      { state: 'unresolved-orphaned', packId: PACK_A, replayUntil: NON_DATE_EPOCH_MS },
+      replay(PACK_A, NON_DATE_EPOCH_MS),
+      warning(PACK_A, NON_DATE_EPOCH_MS - 1, NON_DATE_EPOCH_MS),
+      warning(PACK_A, REPLAY_UNTIL, NON_DATE_EPOCH_MS),
+    ];
+
+    for (const record of invalidRecords) {
+      const candidate = { schema: SAFETY_LEDGER_SCHEMA, records: [record] };
+      expect(() => validateSafetyLedger(candidate)).not.toThrow();
+      expect(validateSafetyLedger(candidate)).toEqual({ status: 'quarantined' });
+    }
   });
 });
 
@@ -476,6 +493,56 @@ describe('settlement, orphaning, acknowledgement, and cleanup', () => {
       expect(await settleSafetyLedger(ready(ledger), live(), completeIntent()))
         .toEqual({ status: 'quarantined' });
     }
+  });
+
+  it('quarantines Date-unrepresentable settlement terminal times without throwing', async () => {
+    const cases = [
+      {
+        expected: live(PACK_A, NON_DATE_EPOCH_MS),
+        intent: {
+          cause: 'injection-result',
+          terminal: replay(PACK_A, NON_DATE_EPOCH_MS, 'complete'),
+        },
+      },
+      {
+        expected: live(PACK_A, NON_DATE_EPOCH_MS - 1),
+        intent: {
+          cause: 'injection-result',
+          terminal: warning(PACK_A, NON_DATE_EPOCH_MS - 1, NON_DATE_EPOCH_MS),
+        },
+      },
+      {
+        expected: live(PACK_A, NON_DATE_EPOCH_MS),
+        intent: {
+          cause: 'cancelled-before-dispatch',
+          terminal: replay(PACK_A, NON_DATE_EPOCH_MS, 'cancelled-before-dispatch'),
+        },
+      },
+      {
+        expected: live(PACK_A, NON_DATE_EPOCH_MS),
+        intent: {
+          cause: 'destination-tab-removed',
+          terminal: replay(PACK_A, NON_DATE_EPOCH_MS, 'closed-unresolved'),
+        },
+      },
+    ] as const;
+
+    for (const { expected, intent } of cases) {
+      const state = ready({ schema: SAFETY_LEDGER_SCHEMA, records: [expected] });
+      await expect(settleSafetyLedger(state, expected, intent)).resolves
+        .toEqual({ status: 'quarantined' });
+    }
+  });
+
+  it('returns invalid-input for Date-unrepresentable operation times', async () => {
+    await expect(pruneSafetyLedgerAfterReconciliation(
+      ready(emptyLedger()), NON_DATE_EPOCH_MS,
+    )).resolves.toEqual({ status: 'blocked', reason: 'invalid-input' });
+    await expect(acknowledgeNeedsReview(
+      ready({ schema: SAFETY_LEDGER_SCHEMA, records: [warning()] }),
+      { packId: PACK_A, replayUntil: REPLAY_UNTIL, warningExpiresAt: WARNING_EXPIRES_AT },
+      NON_DATE_EPOCH_MS,
+    )).resolves.toEqual({ status: 'blocked', reason: 'invalid-input' });
   });
 
   it('persists an expired terminal during reconciliation before pruning it in a separate confirmed write', async () => {

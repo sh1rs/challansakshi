@@ -198,7 +198,13 @@ function isOpaque(candidate: unknown): candidate is string {
 }
 
 function isPositiveTime(candidate: unknown): candidate is number {
-  return Number.isSafeInteger(candidate) && (candidate as number) > 0;
+  if (!Number.isSafeInteger(candidate) || (candidate as number) <= 0) return false;
+  try {
+    const iso = new Date(candidate as number).toISOString();
+    return Date.parse(iso) === candidate;
+  } catch {
+    return false;
+  }
 }
 
 function readSafetyRecord(candidate: unknown): SafetyRecordV1 | null {
