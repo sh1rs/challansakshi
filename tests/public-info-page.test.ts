@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +9,16 @@ const publicInfoSource = readFileSync(
   'utf8',
 );
 const readmeSource = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+const routeReportUrl = new URL(
+  '../docs/superpowers/verification/official-route-reverification-2026-09-03.md',
+  import.meta.url,
+);
+const routeReportSource = existsSync(routeReportUrl) ? readFileSync(routeReportUrl, 'utf8') : '';
+const browserReportUrl = new URL(
+  '../docs/superpowers/verification/public-handoff-browser-qa-2026-09-03.md',
+  import.meta.url,
+);
+const browserReportSource = existsSync(browserReportUrl) ? readFileSync(browserReportUrl, 'utf8') : '';
 
 const bilingualCalls = [...publicInfoSource.matchAll(/t\(language, '([^']*)', '([^']*)'\)/g)]
   .map((match) => ({ en: match[1], hi: match[2] }));
@@ -57,6 +67,112 @@ describe('public privacy and safety pages', () => {
     expect(readmeSource).not.toMatch(/homepage demo|होमपेज डेमो/i);
     expect(readmeSource).toContain('app/page.tsx\n  └─ components/public-beta/CitizenHome.tsx');
     expect(readmeSource).toContain('app/demo/page.tsx\n  └─ components/ChallanSakshiApp.tsx');
+  });
+
+  it('labels the people-facing real product as a non-public prototype', () => {
+    const html = renderToStaticMarkup(createElement(PrivacyPage));
+
+    expect(html).toContain('this release remains a non-public prototype');
+    expect(publicInfoSource).toContain('यह रिलीज़ एक गैर-सार्वजनिक प्रोटोटाइप बनी हुई है।');
+    expect(html).not.toMatch(/early access|public beta/i);
+    expect(publicInfoSource).not.toMatch(/early access|अर्ली एक्सेस|public beta/i);
+  });
+
+  it('documents the complete installation-free handoff without blurring real and synthetic authority', () => {
+    expect(readmeSource).toContain('**Code status:** public-beta candidate.');
+    expect(readmeSource).toContain('**People-facing status:** non-public prototype.');
+    expect(readmeSource).toContain('The complete installation-free path is the in-tab field pack plus the normal official-service anchor.');
+    expect(readmeSource).toContain('The field pack is a user-reviewed factual preparation aid, not an official form, filing, legal conclusion, or proof of submission.');
+    expect(readmeSource).toContain('single controlled description textarea');
+    expect(readmeSource).toContain('Official service opened from this review');
+    expect(readmeSource).toContain('Citizen-reported; not verified by ChallanSakshi.');
+    expect(readmeSource).toContain('Affected-person-reported; entered with a present helper');
+    expect(readmeSource).toContain('Bundled synthetic facts can never satisfy the real official-source gate');
+  });
+
+  it('documents the reduced optional envelope and checked-in closed adapter state', () => {
+    expect(readmeSource).toContain('only the reviewed description, an eligible fixed issue code when supported, and opaque protocol metadata');
+    expect(readmeSource).toContain('does not contain raw evidence, files, dedicated identifier properties, the complete field pack, a receipt, a URL, or selectors');
+    expect(readmeSource).toContain('may contain an allowed masked final-four vehicle fragment or a sensitive fact missed by bounded checks');
+    expect(readmeSource).toContain('Both real extension adapters remain `internal-disabled`');
+    expect(readmeSource).toContain('checked-in extension release is `production-disabled`');
+    expect(readmeSource).toContain('No public installation or preparation action is exposed');
+  });
+
+  it('states the blocked public-release prerequisites without making a launch claim', () => {
+    expect(readmeSource).toContain('A real public announcement remains blocked');
+    expect(readmeSource).toContain('named operator, privacy/grievance owner, and low-data security and official-link correction channel');
+    expect(readmeSource).toContain('external privacy, security, legal, dependency, and supply-chain review');
+    expect(readmeSource).toContain('official-route re-verification cadence');
+    expect(readmeSource).toContain('live monitoring, rollback, correction, and incident ownership');
+    expect(readmeSource).toContain('[official route reverification report](docs/superpowers/verification/official-route-reverification-2026-09-03.md)');
+    expect(readmeSource).not.toMatch(/early access|अर्ली एक्सेस/i);
+    expect(readmeSource).not.toMatch(/\bpublic beta\b/i);
+  });
+
+  it('retains a sanitized non-submitting report for every logical registry record', () => {
+    expect(routeReportSource).toContain('Verification mode: non-submitting');
+    expect(routeReportSource).toContain('9 logical registry records across 7 unique allowlisted URLs');
+    expect(routeReportSource).toContain('Data entered: none');
+    expect(routeReportSource).toContain('Identifiers used: none');
+    expect(routeReportSource).toContain('Submission attempts: none');
+    expect(routeReportSource).toContain('URLs visited: the seven compile-time allowlisted URLs only');
+    expect(routeReportSource).toContain('Retained browser artifacts: no HAR, request log, tokenized URL, cookie, portal form value, or browser-history export');
+    expect(routeReportSource).toContain('Live route and purpose reverified 2026-09-03; availability and accessibility observations are smoke checks, not service guarantees or accessibility certification.');
+
+    const rows = routeReportSource
+      .split('\n')
+      .filter((line) => line.startsWith('| `'))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
+    const shared = [
+      'ChallanSakshi release-route review',
+      '`2026-09-03T04:47:00+05:30`',
+    ];
+    expect(rows).toEqual([
+      ['`fallback:national-services-directory`', '`fallback`', '`https://echallan.parivahan.gov.in/index/challan-services`', '`echallan.parivahan.gov.in`', '`official-services-directory`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#national-services-directory`', '`current`', 'This record is the retained fallback.'],
+      ['`auxiliary:national-record-lookup`', '`auxiliary`', '`https://echallan.parivahan.gov.in/index/accused-challan`', '`echallan.parivahan.gov.in`', '`official-record-lookup`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#national-record-lookup`', '`current`', 'No record fallback; safe stop.'],
+      ['`auxiliary:nextgen-service-landing`', '`auxiliary`', '`https://echallan.parivahan.nic.in/challan/challan-services`', '`echallan.parivahan.nic.in`', '`official-service-landing`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#nextgen-service-landing`', '`current`', 'No record fallback; safe stop.'],
+      ['`auxiliary:national-services-directory`', '`auxiliary`', '`https://echallan.parivahan.gov.in/index/challan-services`', '`echallan.parivahan.gov.in`', '`official-services-directory`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#national-services-directory`', '`current`', 'No record fallback; safe stop.'],
+      ['`auxiliary:virtual-courts`', '`auxiliary`', '`https://vcourts.gov.in/virtualcourt/index.php`', '`vcourts.gov.in`', '`official-court-service`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#virtual-courts`', '`current`', 'No record fallback; safe stop.'],
+      ['`handoff:legacy`', '`handoff`', '`https://echallan.parivahan.gov.in/gsticket`', '`echallan.parivahan.gov.in`', '`official-grievance-service`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#legacy-grievance`', '`current`', '`https://echallan.parivahan.gov.in/index/challan-services`'],
+      ['`handoff:nextgen`', '`handoff`', '`https://echallan.parivahan.nic.in/grievance`', '`echallan.parivahan.nic.in`', '`official-grievance-service`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#nextgen-grievance`', '`current`', '`https://echallan.parivahan.gov.in/index/challan-services`'],
+      ['`handoff:delhi-manual`', '`handoff`', '`https://traffic.delhipolice.gov.in/`', '`traffic.delhipolice.gov.in`', '`official-service`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#delhi-official-landing`', '`current`', '`https://echallan.parivahan.gov.in/index/challan-services`'],
+      ['`handoff:unresolved`', '`handoff`', '`https://echallan.parivahan.gov.in/index/challan-services`', '`echallan.parivahan.gov.in`', '`official-service`', ...shared, '`challansakshi.official-routes/v1` · `public-launch-route-review-2026-09-02#national-services-directory`', '`current`', '`https://echallan.parivahan.gov.in/index/challan-services`'],
+    ]);
+    expect(new Set(rows.map((row) => row[2])).size).toBe(7);
+  });
+
+  it('records route-specific smoke observations without upgrading release authority', () => {
+    expect(routeReportSource).toContain('production Legacy jurisdiction tuple remains empty');
+    expect(routeReportSource).toContain('27 jurisdiction codes matched the NextGen registry scope');
+    expect(routeReportSource).toContain('Delhi landing was JavaScript-dependent');
+    expect(routeReportSource).toContain('no form-adapter claim');
+    expect(routeReportSource).toContain('led toward CAPTCHA, OTP, and payment surfaces');
+    expect(routeReportSource).toContain('crawler attempts for NextGen and directory routes timed out or returned HTTP 502 while the interactive browser loaded them');
+    expect(routeReportSource).toContain('real Legacy and NextGen extension adapters remain `internal-disabled`');
+    expect(routeReportSource).toContain('cannot enable a public release or adapter');
+  });
+
+  it('links the completed browser evidence while retaining every observed and unproven boundary', () => {
+    expect(routeReportSource).toContain('[completed browser and fidelity QA report](public-handoff-browser-qa-2026-09-03.md)');
+    expect(browserReportSource).toContain('Production Vinext origin: `http://127.0.0.1:4177`');
+    expect(browserReportSource).toContain('hydrated in both the in-app browser and connected Chrome');
+    expect(browserReportSource).toContain('Reviewed description copied. Nothing opened or was submitted.');
+    expect(browserReportSource).toContain('`officialLink:0, receipt:0, checkedConfirm:false`');
+    expect(browserReportSource).toContain('Affected-person-reported; entered with a present helper');
+    expect(browserReportSource).toContain('390×844: `clientWidth=375`, `scrollWidth=375`, `bodyScrollWidth=375`');
+    expect(browserReportSource).toContain('320×844: `clientWidth=305`, `scrollWidth=305`, `bodyScrollWidth=305`');
+    expect(browserReportSource).toContain('Actual native 200% zoom remains an honest manual release check');
+    expect(browserReportSource).toContain('`clientWidth=585`, `scrollWidth=585`, `bodyScrollWidth=585`');
+    expect(browserReportSource).toContain('`69.633s`');
+    expect(browserReportSource).toContain('`83.959s`');
+    expect(browserReportSource).toContain('`ERR_BLOCKED_BY_CLIENT`');
+    expect(browserReportSource).toContain('does not prove fixture browser execution');
+    expect(browserReportSource).toContain('No console warning or error was observed on the exercised in-app-browser pages');
+    expect(browserReportSource).toContain('No screenshot was retained');
+    expect(browserReportSource).toContain('no material visual mismatch requiring a code change');
+    expect(browserReportSource).not.toMatch(/native 200% zoom (?:passed|was verified)/i);
+    expect(browserReportSource).not.toMatch(/fixture browser execution (?:passed|was verified)/i);
   });
 
   it('renders the canonical IHMCL routes and preserves the NPCI issuer directory', () => {

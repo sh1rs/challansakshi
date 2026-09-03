@@ -34,7 +34,7 @@ export function CitizenHeader({
         <span aria-hidden="true" />
         {boundary === 'demo'
           ? t(language, 'Demo boundary · use fictional or synthetic test data only · no government connection', 'डेमो सीमा · केवल काल्पनिक या सिंथेटिक टेस्ट डेटा उपयोग करें · कोई सरकारी कनेक्शन नहीं')
-          : t(language, 'Independent public-interest early access · Not a government, bank, court, or toll service', 'स्वतंत्र जनहित अर्ली एक्सेस · यह सरकारी, बैंक, अदालत या टोल सेवा नहीं है')}
+          : t(language, 'Independent non-public prototype · Not a government, bank, court, or toll service', 'स्वतंत्र गैर-सार्वजनिक प्रोटोटाइप · यह सरकारी, बैंक, अदालत या टोल सेवा नहीं है')}
       </div>
       <header className={styles.header}>
         <a className={styles.brand} href="/" aria-label={homeLabel}>
@@ -92,7 +92,7 @@ export function CitizenFooter({
         </div>
         <p>{boundary === 'demo'
           ? t(language, 'Use synthetic test data only. Nothing is filed, paid, authenticated, or sent to a government system.', 'केवल सिंथेटिक टेस्ट डेटा उपयोग करें। कुछ भी फाइल, भुगतान, प्रमाणित या सरकारी सिस्टम को नहीं भेजा जाता।')
-          : t(language, 'Independent early access. It does not file, pay, authenticate, give legal advice, or guarantee an outcome.', 'स्वतंत्र अर्ली एक्सेस। यह फाइल, भुगतान, प्रमाणीकरण, कानूनी सलाह या नतीजे की गारंटी नहीं देता।')}</p>
+          : t(language, 'Independent non-public prototype. It does not file, pay, authenticate, give legal advice, or guarantee an outcome.', 'स्वतंत्र गैर-सार्वजनिक प्रोटोटाइप। यह फाइल, भुगतान, प्रमाणीकरण, कानूनी सलाह या नतीजे की गारंटी नहीं देता।')}</p>
       </div>
     </footer>
   );

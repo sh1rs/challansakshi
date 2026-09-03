@@ -94,9 +94,10 @@ describe('shared citizen product chrome', () => {
   it.each(realSurfaces)('%s keeps the independent-service boundary', (_name, createSurface) => {
     const html = renderToStaticMarkup(createSurface());
 
-    expect(html).toContain('Independent public-interest early access');
+    expect(html).toContain('Independent non-public prototype');
     expect(html).toContain('Not a government, bank, court, or toll service');
-    expect(landmarkFrom(html, 'footer')).toContain('Independent early access');
+    expect(landmarkFrom(html, 'footer')).toContain('Independent non-public prototype');
+    expect(html).not.toMatch(/early access|public beta/i);
   });
 
   it('keeps the synthetic status explicit while using the citizen shell', () => {
