@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
       globals: {
         chrome: 'readonly',
         __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__: 'readonly',
+        __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__: 'readonly',
       },
     },
   },

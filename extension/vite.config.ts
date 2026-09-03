@@ -58,6 +58,11 @@ export function createExtensionViteConfig(
   }
   const outDir = resolve(extensionRoot, 'dist', profile.id);
   const popup = target === 'popup';
+  const selectedSourceAuthority = {
+    profileId: profile.id,
+    envelopeMode: profile.envelopeMode,
+    sourceRegistry: profile.sourceRegistry,
+  };
   return {
     configFile: false,
     base: './',
@@ -66,6 +71,7 @@ export function createExtensionViteConfig(
     plugins: [optionalEntryPlugin(profile)],
     define: {
       __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__: JSON.stringify(profile.id),
+      __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__: JSON.stringify(selectedSourceAuthority),
     },
     build: {
       target: `chrome${profile.minimumChromeVersion}`,

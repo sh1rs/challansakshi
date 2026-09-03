@@ -5,12 +5,15 @@ import {
   SOURCE_CONTRACT_VERSION,
   SOURCE_PREVIEW_BINDING_SCHEMA,
   SOURCE_PROBE_PLAN_SCHEMA,
+  createSourceProbePlan,
   isSourcePreviewBindingV1,
   probeChallanSakshiSource,
   validateSourcePreviewInjectionResult,
   validateSourceReprobeInjectionResult,
   type SourceProbePlanV1,
 } from '../src/source-probe';
+import { probeProductionChallanSakshiSource } from '../src/source-probe-production';
+import { probeSyntheticChallanSakshiSource } from '../src/source-probe-synthetic';
 
 const issuedAtMs = Date.UTC(2026, 8, 3, 8, 0, 0);
 const nowMs = issuedAtMs + 60_000;
@@ -86,6 +89,7 @@ const productionPlan = Object.freeze({
 }) satisfies SourceProbePlanV1;
 
 type ProbePageResult = ReturnType<typeof probeChallanSakshiSource>;
+type ProbeImplementation = (plan: unknown) => ProbePageResult;
 
 function createDom(url: string, capsuleText: string, bodyPrefix = ''): JSDOM {
   return new JSDOM(`<!doctype html><body>${bodyPrefix}<div data-challansakshi-extension-handoff="v1" aria-hidden="true"><span data-challansakshi-extension-envelope="v1">${capsuleText.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</span></div></body>`, {
@@ -94,8 +98,12 @@ function createDom(url: string, capsuleText: string, bodyPrefix = ''): JSDOM {
   });
 }
 
-function runInDom(dom: JSDOM, plan: unknown): ProbePageResult {
-  const executable = dom.window.eval(`(${probeChallanSakshiSource.toString()})`) as (value: unknown) => ProbePageResult;
+function runInDom(
+  dom: JSDOM,
+  plan: unknown,
+  implementation: ProbeImplementation = probeSyntheticChallanSakshiSource,
+): ProbePageResult {
+  const executable = dom.window.eval(`(${implementation.toString()})`) as (value: unknown) => ProbePageResult;
   const serializedPlan = dom.window.JSON.parse(JSON.stringify(plan)) as unknown;
   return executable(serializedPlan);
 }
@@ -111,7 +119,13 @@ function acceptedPageResult(envelope: ExtensionHandoffEnvelope): ProbePageResult
       : 'https://challansakshi.sh1rs.com/review?goal=verify',
     canonical(envelope),
   );
-  return runInDom(dom, envelope.mode === 'synthetic' ? syntheticPlan : productionPlan);
+  return runInDom(
+    dom,
+    envelope.mode === 'synthetic' ? syntheticPlan : productionPlan,
+    envelope.mode === 'synthetic'
+      ? probeSyntheticChallanSakshiSource
+      : probeProductionChallanSakshiSource,
+  );
 }
 
 function injectionResult(envelope: ExtensionHandoffEnvelope, documentId = 'document-A') {
@@ -138,7 +152,7 @@ describe('self-contained source capsule probe', () => {
         `https://challansakshi.sh1rs.com/review${search}`,
         canonical(realEnvelope),
       );
-      expect(runInDom(production, productionPlan)).toEqual({
+      expect(runInDom(production, productionPlan, probeProductionChallanSakshiSource)).toEqual({
         status: 'accepted',
         envelope: realEnvelope,
       });
@@ -175,7 +189,11 @@ describe('self-contained source capsule probe', () => {
       'https://challansakshi.sh1rs.com/review#fragment',
     ];
     for (const url of productionUrls) {
-      expect(runInDom(createDom(url, canonical(realEnvelope)), productionPlan)).toEqual({
+      expect(runInDom(
+        createDom(url, canonical(realEnvelope)),
+        productionPlan,
+        probeProductionChallanSakshiSource,
+      )).toEqual({
         status: 'rejected', code: 'location-mismatch',
       });
     }
@@ -190,6 +208,7 @@ describe('self-contained source capsule probe', () => {
         },
         url: 'http://localhost:3000/demo/extension-fixture/source',
         envelope: syntheticEnvelope,
+        implementation: probeSyntheticChallanSakshiSource,
       },
       {
         plan: {
@@ -198,6 +217,7 @@ describe('self-contained source capsule probe', () => {
         },
         url: 'http://127.0.0.1:3001/demo/extension-fixture/source',
         envelope: syntheticEnvelope,
+        implementation: probeSyntheticChallanSakshiSource,
       },
       {
         plan: {
@@ -206,6 +226,7 @@ describe('self-contained source capsule probe', () => {
         },
         url: 'http://127.0.0.1:3000/demo/extension-fixture/source-copy',
         envelope: syntheticEnvelope,
+        implementation: probeSyntheticChallanSakshiSource,
       },
       {
         plan: {
@@ -214,6 +235,7 @@ describe('self-contained source capsule probe', () => {
         },
         url: 'https://preview.challansakshi.sh1rs.com/review',
         envelope: realEnvelope,
+        implementation: probeProductionChallanSakshiSource,
       },
       {
         plan: {
@@ -222,12 +244,14 @@ describe('self-contained source capsule probe', () => {
         },
         url: 'https://challansakshi.sh1rs.com/review-copy',
         envelope: realEnvelope,
+        implementation: probeProductionChallanSakshiSource,
       },
     ];
     for (const candidate of alternativePlans) {
       expect(runInDom(
         createDom(candidate.url, canonical(candidate.envelope)),
         candidate.plan,
+        candidate.implementation,
       )).toEqual({ status: 'rejected', code: 'invalid-plan' });
     }
   });
@@ -244,7 +268,7 @@ describe('self-contained source capsule probe', () => {
     const frameRealm = frameWindow as unknown as typeof outer.window;
     frameWindow.document.body.innerHTML = '<div data-challansakshi-extension-handoff="v1"><span data-challansakshi-extension-envelope="v1"></span></div>';
     frameWindow.document.querySelector('span')?.append(frameWindow.document.createTextNode(canonical(syntheticEnvelope)));
-    const executable = frameRealm.eval(`(${probeChallanSakshiSource.toString()})`) as (value: unknown) => ProbePageResult;
+    const executable = frameRealm.eval(`(${probeSyntheticChallanSakshiSource.toString()})`) as (value: unknown) => ProbePageResult;
     const realmPlan = frameRealm.JSON.parse(JSON.stringify(syntheticPlan));
     expect(executable(realmPlan)).toEqual({ status: 'rejected', code: 'not-top-frame' });
   });
@@ -254,7 +278,7 @@ describe('self-contained source capsule probe', () => {
       'http://127.0.0.1:3000/demo/extension-fixture/source',
       canonical(syntheticEnvelope),
     );
-    const executable = dom.window.eval(`(${probeChallanSakshiSource.toString()})`) as (value: unknown) => ProbePageResult;
+    const executable = dom.window.eval(`(${probeSyntheticChallanSakshiSource.toString()})`) as (value: unknown) => ProbePageResult;
     const valid = () => dom.window.JSON.parse(JSON.stringify(syntheticPlan)) as Record<string, unknown>;
     const stale = valid();
     stale.operationNotAfterMs = 0;
@@ -505,5 +529,19 @@ describe('source probe public constants', () => {
     expect(SOURCE_PROBE_PLAN_SCHEMA).toBe('challansakshi.source-probe-plan/v1');
     expect(SOURCE_CONTRACT_VERSION).toBe('challansakshi.source-contract/v1');
     expect(SOURCE_PREVIEW_BINDING_SCHEMA).toBe('challansakshi.source-preview-binding/v1');
+  });
+
+  it('builds the selected source plan from the canonical compile-time profile', () => {
+    const operationNotAfterMs = Date.now() + 45_000;
+    const selected = createSourceProbePlan(operationNotAfterMs);
+    expect(selected).toEqual({
+      ...syntheticPlan,
+      operationNotAfterMs,
+    });
+    expect(Object.isFrozen(selected)).toBe(true);
+    expect(Object.isFrozen(selected.expectedLocation)).toBe(true);
+    expect(Object.isFrozen(selected.expectedLocation.allowedSearches)).toBe(true);
+    expect(probeChallanSakshiSource).toBe(probeSyntheticChallanSakshiSource);
+    expect(() => createSourceProbePlan(Number.NaN)).toThrow('Invalid source probe deadline.');
   });
 });
