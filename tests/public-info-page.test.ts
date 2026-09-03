@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -19,6 +20,17 @@ const browserReportUrl = new URL(
   import.meta.url,
 );
 const browserReportSource = existsSync(browserReportUrl) ? readFileSync(browserReportUrl, 'utf8') : '';
+const routeEvidenceDirectoryUrl = new URL(
+  '../docs/superpowers/verification/official-route-reverification-2026-09-03/',
+  import.meta.url,
+);
+const releaseGateAmendmentUrl = new URL(
+  '../docs/superpowers/verification/public-handoff-release-gate-amendment-2026-09-03.md',
+  import.meta.url,
+);
+const releaseGateAmendmentSource = existsSync(releaseGateAmendmentUrl)
+  ? readFileSync(releaseGateAmendmentUrl, 'utf8')
+  : '';
 
 const bilingualCalls = [...publicInfoSource.matchAll(/t\(language, '([^']*)', '([^']*)'\)/g)]
   .map((match) => ({ en: match[1], hi: match[2] }));
@@ -153,8 +165,92 @@ describe('public privacy and safety pages', () => {
     expect(routeReportSource).toContain('cannot enable a public release or adapter');
   });
 
-  it('links the completed browser evidence while retaining every observed and unproven boundary', () => {
-    expect(routeReportSource).toContain('[completed browser and fidelity QA report](public-handoff-browser-qa-2026-09-03.md)');
+  it('binds every retained landing-state screenshot to its exact route context and bytes', () => {
+    const expectedEvidence = [
+      {
+        filename: '01-national-services-directory.jpg',
+        url: 'https://echallan.parivahan.gov.in/index/challan-services',
+        domain: 'echallan.parivahan.gov.in',
+        purpose: 'official-services-directory',
+        sha256: '418783663f482c25e708b79160c53b793880a9247564ed5ce35b5568c9d7f0cf',
+      },
+      {
+        filename: '02-national-record-lookup.jpg',
+        url: 'https://echallan.parivahan.gov.in/index/accused-challan',
+        domain: 'echallan.parivahan.gov.in',
+        purpose: 'official-record-lookup',
+        sha256: '1b97a67235e0e8654ca82b6c3f624790f47dac4fb96e878aad350e94bd84059c',
+      },
+      {
+        filename: '03-nextgen-service-landing.jpg',
+        url: 'https://echallan.parivahan.nic.in/challan/challan-services',
+        domain: 'echallan.parivahan.nic.in',
+        purpose: 'official-service-landing',
+        sha256: '0ac042c0ea7c441fbb3a2fe4b27f50f0d3dcb75830fa162097e2856b1845ebf9',
+      },
+      {
+        filename: '04-virtual-courts.jpg',
+        url: 'https://vcourts.gov.in/virtualcourt/index.php',
+        domain: 'vcourts.gov.in',
+        purpose: 'official-court-service',
+        sha256: '3953089b6933705145d42a4d30c33c50f704a45478e80847e11468423744b477',
+      },
+      {
+        filename: '05-legacy-grievance.jpg',
+        url: 'https://echallan.parivahan.gov.in/gsticket',
+        domain: 'echallan.parivahan.gov.in',
+        purpose: 'official-grievance-service',
+        sha256: '70936b14f13a16e46f60821a20ec31540afcc6ecf648961f3e7d34895fffc723',
+      },
+      {
+        filename: '06-nextgen-grievance.jpg',
+        url: 'https://echallan.parivahan.nic.in/grievance',
+        domain: 'echallan.parivahan.nic.in',
+        purpose: 'official-grievance-service',
+        sha256: 'f05288a2a053d671ee9573237556df7847e1f68ff4fa765dcff23d22292e9942',
+      },
+      {
+        filename: '07-delhi-official-landing.jpg',
+        url: 'https://traffic.delhipolice.gov.in/',
+        domain: 'traffic.delhipolice.gov.in',
+        purpose: 'official-service',
+        sha256: 'e1149f49e1c3492db9e203067a56d02b68296e953bcfc707a3b358bd9b6362a6',
+      },
+    ];
+    const retainedJpegs = readdirSync(routeEvidenceDirectoryUrl)
+      .filter((filename) => filename.endsWith('.jpg'))
+      .sort();
+    const declaredRows = routeReportSource
+      .split('\n')
+      .filter((line) => line.startsWith('| [`'))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
+
+    expect(retainedJpegs).toEqual(expectedEvidence.map(({ filename }) => filename));
+    expect(declaredRows).toEqual(expectedEvidence.map(({ filename, url, domain, purpose, sha256 }) => [
+      '[`' + filename + '`](official-route-reverification-2026-09-03/' + filename + ')',
+      '`' + url + '`',
+      '`' + domain + '`',
+      '`' + purpose + '`',
+      '`' + sha256 + '`',
+    ]));
+
+    for (const evidence of expectedEvidence) {
+      const bytes = readFileSync(new URL(evidence.filename, routeEvidenceDirectoryUrl));
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(evidence.sha256);
+    }
+
+    expect(routeReportSource).toContain('Screenshots are landing-state evidence only.');
+    expect(routeReportSource).toContain('Portal forms remained untouched');
+    expect(routeReportSource).toContain('No citizen data, identifier, CAPTCHA, OTP, credential, payment value, attachment, or declaration was read, filled, or submitted.');
+    expect(routeReportSource).toContain('A visible CAPTCHA is merely part of a public blank landing state and was not read, filled, solved, or otherwise interacted with.');
+  });
+
+  it('separates observed browser passes, automated contracts, and unperformed release blockers', () => {
+    expect(routeReportSource).toContain('[partial browser evidence and release-gate report](public-handoff-browser-qa-2026-09-03.md)');
+    expect(browserReportSource).toContain('Status: partial browser evidence; release gate blocked.');
+    expect(browserReportSource).toContain('Manually exercised core lane, judge proof, and visual fidelity: **PASS for the recorded local runs only.**');
+    expect(browserReportSource).toContain('Automated contract evidence: **PASS for the recorded test run only.**');
+    expect(browserReportSource).toContain('Unperformed manual and separate-harness release gates: **BLOCKED.**');
     expect(browserReportSource).toContain('Production Vinext origin: `http://127.0.0.1:4177`');
     expect(browserReportSource).toContain('hydrated in both the in-app browser and connected Chrome');
     expect(browserReportSource).toContain('Reviewed description copied. Nothing opened or was submitted.');
@@ -171,8 +267,36 @@ describe('public privacy and safety pages', () => {
     expect(browserReportSource).toContain('No console warning or error was observed on the exercised in-app-browser pages');
     expect(browserReportSource).toContain('No screenshot was retained');
     expect(browserReportSource).toContain('no material visual mismatch requiring a code change');
+    for (const unperformedLane of [
+      'Native browser zoom at 200%',
+      'Loaded-extension fixture execution',
+      'Complete shared-device, private-device, and present-helper browser matrix',
+      'Shared-device 10-minute inactivity transition',
+      'Message-only result',
+      'Unresolved-jurisdiction fallback',
+      'Portal-unavailable fallback',
+      'Clipboard-denial handling',
+      'Every citizen-return state',
+      'Continuation-receipt download and redaction',
+      'Reduced-motion behavior',
+      'Hydrated-browser live-region announcements',
+    ]) {
+      expect(browserReportSource).toContain(unperformedLane);
+    }
+    expect(browserReportSource).not.toContain('Status: completed local browser and visual QA evidence');
     expect(browserReportSource).not.toMatch(/native 200% zoom (?:passed|was verified)/i);
     expect(browserReportSource).not.toMatch(/fixture browser execution (?:passed|was verified)/i);
+  });
+
+  it('closes implementation evidence while keeping the public release gate blocked', () => {
+    expect(releaseGateAmendmentSource).toContain('Status: implementation complete; release gate blocked.');
+    expect(releaseGateAmendmentSource).toContain('Task 7 implementation documentation and retained evidence may close');
+    expect(releaseGateAmendmentSource).toContain('does not mark any unperformed manual or separate-harness gate as passed');
+    expect(releaseGateAmendmentSource).toContain('The public product remains a non-public prototype.');
+    expect(releaseGateAmendmentSource).toContain('The code remains a public-beta candidate only.');
+    expect(releaseGateAmendmentSource).toContain('[official-route reverification](official-route-reverification-2026-09-03.md)');
+    expect(releaseGateAmendmentSource).toContain('[browser and visual QA evidence](public-handoff-browser-qa-2026-09-03.md)');
+    expect(releaseGateAmendmentSource).not.toMatch(/release gate:\s*(?:passed|complete)/i);
   });
 
   it('renders the canonical IHMCL routes and preserves the NPCI issuer directory', () => {
