@@ -414,6 +414,426 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+type PreparationProvenance =
+  | Readonly<{ kind: 'bundle-root' }>
+  | Readonly<{
+    kind: 'bundle-member';
+    member: 'consuming' | 'fillPlan' | 'sourceAuthorization' | 'sourceImportedAtMs';
+  }>
+  | Readonly<{ kind: 'safe-literal' }>
+  | Readonly<{ kind: 'unknown'; reason: string }>;
+
+const PREPARED_DISPATCH_KEYS = Object.freeze([
+  'status',
+  'consuming',
+  'fillPlan',
+  'sourceAuthorization',
+  'sourceImportedAtMs',
+] as const);
+const PREPARED_DISPATCH_MEMBERS = new Set(PREPARED_DISPATCH_KEYS.slice(1));
+
+function unwrapPreparationExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isNonNullExpression(current)
+    || ts.isSatisfiesExpression(current)
+  ) current = current.expression;
+  return current;
+}
+
+function directFunction(file: ts.SourceFile, name: string): ts.FunctionDeclaration | null {
+  let found: ts.FunctionDeclaration | null = null;
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = node;
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
+function directCallName(expression: ts.Expression): string | null {
+  const selected = unwrapPreparationExpression(expression);
+  if (!ts.isCallExpression(selected)) return null;
+  const callee = unwrapPreparationExpression(selected.expression);
+  if (ts.isIdentifier(callee)) return callee.text;
+  if (
+    ts.isPropertyAccessExpression(callee)
+    && ts.isIdentifier(callee.expression)
+    && callee.expression.text === 'Object'
+    && callee.name.text === 'freeze'
+  ) return 'Object.freeze';
+  return null;
+}
+
+function propertyName(property: ts.ObjectLiteralElementLike): string | null {
+  if (!property.name) return null;
+  return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)
+    ? property.name.text
+    : null;
+}
+
+function frozenObject(expression: ts.Expression): ts.ObjectLiteralExpression | null {
+  const selected = unwrapPreparationExpression(expression);
+  if (
+    !ts.isCallExpression(selected)
+    || directCallName(selected) !== 'Object.freeze'
+    || selected.arguments.length !== 1
+  ) return null;
+  const argument = selected.arguments[0];
+  return argument && ts.isObjectLiteralExpression(argument) ? argument : null;
+}
+
+function preparedReturn(
+  file: ts.SourceFile,
+  fn: ts.FunctionDeclaration,
+): ReadonlyMap<string, ts.Expression> | null {
+  const matches: Array<ReadonlyMap<string, ts.Expression>> = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== fn) return;
+    if (ts.isReturnStatement(node) && node.expression) {
+      const object = frozenObject(node.expression);
+      if (object) {
+        const entries = new Map<string, ts.Expression>();
+        let valid = true;
+        for (const property of object.properties) {
+          const name = propertyName(property);
+          const expression = ts.isPropertyAssignment(property)
+            ? property.initializer
+            : ts.isShorthandPropertyAssignment(property)
+              ? property.name
+              : null;
+          if (!name || !expression || entries.has(name)) {
+            valid = false;
+            break;
+          }
+          entries.set(name, expression);
+        }
+        const status = entries.get('status');
+        if (
+          valid
+          && status
+          && ts.isStringLiteral(unwrapPreparationExpression(status))
+          && (unwrapPreparationExpression(status) as ts.StringLiteral).text === 'prepared'
+        ) matches.push(entries);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(fn);
+  return matches.length === 1 ? matches[0]! : null;
+}
+
+function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
+  const file = ts.createSourceFile(
+    'service-worker.analysis.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const inner = directFunction(file, 'preparePayloadBearingFill');
+  const outer = directFunction(file, 'prepareFillDispatch');
+  const issues: string[] = [];
+  if (!inner?.body || !outer?.body) return ['both fill-preparation helpers must exist with bodies'];
+
+  type Binding = {
+    declaration: ts.VariableDeclaration;
+    scopeEnd: number;
+    provenance: PreparationProvenance;
+    nullAssignments: number[];
+  };
+  const bindings = new Map<string, Binding>();
+  const collectBindings = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== outer) return;
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      let scope: ts.Node | undefined = node.parent;
+      while (scope && scope !== outer.body && !ts.isBlock(scope)) scope = scope.parent;
+      if (bindings.has(node.name.text)) issues.push(`duplicate outer binding ${node.name.text}`);
+      bindings.set(node.name.text, {
+        declaration: node,
+        scopeEnd: (scope ?? outer.body!).end,
+        provenance: Object.freeze({ kind: 'unknown', reason: 'unclassified initializer' }),
+        nullAssignments: [],
+      });
+    }
+    ts.forEachChild(node, collectBindings);
+  };
+  collectBindings(outer);
+
+  const classifyExpression = (expression: ts.Expression): PreparationProvenance => {
+    const selected = unwrapPreparationExpression(expression);
+    if (
+      ts.isStringLiteral(selected)
+      || ts.isNumericLiteral(selected)
+      || selected.kind === ts.SyntaxKind.NullKeyword
+      || selected.kind === ts.SyntaxKind.TrueKeyword
+      || selected.kind === ts.SyntaxKind.FalseKeyword
+    ) return Object.freeze({ kind: 'safe-literal' });
+    if (ts.isAwaitExpression(selected)) {
+      return directCallName(selected.expression) === 'preparePayloadBearingFill'
+        ? Object.freeze({ kind: 'bundle-root' })
+        : Object.freeze({ kind: 'unknown', reason: 'awaited value is not the closed preparation helper' });
+    }
+    if (ts.isIdentifier(selected)) {
+      if (selected.text === 'request') return Object.freeze({ kind: 'safe-literal' });
+      return bindings.get(selected.text)?.provenance
+        ?? Object.freeze({ kind: 'unknown', reason: 'value does not originate in the closed bundle' });
+    }
+    if (ts.isPropertyAccessExpression(selected)) {
+      const base = classifyExpression(selected.expression);
+      if (base.kind === 'bundle-root') {
+        return PREPARED_DISPATCH_MEMBERS.has(selected.name.text as never)
+          ? Object.freeze({
+            kind: 'bundle-member',
+            member: selected.name.text as Exclude<typeof PREPARED_DISPATCH_KEYS[number], 'status'>,
+          })
+          : Object.freeze({
+            kind: 'unknown',
+            reason: `nonpermitted bundle member "${selected.name.text}"`,
+          });
+      }
+      if (base.kind === 'bundle-member') {
+        return Object.freeze({
+          kind: 'unknown',
+          reason: `nonpermitted derivation from bundle member "${base.member}"`,
+        });
+      }
+      return base.kind === 'unknown'
+        ? base
+        : Object.freeze({ kind: 'safe-literal' });
+    }
+    if (ts.isObjectLiteralExpression(selected)) {
+      for (const property of selected.properties) {
+        if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
+          return Object.freeze({ kind: 'unknown', reason: 'non-data object member' });
+        }
+        const value = ts.isPropertyAssignment(property) ? property.initializer : property.name;
+        const child = classifyExpression(value);
+        if (child.kind === 'unknown' || child.kind === 'bundle-root') return child;
+      }
+      return Object.freeze({ kind: 'safe-literal' });
+    }
+    return Object.freeze({ kind: 'unknown', reason: 'value does not derive from a permitted origin' });
+  };
+
+  for (let pass = 0; pass < bindings.size + 1; pass += 1) {
+    let changed = false;
+    for (const binding of bindings.values()) {
+      const declaredAsBundle = binding.declaration.type?.getText(file).includes('PreparedFillDispatch')
+        && binding.declaration.initializer?.kind === ts.SyntaxKind.NullKeyword;
+      const next = declaredAsBundle
+        ? Object.freeze({ kind: 'bundle-root' } as const)
+        : binding.declaration.initializer
+          ? classifyExpression(binding.declaration.initializer)
+          : Object.freeze({ kind: 'unknown', reason: 'binding has no initializer' } as const);
+      if (JSON.stringify(next) !== JSON.stringify(binding.provenance)) {
+        binding.provenance = next;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  const awaitCalls: Array<{ name: string | null; position: number }> = [];
+  const collectFlow = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== outer) return;
+    if (ts.isAwaitExpression(node)) {
+      awaitCalls.push({ name: directCallName(node.expression), position: node.getStart(file) });
+    }
+    if (
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && ts.isIdentifier(node.left)
+    ) {
+      const binding = bindings.get(node.left.text);
+      if (binding) {
+        const assigned = classifyExpression(node.right);
+        if (node.right.kind === ts.SyntaxKind.NullKeyword) {
+          binding.nullAssignments.push(node.getEnd());
+        } else if (assigned.kind !== binding.provenance.kind) {
+          issues.push(`${node.left.text} is reassigned from an incompatible origin`);
+        }
+      }
+    }
+    ts.forEachChild(node, collectFlow);
+  };
+  collectFlow(outer);
+  const payloadHelperAwaits = awaitCalls.filter((call) => call.name === 'preparePayloadBearingFill');
+  const alarmAwaits = awaitCalls.filter((call) => call.name === 'clearAlarm' || call.name === 'createAlarm');
+  if (payloadHelperAwaits.length !== 1) issues.push('outer helper must await the payload helper exactly once');
+  if (alarmAwaits.length !== 3) issues.push('outer helper must own exactly three canonical alarm awaits');
+  for (const call of awaitCalls) {
+    if (!['preparePayloadBearingFill', 'clearAlarm', 'createAlarm'].includes(call.name ?? '')) {
+      issues.push('outer helper awaits a value outside the closed preparation/alarm flow');
+    }
+  }
+  const firstAlarm = Math.min(...alarmAwaits.map((call) => call.position));
+  if (!Number.isFinite(firstAlarm)) issues.push('outer helper has no canonical alarm boundary');
+
+  const isBindingReference = (node: ts.Identifier, declaration: ts.VariableDeclaration) => {
+    if (node === declaration.name) return false;
+    if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) return false;
+    if (
+      (ts.isPropertyAssignment(node.parent) || ts.isShorthandPropertyAssignment(node.parent))
+      && node.parent.name === node
+      && !ts.isShorthandPropertyAssignment(node.parent)
+    ) return false;
+    return true;
+  };
+  for (const [name, binding] of bindings) {
+    const crossesAlarm = binding.declaration.getStart(file) < firstAlarm && binding.scopeEnd > firstAlarm;
+    if (binding.provenance.kind === 'unknown') {
+      issues.push(`${name}: ${binding.provenance.reason}`);
+      if (crossesAlarm) issues.push(`${name}: nonpermitted origin crosses an alarm await`);
+      continue;
+    }
+    if (binding.provenance.kind !== 'bundle-root' || !crossesAlarm) continue;
+    const kill = binding.nullAssignments.filter((position) => position < firstAlarm).at(-1);
+    if (kill === undefined) {
+      issues.push(`${name}: bundle root is not killed before the first alarm await`);
+      continue;
+    }
+    let readAfterKill = false;
+    const visitReferences = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== outer) return;
+      if (
+        ts.isIdentifier(node)
+        && node.text === name
+        && node.getStart(file) > kill
+        && isBindingReference(node, binding.declaration)
+      ) readAfterKill = true;
+      ts.forEachChild(node, visitReferences);
+    };
+    visitReferences(outer);
+    if (readAfterKill) issues.push(`${name}: bundle root is read after its pre-alarm kill`);
+  }
+
+  const visitNestedCaptures = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== outer) {
+      const visitIdentifiers = (child: ts.Node) => {
+        if (ts.isIdentifier(child)) {
+          const provenance = bindings.get(child.text)?.provenance;
+          if (provenance?.kind === 'bundle-root' || provenance?.kind === 'unknown') {
+            issues.push(`${child.text}: nonpermitted outer origin captured by nested function`);
+          }
+        }
+        ts.forEachChild(child, visitIdentifiers);
+      };
+      visitIdentifiers(node);
+      return;
+    }
+    ts.forEachChild(node, visitNestedCaptures);
+  };
+  visitNestedCaptures(outer);
+
+  const outerReturns: ts.ReturnStatement[] = [];
+  const collectOuterReturns = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node !== outer) return;
+    if (ts.isReturnStatement(node)) outerReturns.push(node);
+    ts.forEachChild(node, collectOuterReturns);
+  };
+  collectOuterReturns(outer);
+  for (const statement of outerReturns) {
+    if (!statement.expression) {
+      issues.push('outer helper has a valueless return');
+      continue;
+    }
+    const object = frozenObject(statement.expression);
+    const status = object?.properties.find((property) => propertyName(property) === 'status');
+    const statusValue = status && ts.isPropertyAssignment(status)
+      ? unwrapPreparationExpression(status.initializer)
+      : null;
+    if (statusValue && ts.isStringLiteral(statusValue) && statusValue.text === 'prepared') continue;
+    if (directCallName(statement.expression) === 'cancelBeforeDispatch') continue;
+    const provenance = classifyExpression(statement.expression);
+    if (
+      provenance.kind === 'unknown'
+      || provenance.kind === 'bundle-member'
+      || (provenance.kind === 'bundle-root' && statement.getStart(file) >= firstAlarm)
+    ) issues.push('outer helper returns nonpermitted bundle data');
+  }
+
+  const outerReturn = preparedReturn(file, outer);
+  if (!outerReturn || JSON.stringify([...outerReturn.keys()]) !== JSON.stringify(PREPARED_DISPATCH_KEYS)) {
+    issues.push('outer success return must be the exact closed prepared bundle');
+  } else {
+    const status = unwrapPreparationExpression(outerReturn.get('status')!);
+    if (!ts.isStringLiteral(status) || status.text !== 'prepared') {
+      issues.push('outer success status must be the prepared literal');
+    }
+    for (const member of PREPARED_DISPATCH_KEYS.slice(1)) {
+      const provenance = classifyExpression(outerReturn.get(member)!);
+      if (provenance.kind !== 'bundle-member' || provenance.member !== member) {
+        issues.push(`outer ${member} must originate from the corresponding closed bundle member`);
+      }
+    }
+  }
+
+  const innerReturn = preparedReturn(file, inner);
+  if (!innerReturn || JSON.stringify([...innerReturn.keys()]) !== JSON.stringify(PREPARED_DISPATCH_KEYS)) {
+    issues.push('inner success return must be the exact closed prepared bundle');
+  } else {
+    const innerBindings = new Map<string, ts.VariableDeclaration>();
+    const collectInnerBindings = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== inner) return;
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+        innerBindings.set(node.name.text, node);
+      }
+      ts.forEachChild(node, collectInnerBindings);
+    };
+    collectInnerBindings(inner);
+    const declarationFor = (expression: ts.Expression) => {
+      const selected = unwrapPreparationExpression(expression);
+      return ts.isIdentifier(selected) ? innerBindings.get(selected.text) ?? null : null;
+    };
+    const consumingDeclaration = declarationFor(innerReturn.get('consuming')!);
+    const consumingObject = consumingDeclaration?.initializer
+      ? frozenObject(consumingDeclaration.initializer)
+      : null;
+    const consumingKeys = consumingObject?.properties.map(propertyName) ?? [];
+    if (
+      consumingDeclaration?.type?.getText(file) !== 'ConsumingSessionStateV1'
+      || JSON.stringify(consumingKeys) !== JSON.stringify([
+        'schema', 'state', 'generation', 'armNonce', 'packId', 'attemptId', 'replayUntil',
+        'attemptNotAfterMs', 'destinationTabId', 'destinationDocumentId',
+      ])
+    ) issues.push('inner consuming member must originate from the exact payload-free tuple');
+
+    const fillPlan = unwrapPreparationExpression(innerReturn.get('fillPlan')!);
+    const fillPlanRoot = ts.isPropertyAccessExpression(fillPlan)
+      && fillPlan.name.text === 'plan'
+      && ts.isIdentifier(unwrapPreparationExpression(fillPlan.expression))
+      ? innerBindings.get((unwrapPreparationExpression(fillPlan.expression) as ts.Identifier).text)
+      : null;
+    if (
+      !fillPlanRoot?.initializer
+      || directCallName(fillPlanRoot.initializer) !== 'buildDestinationFillPlan'
+    ) issues.push('inner fillPlan must originate from the closed fill-plan builder');
+
+    const sourceBindingDeclaration = declarationFor(innerReturn.get('sourceAuthorization')!);
+    if (
+      sourceBindingDeclaration?.type?.getText(file) !== 'SourcePreviewBindingV1'
+      || !sourceBindingDeclaration.initializer
+      || directCallName(sourceBindingDeclaration.initializer) !== 'sourceBinding'
+    ) issues.push('inner sourceAuthorization must originate from the minimum source binding');
+
+    const importedAtDeclaration = declarationFor(innerReturn.get('sourceImportedAtMs')!);
+    const importedAtInitializer = importedAtDeclaration?.initializer
+      ? unwrapPreparationExpression(importedAtDeclaration.initializer)
+      : null;
+    if (
+      !importedAtInitializer
+      || !ts.isPropertyAccessExpression(importedAtInitializer)
+      || importedAtInitializer.name.text !== 'importedAtMs'
+    ) issues.push('inner sourceImportedAtMs must originate from the imported-time scalar');
+  }
+
+  return issues;
+}
+
 describe('closed extension session state', () => {
   it('reconstructs the exact staged union and rejects reordered or accessor-controlled state', () => {
     const staged = {
@@ -614,38 +1034,50 @@ describe('serialized handoff lifecycle', () => {
     expect(payloadPreparation.body).toBeDefined();
     expect(preparation.body).toBeDefined();
     expect(fill.body).toBeDefined();
+    expect(analyzePayloadFreeFillPreparation(source)).toEqual([]);
 
-    const payloadAliases = new Set([
-      'lifecycle',
-      'staged',
-      'source',
-      'previewPlan',
-      'destinationRaw',
-      'preflight',
-      'arming',
-      'armedSession',
-      'armedLedger',
-      'live',
-      'consumed',
-    ]);
-
-    const directPreparationIdentifiers = new Set<string>();
-    const collectDirectPreparation = (node: ts.Node) => {
-      if (ts.isFunctionLike(node) && node !== preparation) return;
-      if (ts.isIdentifier(node)) directPreparationIdentifiers.add(node.text);
-      ts.forEachChild(node, collectDirectPreparation);
-    };
-    collectDirectPreparation(preparation);
-    expect([...directPreparationIdentifiers].filter((name) => payloadAliases.has(name))).toEqual([]);
-
-    const directFillIdentifiers = new Set<string>();
-    const collectDirect = (node: ts.Node) => {
-      if (ts.isFunctionLike(node) && node !== fill) return;
-      if (ts.isIdentifier(node)) directFillIdentifiers.add(node.text);
-      ts.forEachChild(node, collectDirect);
-    };
-    collectDirect(fill);
-    expect([...directFillIdentifiers].filter((name) => payloadAliases.has(name))).toEqual([]);
+    const renamedAliasMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  const freshlyNamedCarrier = (prepared as unknown as { envelope: unknown }).envelope;',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(renamedAliasMutation).not.toBe(source);
+    const mutationIssues = analyzePayloadFreeFillPreparation(renamedAliasMutation);
+    expect(mutationIssues).toContain(
+      'freshlyNamedCarrier: nonpermitted bundle member "envelope"',
+    );
+    expect(mutationIssues).toContain(
+      'freshlyNamedCarrier: nonpermitted origin crosses an alarm await',
+    );
+    const nestedPayloadMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  const freshlyNamedValues = prepared.fillPlan.values;',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(nestedPayloadMutation).not.toBe(source);
+    expect(analyzePayloadFreeFillPreparation(nestedPayloadMutation)).toContain(
+      'freshlyNamedValues: nonpermitted derivation from bundle member "fillPlan"',
+    );
+    const returnedPayloadMutation = source.replace(
+      '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      [
+        '  if (request.actionTabId < 0) {',
+        '    return (prepared as unknown as { envelope: WorkerResponseV1 }).envelope;',
+        '  }',
+        '  prepared = null;',
+        '  await clearAlarm(SESSION_EXPIRY_ALARM);',
+      ].join('\n'),
+    );
+    expect(returnedPayloadMutation).not.toBe(source);
+    expect(analyzePayloadFreeFillPreparation(returnedPayloadMutation)).toContain(
+      'outer helper returns nonpermitted bundle data',
+    );
 
     const preparedReturns: string[][] = [];
     const collectPreparedReturns = (node: ts.Node) => {
