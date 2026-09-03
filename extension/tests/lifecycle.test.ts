@@ -1791,6 +1791,284 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       || declarationFor(fillPlanInputs?.get('attemptId')) !== attemptIdDeclaration
       || declarationFor(fillPlanInputs?.get('operationNotAfterMs')) !== attemptDeadlineDeclaration
     ) report('inner fillPlan has invalid attempt inputs');
+
+    const authoritativeRoles = [
+      lifecycleDeclaration,
+      stagedDeclaration,
+      previewPlanDeclaration,
+      attemptedAtDeclaration,
+      adapterExpiryDeclaration,
+      attemptDeadlineDeclaration,
+      nonceDeclaration,
+      attemptIdDeclaration,
+      fillPlanRoot,
+      sourceBindingDeclaration,
+      importedAtDeclaration,
+      armingDeclaration,
+      armedSessionDeclaration,
+      liveDeclaration,
+      armedLedgerDeclaration,
+      consumingDeclaration,
+      consumedDeclaration,
+    ] as const;
+    const presentAuthoritativeRoles = authoritativeRoles.filter(
+      (declaration): declaration is ts.VariableDeclaration => declaration !== null,
+    );
+    const isDirectSingleConst = (declaration: ts.VariableDeclaration) => {
+      const declarationList = declaration.parent;
+      const statement = declarationList.parent;
+      return ts.isVariableDeclarationList(declarationList)
+        && declarationList.declarations.length === 1
+        && Boolean(declarationList.flags & ts.NodeFlags.Const)
+        && ts.isVariableStatement(statement)
+        && statement.parent === inner.body;
+    };
+    let authoritativeRolesValid = Boolean(
+      authoritativeRoles.every((declaration) => declaration !== null)
+      && new Set(presentAuthoritativeRoles).size === authoritativeRoles.length
+      && presentAuthoritativeRoles.every(isDirectSingleConst),
+    );
+    const authoritativeSet = new Set(presentAuthoritativeRoles);
+    const authoritativeOrigin = new Map<ts.VariableDeclaration, ts.VariableDeclaration>();
+    for (const declaration of presentAuthoritativeRoles) {
+      authoritativeOrigin.set(declaration, declaration);
+    }
+    const rootDeclaration = (expression: ts.Expression | undefined) => {
+      if (!expression) return null;
+      let selected = unwrapPreparationExpression(expression);
+      while (ts.isPropertyAccessExpression(selected) || ts.isElementAccessExpression(selected)) {
+        selected = unwrapPreparationExpression(selected.expression);
+      }
+      return ts.isIdentifier(selected) ? declarationForIdentifier(selected) : null;
+    };
+    let discoveredAlias = true;
+    while (discoveredAlias) {
+      discoveredAlias = false;
+      for (const declaration of allInnerDeclarations) {
+        if (authoritativeOrigin.has(declaration)) continue;
+        const root = rootDeclaration(declaration.initializer);
+        const origin = root ? authoritativeOrigin.get(root) : null;
+        if (origin) {
+          authoritativeOrigin.set(declaration, origin);
+          discoveredAlias = true;
+        }
+      }
+    }
+    const authoritativeRoot = (expression: ts.Expression | undefined) => {
+      const declaration = rootDeclaration(expression);
+      return declaration ? authoritativeOrigin.get(declaration) ?? null : null;
+    };
+    if (
+      allInnerDeclarations.some((declaration) => (
+        !authoritativeSet.has(declaration) && authoritativeOrigin.has(declaration)
+      ))
+    ) authoritativeRolesValid = false;
+
+    const writeRoots = (expression: ts.Expression): ReadonlySet<ts.VariableDeclaration> => {
+      const selected = unwrapPreparationExpression(expression);
+      const directRoot = authoritativeRoot(selected);
+      if (directRoot) return new Set([directRoot]);
+      const roots = new Set<ts.VariableDeclaration>();
+      const include = (nested: ts.Expression) => {
+        for (const root of writeRoots(nested)) roots.add(root);
+      };
+      if (ts.isObjectLiteralExpression(selected)) {
+        for (const property of selected.properties) {
+          if (ts.isShorthandPropertyAssignment(property)) include(property.name);
+          else if (ts.isPropertyAssignment(property)) include(property.initializer);
+          else if (ts.isSpreadAssignment(property)) include(property.expression);
+        }
+      } else if (ts.isArrayLiteralExpression(selected)) {
+        for (const element of selected.elements) {
+          if (ts.isOmittedExpression(element)) continue;
+          include(ts.isSpreadElement(element) ? element.expression : element);
+        }
+      } else if (
+        ts.isBinaryExpression(selected)
+        && selected.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      ) include(selected.left);
+      return roots;
+    };
+    const writeTargets: ts.Expression[] = [];
+    const writes = new Map<ts.VariableDeclaration, number[]>();
+    const recordWrite = (target: ts.Expression, positionNode: ts.Node) => {
+      writeTargets.push(target);
+      for (const root of writeRoots(target)) {
+        const positions = writes.get(root) ?? [];
+        positions.push(positionNode.getStart(file));
+        writes.set(root, positions);
+      }
+    };
+    const collectWrites = (node: ts.Node) => {
+      if (
+        ts.isBinaryExpression(node)
+        && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+      ) recordWrite(node.left, node);
+      if (
+        (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+        && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+      ) recordWrite(node.operand, node);
+      if (ts.isDeleteExpression(node)) recordWrite(node.expression, node);
+      if (
+        (ts.isForInStatement(node) || ts.isForOfStatement(node))
+        && !ts.isVariableDeclarationList(node.initializer)
+      ) recordWrite(node.initializer, node);
+      ts.forEachChild(node, collectWrites);
+    };
+    collectWrites(inner);
+
+    const inside = (node: ts.Node, ancestor: ts.Node) => {
+      let selected: ts.Node | undefined = node;
+      while (selected) {
+        if (selected === ancestor) return true;
+        if (selected === inner) return false;
+        selected = selected.parent;
+      }
+      return false;
+    };
+    const declarationNameContains = (declaration: ts.VariableDeclaration, node: ts.Node) => (
+      inside(node, declaration.name)
+    );
+    const isReferenceIdentifier = (identifier: ts.Identifier) => {
+      const parent = identifier.parent;
+      if (ts.isPropertyAccessExpression(parent) && parent.name === identifier) return false;
+      if (
+        (ts.isPropertyAssignment(parent)
+          || ts.isMethodDeclaration(parent)
+          || ts.isGetAccessorDeclaration(parent)
+          || ts.isSetAccessorDeclaration(parent))
+        && parent.name === identifier
+      ) return false;
+      if (ts.isBindingElement(parent) && parent.propertyName === identifier) return false;
+      return true;
+    };
+    const lastAuthoritativeUse = new Map<ts.VariableDeclaration, number>();
+    const collectAuthoritativeUses = (node: ts.Node) => {
+      if (ts.isIdentifier(node) && isReferenceIdentifier(node)) {
+        const declaration = declarationForIdentifier(node);
+        const origin = declaration ? authoritativeOrigin.get(declaration) : null;
+        if (
+          origin
+          && !declarationNameContains(declaration!, node)
+          && !writeTargets.some((target) => inside(node, target))
+        ) {
+          lastAuthoritativeUse.set(
+            origin,
+            Math.max(lastAuthoritativeUse.get(origin) ?? 0, node.getStart(file)),
+          );
+        }
+      }
+      ts.forEachChild(node, collectAuthoritativeUses);
+    };
+    collectAuthoritativeUses(inner);
+    for (const [root, positions] of writes) {
+      const lastUse = lastAuthoritativeUse.get(root) ?? 0;
+      if (positions.some((position) => position > root.end && position <= lastUse)) {
+        authoritativeRolesValid = false;
+      }
+    }
+
+    const containsAuthoritativeReference = (node: ts.Node) => {
+      let contains = false;
+      const visit = (selected: ts.Node) => {
+        if (contains) return;
+        if (ts.isIdentifier(selected) && isReferenceIdentifier(selected)) {
+          const declaration = declarationForIdentifier(selected);
+          if (declaration && authoritativeOrigin.has(declaration)) {
+            contains = true;
+            return;
+          }
+        }
+        ts.forEachChild(selected, visit);
+      };
+      visit(node);
+      return contains;
+    };
+    const callPath = (expression: ts.LeftHandSideExpression) => {
+      const members: string[] = [];
+      let selected: ts.Expression = unwrapPreparationExpression(expression);
+      while (ts.isPropertyAccessExpression(selected)) {
+        members.unshift(selected.name.text);
+        selected = unwrapPreparationExpression(selected.expression);
+      }
+      if (!ts.isIdentifier(selected)) return null;
+      members.unshift(selected.text);
+      return members.join('.');
+    };
+    const approvedRoleCalls = new Set([
+      'Object.freeze',
+      'Date.parse',
+      'fixedBlocker',
+      'makePreviewPlan',
+      'routeFailure',
+      'actionTabMatches',
+      'sourceBinding',
+      'runSourceReprobe',
+      'stagedPreviewTiming',
+      'validateDestinationRepreflightInjectionResult',
+      'isPositiveTime',
+      'nextOperationDeadline',
+      'newOpaque',
+      'buildDestinationFillPlan',
+      'writeSessionState',
+      'liveFromSession',
+      'readyLedger',
+      'armUnresolvedLive',
+      'cancelBeforeDispatch',
+      'buildFixedWorkerResponse',
+      'buildRejectedWorkerResponse',
+      'chrome.scripting.executeScript',
+    ]);
+    const allowedRoleReturns = new Set<ts.ReturnStatement>([
+      armingFailureReturn,
+      cancellationReturn,
+      consumingFailureReturn,
+      preparedReturnStatement,
+    ].filter((statement): statement is ts.ReturnStatement => statement !== null));
+    const collectEscapes = (node: ts.Node) => {
+      if (node !== inner && ts.isFunctionLike(node)) {
+        if (containsAuthoritativeReference(node)) authoritativeRolesValid = false;
+        return;
+      }
+      if (
+        ts.isVariableDeclaration(node)
+        && !ts.isIdentifier(node.name)
+        && node.initializer
+        && containsAuthoritativeReference(node.initializer)
+      ) authoritativeRolesValid = false;
+      if (
+        ts.isVariableDeclaration(node)
+        && !authoritativeSet.has(node)
+        && node.initializer
+      ) {
+        const selected = unwrapPreparationExpression(node.initializer);
+        if (
+          (ts.isObjectLiteralExpression(selected) || ts.isArrayLiteralExpression(selected))
+          && containsAuthoritativeReference(selected)
+        ) authoritativeRolesValid = false;
+      }
+      if (
+        ts.isCallExpression(node)
+        && node.arguments.some(containsAuthoritativeReference)
+        && !approvedRoleCalls.has(callPath(node.expression) ?? '')
+      ) authoritativeRolesValid = false;
+      if (
+        (ts.isSpreadElement(node) || ts.isSpreadAssignment(node))
+        && containsAuthoritativeReference(node.expression)
+      ) authoritativeRolesValid = false;
+      if (
+        ts.isReturnStatement(node)
+        && node.expression
+        && containsAuthoritativeReference(node.expression)
+        && !allowedRoleReturns.has(node)
+      ) authoritativeRolesValid = false;
+      ts.forEachChild(node, collectEscapes);
+    };
+    collectEscapes(inner);
+    if (!authoritativeRolesValid) {
+      report('inner authoritative roles must be immutable direct const declarations');
+    }
   }
 
   return issues;
@@ -2560,6 +2838,246 @@ describe('serialized handoff lifecycle', () => {
       'inserted statement before prepared return',
     );
 
+    const expectAuthoritativeImmutabilityRejection = (mutated: string, label: string) => {
+      expect.soft(analyzeMutation(mutated, label, true), label).toContain(
+        'inner authoritative roles must be immutable direct const declarations',
+      );
+    };
+    for (const [label, declarationAnchor, mutableDeclaration, reassignment] of [
+      [
+        'attempt ID reassignment',
+        "  const attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        "  let attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        '  attemptId = staged.envelope.resultRevisionId;',
+      ],
+      [
+        'nonce reassignment',
+        '  const armNonce = newOpaque([staged.generation, staged.envelope.packId]);',
+        '  let armNonce = newOpaque([staged.generation, staged.envelope.packId]);',
+        '  armNonce = staged.envelope.resultRevisionId;',
+      ],
+      [
+        'attempt deadline reassignment',
+        '  const attemptNotAfterMs = nextOperationDeadline(',
+        '  let attemptNotAfterMs = nextOperationDeadline(',
+        '  attemptNotAfterMs = staged.effectiveExpiresAtMs;',
+      ],
+    ] as const) {
+      const mutableRole = replaceExactlyOnce(source, declarationAnchor, mutableDeclaration, label);
+      const reassignedRole = replaceExactlyOnce(
+        mutableRole,
+        '  const arming: ArmingSessionStateV1 = Object.freeze({',
+        `${reassignment}\n  const arming: ArmingSessionStateV1 = Object.freeze({`,
+        `${label} write`,
+      );
+      expectAuthoritativeImmutabilityRejection(reassignedRole, label);
+    }
+
+    const lifecycleReassignmentMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        [
+          '): Promise<WorkerResponseV1 | PreparedFillDispatch> {',
+          '  const lifecycle = await reconcileLifecycle();',
+          '  const blocker = fixedBlocker(request.command, lifecycle);',
+        ].join('\n'),
+        [
+          '): Promise<WorkerResponseV1 | PreparedFillDispatch> {',
+          '  let lifecycle = await reconcileLifecycle();',
+          '  const blocker = fixedBlocker(request.command, lifecycle);',
+        ].join('\n'),
+        'mutable canonical lifecycle',
+      ),
+      '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+      [
+        '  const replacementLifecycle = await reconcileLifecycle();',
+        "  if (replacementLifecycle.status !== 'ready') {",
+        "    return buildFixedWorkerResponse(request.command, 'quarantined');",
+        '  }',
+        '  lifecycle = replacementLifecycle;',
+        '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+      ].join('\n'),
+      'canonical lifecycle reassignment',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      lifecycleReassignmentMutation,
+      'canonical lifecycle reassignment',
+    );
+
+    for (const [label, declarationAnchor, mutableDeclaration, reassignment] of [
+      [
+        'source authorization reassignment',
+        '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+        '  let sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+        '  sourceAuthorization = sourceBinding(arming);',
+      ],
+      [
+        'source imported time reassignment',
+        '  const sourceImportedAtMs = staged.importedAtMs;',
+        '  let sourceImportedAtMs = staged.importedAtMs;',
+        '  sourceImportedAtMs = arming.importedAtMs;',
+      ],
+    ] as const) {
+      const mutableRole = replaceExactlyOnce(source, declarationAnchor, mutableDeclaration, label);
+      const reassignedRole = replaceExactlyOnce(
+        mutableRole,
+        [
+          "    return cancelBeforeDispatch(arming, buildRejectedWorkerResponse(request.command, 'operation-failed'));",
+          '  }',
+          '  return Object.freeze({',
+        ].join('\n'),
+        [
+          "    return cancelBeforeDispatch(arming, buildRejectedWorkerResponse(request.command, 'operation-failed'));",
+          '  }',
+          reassignment,
+          '  return Object.freeze({',
+        ].join('\n'),
+        `${label} write`,
+      );
+      expectAuthoritativeImmutabilityRejection(reassignedRole, label);
+    }
+
+    for (const [label, write] of [
+      [
+        'authoritative property write',
+        '  (arming as unknown as { attemptId: string }).attemptId = staged.envelope.resultRevisionId;',
+      ],
+      [
+        'authoritative element write',
+        "  (arming as unknown as Record<string, unknown>)['attemptId'] = staged.envelope.resultRevisionId;",
+      ],
+      [
+        'authoritative property delete',
+        '  delete (arming as unknown as { attemptId?: string }).attemptId;',
+      ],
+    ] as const) {
+      const objectWriteMutation = replaceExactlyOnce(
+        source,
+        '  const live = liveFromSession(arming);',
+        `${write}\n  const live = liveFromSession(arming);`,
+        label,
+      );
+      expectAuthoritativeImmutabilityRejection(objectWriteMutation, label);
+    }
+
+    for (const [label, write] of [
+      ['authoritative scalar update', '  attemptNotAfterMs++;'],
+      ['authoritative scalar compound assignment', '  attemptNotAfterMs += 1;'],
+    ] as const) {
+      const mutableDeadline = replaceExactlyOnce(
+        source,
+        '  const attemptNotAfterMs = nextOperationDeadline(',
+        '  let attemptNotAfterMs = nextOperationDeadline(',
+        `${label} declaration`,
+      );
+      const scalarWriteMutation = replaceExactlyOnce(
+        mutableDeadline,
+        '  const armNonce = newOpaque([staged.generation, staged.envelope.packId]);',
+        `${write}\n  const armNonce = newOpaque([staged.generation, staged.envelope.packId]);`,
+        label,
+      );
+      expectAuthoritativeImmutabilityRejection(scalarWriteMutation, label);
+    }
+
+    for (const [label, write] of [
+      [
+        'authoritative scalar logical assignment',
+        '  attemptId ||= staged.envelope.resultRevisionId;',
+      ],
+      [
+        'authoritative scalar destructuring assignment',
+        '  ({ attemptId } = { attemptId: staged.envelope.resultRevisionId });',
+      ],
+    ] as const) {
+      const mutableAttemptId = replaceExactlyOnce(
+        source,
+        "  const attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        "  let attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        `${label} declaration`,
+      );
+      const scalarWriteMutation = replaceExactlyOnce(
+        mutableAttemptId,
+        '  const fillBuilt = buildDestinationFillPlan({',
+        `${write}\n  const fillBuilt = buildDestinationFillPlan({`,
+        label,
+      );
+      expectAuthoritativeImmutabilityRejection(scalarWriteMutation, label);
+    }
+
+    const multipleDeclarationMutation = replaceExactlyOnce(
+      source,
+      '  const attemptedAtMs = Date.now();',
+      '  const attemptedAtMs = Date.now(), attemptedAtWitness = attemptedAtMs;',
+      'authoritative multi-declaration statement',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      multipleDeclarationMutation,
+      'authoritative multi-declaration statement',
+    );
+
+    const transitiveAliasWriteMutation = replaceExactlyOnce(
+      source,
+      '  const live = liveFromSession(arming);',
+      [
+        '  const durableAlias = arming;',
+        '  const envelopeAlias = durableAlias.envelope;',
+        "  (envelopeAlias as unknown as { packId: string }).packId = 'aliased-pack';",
+        '  const live = liveFromSession(arming);',
+      ].join('\n'),
+      'transitive authoritative alias write',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      transitiveAliasWriteMutation,
+      'transitive authoritative alias write',
+    );
+
+    const authoritativeCallSinkMutation = replaceExactlyOnce(
+      source,
+      '  const live = liveFromSession(arming);',
+      '  void JSON.stringify(arming);\n  const live = liveFromSession(arming);',
+      'authoritative call sink',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      authoritativeCallSinkMutation,
+      'authoritative call sink',
+    );
+
+    const authoritativeClosureEscapeMutation = replaceExactlyOnce(
+      source,
+      '  const live = liveFromSession(arming);',
+      [
+        '  const readDurableLater = () => arming;',
+        '  void readDurableLater;',
+        '  const live = liveFromSession(arming);',
+      ].join('\n'),
+      'authoritative closure escape',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      authoritativeClosureEscapeMutation,
+      'authoritative closure escape',
+    );
+
+    const authoritativeForOfWriteMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        "  const attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        "  let attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        'authoritative for-of declaration',
+      ),
+      '  const fillBuilt = buildDestinationFillPlan({',
+      [
+        '  for (attemptId of [staged.envelope.resultRevisionId]) {',
+        '    break;',
+        '  }',
+        '  const fillBuilt = buildDestinationFillPlan({',
+      ].join('\n'),
+      'authoritative for-of write',
+    );
+    expectAuthoritativeImmutabilityRejection(
+      authoritativeForOfWriteMutation,
+      'authoritative for-of write',
+    );
+
     const renamedAliasMutation = replaceExactlyOnce(
       source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
@@ -2827,7 +3345,7 @@ describe('serialized handoff lifecycle', () => {
       visit(statement);
     }
     expect(forbiddenAwaits).toEqual([]);
-  }, 60_000);
+  }, 120_000);
 
   it('requires an exact own-data source tab URL before the source probe', async () => {
     const harness = makeChromeHarness();
