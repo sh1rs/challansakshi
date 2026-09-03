@@ -1,15 +1,15 @@
 .chrome,
 .footer {
-  --chrome-ink: #071b45;
-  --chrome-muted: #526071;
-  --chrome-teal: #087a74;
-  --chrome-teal-dark: #075b58;
-  --chrome-navy: #102c47;
+  --chrome-ink: var(--ink);
+  --chrome-muted: var(--muted);
+  --chrome-teal: var(--teal);
+  --chrome-teal-dark: var(--accent-text);
+  --chrome-navy: var(--navy);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .chrome {
-  background: #fff;
+  background: var(--card);
   color: var(--chrome-ink);
 }
 
@@ -21,7 +21,7 @@
   gap: 9px;
   padding: 8px 20px;
   background: var(--chrome-navy);
-  color: #edf8f7;
+  color: var(--on-navy);
   font-size: 12px;
   font-weight: 760;
   letter-spacing: .015em;
@@ -45,8 +45,8 @@
   justify-content: space-between;
   gap: 24px;
   margin-inline: auto;
-  border-bottom: 1px solid #d6dbe3;
-  background: #fff;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--card);
 }
 
 .brand {
@@ -66,7 +66,7 @@
   flex: 0 0 auto;
   border-radius: 13px 13px 19px 19px;
   background: var(--chrome-teal);
-  box-shadow: inset 0 -5px 0 rgb(0 0 0 / 8%);
+  box-shadow: inset 0 -5px 0 var(--shadow);
   color: #fff;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 19px;
@@ -100,9 +100,9 @@
   display: flex;
   flex: 0 0 auto;
   padding: 3px;
-  border: 1px solid #cad2cf;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--card);
 }
 .languages button {
   min-width: 48px;
@@ -110,33 +110,33 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #52625d;
+  color: var(--muted);
   font-size: 14px;
   font-weight: 850;
   cursor: pointer;
 }
 .languages .active { background: var(--chrome-navy); color: #fff; }
-.englishOnly { max-width: 128px; color: #697870; font-size: 12px; font-weight: 800; line-height: 1.25; text-align: center; text-transform: uppercase; }
+.englishOnly { max-width: 128px; color: var(--muted); font-size: 12px; font-weight: 800; line-height: 1.25; text-align: center; text-transform: uppercase; }
 
 .headerButton {
   min-height: 48px;
   padding: 0 12px;
-  border: 1px solid #667e77;
+  border: 1px solid var(--teal-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--card);
   color: var(--chrome-teal-dark);
   font-size: 13px;
   font-weight: 820;
   cursor: pointer;
 }
-.headerButton[aria-pressed='true'] { border-color: var(--chrome-teal); background: #eaf7f3; box-shadow: 0 0 0 2px rgb(8 122 116 / 12%); }
-.headerButtonDanger { border-color: #b5544e; background: #fff8f5; color: #82332f; }
+.headerButton[aria-pressed='true'] { border-color: var(--chrome-teal); background: var(--teal-soft); box-shadow: 0 0 0 2px rgb(8 122 116 / 12%); }
+.headerButtonDanger { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 
 .chrome button:focus-visible,
-.chrome a:focus-visible { outline: 3px solid #075650; outline-offset: 3px; }
+.chrome a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .footer a:focus-visible { outline: 3px solid #f1b755; outline-offset: 3px; }
 
-.footer { border-top: 1px solid #d8ddd8; background: var(--chrome-navy); color: #e8f0f1; }
+.footer { border-top: 1px solid var(--border-soft); background: var(--chrome-navy); color: var(--on-navy); }
 .footerInner {
   width: min(1320px, calc(100% - 48px));
   min-height: 150px;
@@ -151,10 +151,10 @@
 .footerBrand strong,
 .footerBrand small { display: block; }
 .footerBrand strong { font: 700 18px Georgia, "Times New Roman", serif; }
-.footerBrand small { margin-top: 5px; color: #a9c2c2; font-size: 11px; }
+.footerBrand small { margin-top: 5px; color: var(--on-navy); font-size: 11px; }
 .footerLinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; }
-.footerLinks a { min-height: 48px; display: inline-flex; align-items: center; color: #ecf8f7; font-size: 12px; font-weight: 740; text-underline-offset: 4px; }
-.footer p { margin: 0; color: #b8c8ce; font-size: 12px; line-height: 1.65; text-align: right; }
+.footerLinks a { min-height: 48px; display: inline-flex; align-items: center; color: var(--on-navy); font-size: 12px; font-weight: 740; text-underline-offset: 4px; }
+.footer p { margin: 0; color: var(--on-navy); font-size: 12px; line-height: 1.65; text-align: right; }
 
 @media (max-width: 1050px) {
   .routeLinks { display: none; }

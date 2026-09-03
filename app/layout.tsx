@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { buildThemeBootScript } from '../lib/theme-preference';
 import './globals.css';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -23,8 +24,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: buildThemeBootScript() }} />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,12 +1,46 @@
 'use client';
 /* eslint-disable @next/next/no-html-link-for-pages -- Same-origin anchors deliberately cross privacy and demo state boundaries. */
 
+import { useSyncExternalStore } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import type { Language } from '../../lib/domain';
 import styles from './CitizenChrome.module.css';
 
 function t(language: Language, en: string, hi: string) {
   return language === 'hi' ? hi : en;
+}
+
+// Theme choice store. The document root attribute (stamped pre-paint by the
+// root layout's boot script) is the source of truth; this store only mirrors
+// it for rendering. Persistence is delegated to the hook the boot script
+// installs — this component never touches storage itself (the real-route
+// privacy contract forbids it). Without the hook the choice still applies to
+// this tab.
+const themeListeners = new Set<() => void>();
+
+function subscribeToTheme(listener: () => void) {
+  themeListeners.add(listener);
+  return () => {
+    themeListeners.delete(listener);
+  };
+}
+
+function readDarkTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function readServerDarkTheme() {
+  return false;
+}
+
+function applyThemeChoice(theme: 'light' | 'dark') {
+  const hook = (window as unknown as Record<string, unknown>).__challansakshiApplyTheme;
+  if (typeof hook === 'function') {
+    (hook as (theme: string) => void)(theme);
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  themeListeners.forEach((listener) => listener());
 }
 
 export function CitizenHeader({
@@ -27,6 +61,11 @@ export function CitizenHeader({
   englishOnly?: boolean;
 }) {
   const homeLabel = t(language, 'ChallanSakshi home', 'चालान साक्षी होम');
+  const darkTheme = useSyncExternalStore(subscribeToTheme, readDarkTheme, readServerDarkTheme);
+
+  const toggleTheme = () => {
+    applyThemeChoice(darkTheme ? 'light' : 'dark');
+  };
 
   return (
     <div className={styles.chrome} data-product-shell="citizen" data-product-mode={boundary}>
@@ -49,6 +88,9 @@ export function CitizenHeader({
             <a href="/demo">{t(language, 'Hackathon demo', 'हैकाथॉन डेमो')}</a>
           </div>
           {utilities ? <div className={styles.utilities}>{utilities}</div> : null}
+          <CitizenHeaderButton type="button" aria-pressed={darkTheme} onClick={toggleTheme}>
+            {t(language, 'Dark mode', 'डार्क मोड')}
+          </CitizenHeaderButton>
           {englishOnly ? (
             <span className={styles.englishOnly}>English-only safety beta</span>
           ) : (
