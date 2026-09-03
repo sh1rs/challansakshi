@@ -123,6 +123,15 @@ beforeEach(() => {
 });
 
 describe('closed payload-free ledger validation', () => {
+  it('locks the frozen persistence contract to independent literals', () => {
+    expect(EXTENSION_SAFETY_LEDGER_KEY).toBe('challansakshi.safety-ledger.v1');
+    expect(SAFETY_LEDGER_SCHEMA).toBe('challansakshi.safety-ledger/v1');
+    expect(DEVICE_OWNER_RESET_ATTESTATION_SCHEMA)
+      .toBe('challansakshi.device-owner-reset-attestation/v1');
+    expect(SAFETY_LEDGER_CAPACITY).toBe(32);
+    expect(NEEDS_REVIEW_WARNING_LIFETIME_MS).toBe(86_400_000);
+  });
+
   it('reconstructs and deeply freezes every exact persisted variant in lexicographic order', () => {
     const candidate = {
       schema: SAFETY_LEDGER_SCHEMA,
