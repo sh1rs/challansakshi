@@ -322,7 +322,10 @@ async function ensureTrustedAccess(): Promise<boolean> {
   return granted;
 }
 
-function readStoredContainer(candidate: unknown): SafetyLedgerReadResult | null {
+function readStoredContainer(
+  candidate: unknown,
+  absenceAsEmpty: boolean,
+): SafetyLedgerReadResult | null {
   try {
     if (
       typeof candidate !== 'object'
@@ -332,7 +335,9 @@ function readStoredContainer(candidate: unknown): SafetyLedgerReadResult | null 
     ) return null;
     const ownKeys = Reflect.ownKeys(candidate);
     if (ownKeys.length === 0) {
-      return Object.freeze({ status: 'ready', ledger: emptySafetyLedger() });
+      return absenceAsEmpty
+        ? Object.freeze({ status: 'ready', ledger: emptySafetyLedger() })
+        : null;
     }
     if (ownKeys.length !== 1 || ownKeys[0] !== EXTENSION_SAFETY_LEDGER_KEY) return null;
     const slot = Object.getOwnPropertyDescriptor(candidate, EXTENSION_SAFETY_LEDGER_KEY);
@@ -351,7 +356,7 @@ export async function readSafetyLedger(): Promise<SafetyLedgerReadResult> {
   } catch {
     return unavailable('storage-read-failed');
   }
-  const parsed = readStoredContainer(raw);
+  const parsed = readStoredContainer(raw, true);
   return parsed ?? unavailable('storage-read-failed');
 }
 
@@ -423,7 +428,7 @@ async function writeSafetyLedger(ledger: SafetyLedgerV1): Promise<SafetyLedgerMu
   } catch {
     return unavailable('storage-readback-failed');
   }
-  const parsed = readStoredContainer(raw);
+  const parsed = readStoredContainer(raw, false);
   if (!parsed || parsed.status !== 'ready') return unavailable('readback-invalid');
   if (JSON.stringify(parsed.ledger) !== JSON.stringify(ledger)) return unavailable('readback-mismatch');
   return Object.freeze({ status: 'confirmed', ledger: parsed.ledger });
