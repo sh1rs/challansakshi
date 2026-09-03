@@ -207,7 +207,7 @@ describe('public privacy and safety pages', () => {
         url: 'https://echallan.parivahan.nic.in/grievance',
         domain: 'echallan.parivahan.nic.in',
         purpose: 'official-grievance-service',
-        sha256: 'f05288a2a053d671ee9573237556df7847e1f68ff4fa765dcff23d22292e9942',
+        sha256: 'd858125abb9a8fc2c416b04ae0cb7af65ee12ec8a226c83137eb496ba84e7b25',
       },
       {
         filename: '07-delhi-official-landing.jpg',
@@ -242,7 +242,11 @@ describe('public privacy and safety pages', () => {
     expect(routeReportSource).toContain('Screenshots are landing-state evidence only.');
     expect(routeReportSource).toContain('Portal forms remained untouched');
     expect(routeReportSource).toContain('No citizen data, identifier, CAPTCHA, OTP, credential, payment value, attachment, or declaration was read, filled, or submitted.');
-    expect(routeReportSource).toContain('A visible CAPTCHA is merely part of a public blank landing state and was not read, filled, solved, or otherwise interacted with.');
+    expect(routeReportSource).toContain('No retained screenshot contains a readable CAPTCHA.');
+    expect(routeReportSource).toContain('Image 06 is a 1200×390 cropped route-purpose/header capture.');
+    expect(routeReportSource).toContain('Its identifier, CAPTCHA, input, and all other protected control/value regions were excluded before retention.');
+    expect(routeReportSource).toContain('it does not OCR-inspect or visually certify screenshot pixels');
+    expect(routeReportSource).toContain('a retained human-review finding, not a unit-test capability claim');
   });
 
   it('separates observed browser passes, automated contracts, and unperformed release blockers', () => {

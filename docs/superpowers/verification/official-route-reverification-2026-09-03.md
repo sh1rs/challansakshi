@@ -36,7 +36,7 @@ The verifier string and evidence references below reproduce the checked-in regis
 
 ## Retained landing-state screenshot inventory
 
-Screenshots are landing-state evidence only. Portal forms remained untouched throughout capture. No citizen data, identifier, CAPTCHA, OTP, credential, payment value, attachment, or declaration was read, filled, or submitted. A visible CAPTCHA is merely part of a public blank landing state and was not read, filled, solved, or otherwise interacted with. The files contain no intentionally supplied citizen or case material and do not prove service availability, accessibility, form compatibility, adapter compatibility, or successful submission.
+Screenshots are landing-state evidence only. Portal forms remained untouched throughout capture. No citizen data, identifier, CAPTCHA, OTP, credential, payment value, attachment, or declaration was read, filled, or submitted. No retained screenshot contains a readable CAPTCHA. The files contain no intentionally supplied citizen or case material and do not prove service availability, accessibility, form compatibility, adapter compatibility, or successful submission.
 
 Each retained image is linked below to its exact allowlisted route, observed domain, recorded purpose, and SHA-256 digest. The digest binds this declaration to the checked-in bytes; it does not authenticate the government service or elevate a landing-state screenshot into operational approval.
 
@@ -47,8 +47,10 @@ Each retained image is linked below to its exact allowlisted route, observed dom
 | [`03-nextgen-service-landing.jpg`](official-route-reverification-2026-09-03/03-nextgen-service-landing.jpg) | `https://echallan.parivahan.nic.in/challan/challan-services` | `echallan.parivahan.nic.in` | `official-service-landing` | `0ac042c0ea7c441fbb3a2fe4b27f50f0d3dcb75830fa162097e2856b1845ebf9` |
 | [`04-virtual-courts.jpg`](official-route-reverification-2026-09-03/04-virtual-courts.jpg) | `https://vcourts.gov.in/virtualcourt/index.php` | `vcourts.gov.in` | `official-court-service` | `3953089b6933705145d42a4d30c33c50f704a45478e80847e11468423744b477` |
 | [`05-legacy-grievance.jpg`](official-route-reverification-2026-09-03/05-legacy-grievance.jpg) | `https://echallan.parivahan.gov.in/gsticket` | `echallan.parivahan.gov.in` | `official-grievance-service` | `70936b14f13a16e46f60821a20ec31540afcc6ecf648961f3e7d34895fffc723` |
-| [`06-nextgen-grievance.jpg`](official-route-reverification-2026-09-03/06-nextgen-grievance.jpg) | `https://echallan.parivahan.nic.in/grievance` | `echallan.parivahan.nic.in` | `official-grievance-service` | `f05288a2a053d671ee9573237556df7847e1f68ff4fa765dcff23d22292e9942` |
+| [`06-nextgen-grievance.jpg`](official-route-reverification-2026-09-03/06-nextgen-grievance.jpg) | `https://echallan.parivahan.nic.in/grievance` | `echallan.parivahan.nic.in` | `official-grievance-service` | `d858125abb9a8fc2c416b04ae0cb7af65ee12ec8a226c83137eb496ba84e7b25` |
 | [`07-delhi-official-landing.jpg`](official-route-reverification-2026-09-03/07-delhi-official-landing.jpg) | `https://traffic.delhipolice.gov.in/` | `traffic.delhipolice.gov.in` | `official-service` | `e1149f49e1c3492db9e203067a56d02b68296e953bcfc707a3b358bd9b6362a6` |
+
+Image 06 is a 1200×390 cropped route-purpose/header capture. Its identifier, CAPTCHA, input, and all other protected control/value regions were excluded before retention. The automated inventory contract binds the reviewed crop's filename, route context, and exact bytes; it does not OCR-inspect or visually certify screenshot pixels. The no-readable-CAPTCHA statement is therefore a retained human-review finding, not a unit-test capability claim.
 
 ## Sanitized observations
 
