@@ -544,15 +544,29 @@ function isExactClassConflictObservation(
 export function projectSyntheticClassConflictFacts(
   input: SyntheticClassConflictProjectionInput,
 ): SyntheticClassConflictProjectionResult {
-  if (!/^[0-9a-f]{32}$/.test(input.resultRevisionId)) {
+  const wrapper = readExactDataRecord(input, [
+    'extraction',
+    'resultRevisionId',
+    'confirmation',
+  ]);
+  if (!wrapper) return { status: 'abstained', reason: 'class-facts-not-action-ready' };
+  const resultRevisionId = wrapper.resultRevisionId;
+  if (typeof resultRevisionId !== 'string' || !/^[0-9a-f]{32}$/.test(resultRevisionId)) {
     return { status: 'abstained', reason: 'invalid-result-revision' };
   }
+  const confirmation = readExactDataRecord(wrapper.confirmation, [
+    'status',
+    'resultRevisionId',
+  ]);
   if (
-    input.confirmation.status !== 'confirmed'
-    || input.confirmation.resultRevisionId !== input.resultRevisionId
+    !confirmation
+    || confirmation.status !== 'confirmed'
+    || typeof confirmation.resultRevisionId !== 'string'
+    || !/^[0-9a-f]{32}$/.test(confirmation.resultRevisionId)
+    || confirmation.resultRevisionId !== resultRevisionId
   ) return { status: 'abstained', reason: 'confirmation-revision-mismatch' };
 
-  const extraction = readSyntheticEvidenceExtraction(input.extraction);
+  const extraction = readSyntheticEvidenceExtraction(wrapper.extraction);
   if (
     !extraction
     || !isExactClassConflictObservation(
@@ -591,10 +605,10 @@ export function projectSyntheticClassConflictFacts(
     confidence: 'high' as const,
     limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS[source],
     confirmation: 'citizen-confirmed' as const,
-    reviewRevisionId: input.resultRevisionId,
+    reviewRevisionId: resultRevisionId,
   });
   const facts: SyntheticReviewedFactProjection = Object.freeze({
-    reviewRevisionId: input.resultRevisionId,
+    reviewRevisionId: resultRevisionId,
     vehicleRecordClass: fact(
       'two-wheeler' as const,
       'bundled-synthetic-vehicle-record',

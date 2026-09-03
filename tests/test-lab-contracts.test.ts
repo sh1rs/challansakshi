@@ -136,6 +136,9 @@ describe('synthetic Test Lab product contract', () => {
     expect(entry.match(/primaryButton/g)).toHaveLength(1);
     expect(entry).toContain('>Start the 90-second proof</button>');
     expect(entry).not.toMatch(/10 fictional cases|Run all 10 cases|Open flagship walkthrough/);
+    expect(entry.indexOf('White Maruti Swift · Four-wheeler')).toBeLessThan(entry.indexOf('AI extracts'));
+    expect(entry.indexOf('Citizen controls')).toBeLessThan(entry.indexOf('>Start the 90-second proof</button>'));
+    expect(entry.indexOf('>Start the 90-second proof</button>')).toBeLessThan(entry.indexOf('No real record, upload'));
 
     const suiteIndex = html.indexOf('id="suite-heading"');
     expect(suiteIndex).toBeGreaterThan(html.indexOf('data-challansakshi-judge-entry="v1"'));
@@ -360,7 +363,14 @@ describe('synthetic Test Lab product contract', () => {
     expect(ruleFor(styles, '.judgePair strong')).toMatch(/overflow-wrap:\s*anywhere/);
 
     const mobile = mediaBlock(styles, '(max-width: 560px)');
-    expect(ruleFor(mobile, '.judgePair')).toMatch(/grid-template-columns:\s*1fr/);
+    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/min-height:\s*calc\(100svh\s*-\s*180px\)/);
+    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/gap:\s*12px/);
+    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/padding-block:\s*18px/);
+    expect(ruleFor(mobile, '.judgeIntro h1')).toMatch(/font-size:\s*32px/);
+    expect(ruleFor(mobile, '.judgePair')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+minmax\(0,\s*1fr\)/);
+    expect(ruleFor(mobile, '.judgePair article')).toMatch(/padding:\s*10px/);
+    expect(ruleFor(mobile, '.judgeBoundary')).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+    expect(ruleFor(mobile, '.judgeBoundary p')).toMatch(/padding:\s*8px/);
     expect(ruleFor(mobile, '.judgeEntry .primaryButton')).toMatch(/min-height:\s*48px/);
     expect(ruleFor(mobile, '.judgeEntry .primaryButton')).toMatch(/font-size:\s*16px/);
 
@@ -368,6 +378,8 @@ describe('synthetic Test Lab product contract', () => {
     expect(ruleFor(narrow, '.judgeEntry')).toMatch(/padding-inline:\s*0/);
     const narrowest = mediaBlock(styles, '(max-width: 320px)');
     expect(ruleFor(narrowest, '.judgeEntry')).toMatch(/min-width:\s*0/);
+    expect(ruleFor(narrowest, '.judgePair')).toMatch(/grid-template-columns:\s*1fr/);
+    expect(ruleFor(narrowest, '.judgeBoundary')).toMatch(/grid-template-columns:\s*1fr/);
   });
 
   it('keeps lab controls at 48px and essential copy at 16px on narrow screens', () => {

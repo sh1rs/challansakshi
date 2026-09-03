@@ -433,8 +433,20 @@
 }
 
 @media (max-width: 560px) {
-  .judgePair { grid-template-columns: 1fr; }
-  .judgePair > b { transform: rotate(90deg); justify-self: center; }
+  .judgeEntry { min-height: calc(100svh - 180px); gap: 12px; padding-block: 18px; }
+  .judgeIntro h1 { margin-top: 8px; font-size: 32px; line-height: 1.05; }
+  .judgeIntro .heroLead { margin-top: 8px; line-height: 1.35; }
+  .judgePair { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; }
+  .judgePair article { padding: 10px; }
+  .judgePair span { font-size: 9px; line-height: 1.2; }
+  .judgePair strong { margin-top: 4px; overflow-wrap: anywhere; font-size: 16px; line-height: 1.2; }
+  .judgePair > b { font-size: 18px; }
+  .judgeBoundary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .judgeBoundary p { padding: 8px; border-right: 1px solid var(--line); border-bottom: 0; }
+  .judgeBoundary p:last-child { border-right: 0; }
+  .judgeBoundary b { font-size: 14px; line-height: 1.15; }
+  .judgeBoundary span { font-size: 11px; line-height: 1.25; }
+  .judgeSafety { margin-top: 0; font-size: 11px; line-height: 1.35; }
   .judgeEntry .primaryButton { min-height: 48px; width: 100%; font-size: 16px; }
   .heroLead { font-size: 16px; }
   .heroActions { flex-direction: column; }
@@ -550,6 +562,11 @@
 
 @media (max-width: 320px) {
   .judgeEntry { min-height: calc(100svh - 148px); min-width: 0; align-content: center; }
+  .judgePair,
+  .judgeBoundary { grid-template-columns: 1fr; }
+  .judgePair > b { transform: rotate(90deg); justify-self: center; }
+  .judgeBoundary p { border-right: 0; border-bottom: 1px solid var(--line); }
+  .judgeBoundary p:last-child { border-bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

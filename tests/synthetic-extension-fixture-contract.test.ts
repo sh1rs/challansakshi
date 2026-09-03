@@ -28,7 +28,13 @@ type FixtureContractModule = {
       protectedControls: readonly Record<string, unknown>[];
       untouchedSentence: string;
       counterTokens: readonly string[];
-      counters: readonly { token: string; id: string }[];
+      counters: readonly {
+        token: string;
+        id: string;
+        markerAttribute: string;
+        markerValue: string;
+      }[];
+      eventSequence: Record<string, string>;
       reset: Record<string, string>;
       ready: Record<string, string>;
       customEvents: readonly string[];
@@ -160,24 +166,28 @@ describe('synthetic extension fixture contract', () => {
         untouchedSentence: 'Untouched: challan number, CAPTCHA, OTP, Aadhaar, payment, attachment, declaration, Submit',
         counterTokens: ['input', 'change', 'blur', 'keyboard', 'custom', 'link-click', 'button-click', 'submit', 'form-effect', 'autosave', 'fetch', 'xhr', 'beacon', 'history', 'navigation', 'upload', 'download'],
         counters: [
-          { token: 'input', id: 'challansakshi-fixture-counter-input' },
-          { token: 'change', id: 'challansakshi-fixture-counter-change' },
-          { token: 'blur', id: 'challansakshi-fixture-counter-blur' },
-          { token: 'keyboard', id: 'challansakshi-fixture-counter-keyboard' },
-          { token: 'custom', id: 'challansakshi-fixture-counter-custom' },
-          { token: 'link-click', id: 'challansakshi-fixture-counter-link-click' },
-          { token: 'button-click', id: 'challansakshi-fixture-counter-button-click' },
-          { token: 'submit', id: 'challansakshi-fixture-counter-submit' },
-          { token: 'form-effect', id: 'challansakshi-fixture-counter-form-effect' },
-          { token: 'autosave', id: 'challansakshi-fixture-counter-autosave' },
-          { token: 'fetch', id: 'challansakshi-fixture-counter-fetch' },
-          { token: 'xhr', id: 'challansakshi-fixture-counter-xhr' },
-          { token: 'beacon', id: 'challansakshi-fixture-counter-beacon' },
-          { token: 'history', id: 'challansakshi-fixture-counter-history' },
-          { token: 'navigation', id: 'challansakshi-fixture-counter-navigation' },
-          { token: 'upload', id: 'challansakshi-fixture-counter-upload' },
-          { token: 'download', id: 'challansakshi-fixture-counter-download' },
+          { token: 'input', id: 'challansakshi-fixture-counter-input', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'input' },
+          { token: 'change', id: 'challansakshi-fixture-counter-change', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'change' },
+          { token: 'blur', id: 'challansakshi-fixture-counter-blur', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'blur' },
+          { token: 'keyboard', id: 'challansakshi-fixture-counter-keyboard', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'keyboard' },
+          { token: 'custom', id: 'challansakshi-fixture-counter-custom', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'custom' },
+          { token: 'link-click', id: 'challansakshi-fixture-counter-link-click', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'link-click' },
+          { token: 'button-click', id: 'challansakshi-fixture-counter-button-click', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'button-click' },
+          { token: 'submit', id: 'challansakshi-fixture-counter-submit', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'submit' },
+          { token: 'form-effect', id: 'challansakshi-fixture-counter-form-effect', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'form-effect' },
+          { token: 'autosave', id: 'challansakshi-fixture-counter-autosave', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'autosave' },
+          { token: 'fetch', id: 'challansakshi-fixture-counter-fetch', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'fetch' },
+          { token: 'xhr', id: 'challansakshi-fixture-counter-xhr', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'xhr' },
+          { token: 'beacon', id: 'challansakshi-fixture-counter-beacon', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'beacon' },
+          { token: 'history', id: 'challansakshi-fixture-counter-history', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'history' },
+          { token: 'navigation', id: 'challansakshi-fixture-counter-navigation', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'navigation' },
+          { token: 'upload', id: 'challansakshi-fixture-counter-upload', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'upload' },
+          { token: 'download', id: 'challansakshi-fixture-counter-download', markerAttribute: 'data-challansakshi-fixture-counter', markerValue: 'download' },
         ],
+        eventSequence: {
+          markerAttribute: 'data-challansakshi-fixture-event-sequence',
+          markerValue: 'true',
+        },
         reset: { id: 'challansakshi-fixture-reset', label: 'Reset fictional fixture baseline' },
         ready: { attribute: 'data-challansakshi-fixture-ready', value: 'true' },
         customEvents: ['challansakshi-fixture-custom', 'challansakshi-fixture-autosave'],
@@ -320,11 +330,17 @@ describe('synthetic extension fixture contract', () => {
   });
 
   it('emits every adapter-facing form literal through the shared fixture authority', () => {
-    expect(destinationSource).toContain('for (const { token, id } of fixture.counters)');
+    expect(destinationSource).toContain('for (const { token, id, markerAttribute, markerValue } of fixture.counters)');
     expect(destinationSource).toContain('method={fixture.form.method}');
     expect(destinationSource).toContain('defaultValue={fixture.category.options[0].value}');
     expect(destinationSource.match(/type=\{control\.type\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(destinationSource).toContain('{...{ [markerAttribute]: markerValue }}');
+    expect(destinationSource).toContain('[fixture.eventSequence.markerAttribute]: fixture.eventSequence.markerValue');
+    expect(destinationSource).toContain('fixture.eventSequence.markerAttribute');
+    expect(destinationSource).toContain('fixture.eventSequence.markerValue');
     expect(destinationSource).not.toContain('`challansakshi-fixture-counter-${token}`');
+    expect(destinationSource).not.toContain('data-challansakshi-fixture-counter={token}');
+    expect(destinationSource).not.toContain('[data-challansakshi-fixture-event-sequence="true"]');
     expect(destinationSource).not.toContain('method="post"');
     expect(destinationSource).not.toContain('defaultValue=""');
   });

@@ -42,11 +42,15 @@ export default function SyntheticExtensionFixtureDestinationPage() {
     let counters = { ...resetSyntheticFixtureInstrumentationState().counters };
     let dispatchedEventSequence: string[] = [];
     const renderInstrumentation = () => {
-      for (const { token, id } of fixture.counters) {
+      for (const { token, id, markerAttribute, markerValue } of fixture.counters) {
         const output = document.getElementById(id) as HTMLOutputElement | null;
-        if (output) output.value = String(counters[token]);
+        if (output?.getAttribute(markerAttribute) === markerValue) {
+          output.value = String(counters[token]);
+        }
       }
-      const sequence = root.querySelector<HTMLOutputElement>('[data-challansakshi-fixture-event-sequence="true"]');
+      const sequence = Array.from(root.getElementsByTagName('output')).find((output) => (
+        output.getAttribute(fixture.eventSequence.markerAttribute) === fixture.eventSequence.markerValue
+      ));
       if (sequence) sequence.value = JSON.stringify(dispatchedEventSequence);
     };
     const record = (token: SyntheticFixtureCounterToken, eventName: string = token) => {
@@ -218,15 +222,17 @@ export default function SyntheticExtensionFixtureDestinationPage() {
             <button id={fixture.reset.id} type="button">{fixture.reset.label}</button>
           </div>
           <div className={styles.fixtureCounters}>
-            {fixture.counters.map(({ token, id }) => (
+            {fixture.counters.map(({ token, id, markerAttribute, markerValue }) => (
               <label key={token} htmlFor={id}>
                 <span>{token}</span>
-                <output id={id} data-challansakshi-fixture-counter={token}>0</output>
+                <output id={id} {...{ [markerAttribute]: markerValue }}>0</output>
               </label>
             ))}
           </div>
           <p>Dispatched-event sequence</p>
-          <output data-challansakshi-fixture-event-sequence="true">[]</output>
+          <output {...{
+            [fixture.eventSequence.markerAttribute]: fixture.eventSequence.markerValue,
+          }}>[]</output>
           <div className={styles.fixtureProbes} aria-label="Deliberate instrumentation probes">
             <a href={fixture.path}>Fictional navigation probe</a>
             <button type="button">Fictional button probe</button>

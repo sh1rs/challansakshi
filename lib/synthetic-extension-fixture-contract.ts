@@ -105,6 +105,8 @@ const protectedControls = Object.freeze([
 const counters = Object.freeze(SYNTHETIC_FIXTURE_COUNTER_TOKENS.map((token) => Object.freeze({
   token,
   id: `challansakshi-fixture-counter-${token}`,
+  markerAttribute: 'data-challansakshi-fixture-counter',
+  markerValue: token,
 })));
 
 export const SYNTHETIC_EXTENSION_FIXTURE = Object.freeze({
@@ -156,6 +158,10 @@ export const SYNTHETIC_EXTENSION_FIXTURE = Object.freeze({
     untouchedSentence: 'Untouched: challan number, CAPTCHA, OTP, Aadhaar, payment, attachment, declaration, Submit',
     counterTokens: SYNTHETIC_FIXTURE_COUNTER_TOKENS,
     counters,
+    eventSequence: Object.freeze({
+      markerAttribute: 'data-challansakshi-fixture-event-sequence',
+      markerValue: 'true',
+    }),
     reset: Object.freeze({
       id: 'challansakshi-fixture-reset',
       label: 'Reset fictional fixture baseline',

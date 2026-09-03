@@ -633,4 +633,122 @@ describe('deterministic test laboratory corpus', () => {
     }
     expect(getterCalls).toBe(0);
   });
+
+  it('sanitizes the exact public projector wrapper before reading revisions confirmation or extraction', () => {
+    const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: unknown) => {
+      status: string;
+      reason?: string;
+    });
+    expect(project).toBeTypeOf('function');
+    if (!project) return;
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+    expect(flagship).toBeDefined();
+    if (!flagship) return;
+    const flagshipExtraction = flagship.extraction;
+    const resultRevisionId = '11111111111111111111111111111111';
+    const valid = () => ({
+      extraction: structuredClone(flagshipExtraction),
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId },
+    });
+    let getterCalls = 0;
+    let coercionCalls = 0;
+    const throwingAccessor = () => {
+      getterCalls += 1;
+      throw new Error('must not execute');
+    };
+    const coerciveValue = {
+      toString: () => {
+        coercionCalls += 1;
+        return resultRevisionId;
+      },
+      toJSON: () => {
+        coercionCalls += 1;
+        return resultRevisionId;
+      },
+    };
+    class ProjectorInput {
+      extraction = structuredClone(flagshipExtraction);
+      resultRevisionId = '11111111111111111111111111111111';
+      confirmation = { status: 'confirmed', resultRevisionId };
+    }
+    class Confirmation {
+      status = 'confirmed';
+      resultRevisionId = '11111111111111111111111111111111';
+    }
+    const rootExtractionAccessor = valid();
+    Object.defineProperty(rootExtractionAccessor, 'extraction', { enumerable: true, get: throwingAccessor });
+    const rootRevisionAccessor = valid();
+    Object.defineProperty(rootRevisionAccessor, 'resultRevisionId', { enumerable: true, get: throwingAccessor });
+    const rootConfirmationAccessor = valid();
+    Object.defineProperty(rootConfirmationAccessor, 'confirmation', { enumerable: true, get: throwingAccessor });
+    const confirmationStatusAccessor = valid();
+    Object.defineProperty(confirmationStatusAccessor.confirmation, 'status', { enumerable: true, get: throwingAccessor });
+    const confirmationRevisionAccessor = valid();
+    Object.defineProperty(confirmationRevisionAccessor.confirmation, 'resultRevisionId', { enumerable: true, get: throwingAccessor });
+    const rootProxy = new Proxy(valid(), {
+      get: throwingAccessor,
+      ownKeys: () => { throw new Error('hostile root proxy'); },
+    });
+    const confirmationProxy = valid();
+    confirmationProxy.confirmation = new Proxy(confirmationProxy.confirmation, {
+      get: throwingAccessor,
+      ownKeys: () => { throw new Error('hostile confirmation proxy'); },
+    });
+    const inheritedRoot = Object.assign(Object.create({ fabricated: true }), valid());
+    const inheritedConfirmation = valid();
+    inheritedConfirmation.confirmation = Object.assign(
+      Object.create({ fabricated: true }),
+      inheritedConfirmation.confirmation,
+    );
+    const classConfirmation = valid();
+    classConfirmation.confirmation = new Confirmation();
+    const coerciveResultRevision = { ...valid(), resultRevisionId: coerciveValue };
+    const coerciveConfirmationRevision = {
+      ...valid(),
+      confirmation: { status: 'confirmed', resultRevisionId: coerciveValue },
+    };
+    const missingRoot = {
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId },
+    };
+    const missingConfirmation = {
+      extraction: structuredClone(flagshipExtraction),
+      resultRevisionId,
+      confirmation: { resultRevisionId },
+    };
+
+    const candidates: unknown[] = [
+      null,
+      [],
+      new ProjectorInput(),
+      inheritedRoot,
+      { ...valid(), fabricated: true },
+      missingRoot,
+      rootExtractionAccessor,
+      rootRevisionAccessor,
+      rootConfirmationAccessor,
+      rootProxy,
+      { ...valid(), resultRevisionId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
+      coerciveResultRevision,
+      { ...valid(), confirmation: null },
+      { ...valid(), confirmation: [] },
+      classConfirmation,
+      inheritedConfirmation,
+      { ...valid(), confirmation: { ...valid().confirmation, fabricated: true } },
+      missingConfirmation,
+      confirmationStatusAccessor,
+      confirmationRevisionAccessor,
+      confirmationProxy,
+      coerciveConfirmationRevision,
+    ];
+
+    for (const candidate of candidates) {
+      let result: { status: string; reason?: string } | undefined;
+      expect(() => { result = project(candidate); }).not.toThrow();
+      expect(result?.status).toBe('abstained');
+    }
+    expect(getterCalls).toBe(0);
+    expect(coercionCalls).toBe(0);
+  });
 });
