@@ -971,6 +971,12 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       'newOpaque',
       'nextOperationDeadline',
       'makePreviewPlan',
+      'liveFromSession',
+      'readyLedger',
+      'armUnresolvedLive',
+      'cancelBeforeDispatch',
+      'buildFixedWorkerResponse',
+      'buildRejectedWorkerResponse',
       'Object',
       'Date',
       'SESSION_STATE_SCHEMA',
@@ -991,11 +997,9 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
           innerShadows.add(node.name.text);
         }
         for (const parameter of node.parameters) recordBindingName(parameter.name);
-        return;
       }
       if (node !== inner && ts.isClassDeclaration(node) && node.name) {
         if (protectedBindings.has(node.name.text)) innerShadows.add(node.name.text);
-        return;
       }
       if (ts.isVariableDeclaration(node)) recordBindingName(node.name);
       if (ts.isParameter(node)) recordBindingName(node.name);
@@ -1042,6 +1046,12 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       newOpaque: canonicalFileFunction('newOpaque'),
       nextOperationDeadline: canonicalFileFunction('nextOperationDeadline'),
       makePreviewPlan: canonicalFileFunction('makePreviewPlan'),
+      liveFromSession: canonicalFileFunction('liveFromSession'),
+      readyLedger: canonicalFileFunction('readyLedger'),
+      armUnresolvedLive: canonicalImport('armUnresolvedLive', './safety-ledger'),
+      cancelBeforeDispatch: canonicalFileFunction('cancelBeforeDispatch'),
+      buildFixedWorkerResponse: canonicalImport('buildFixedWorkerResponse', './message-contract'),
+      buildRejectedWorkerResponse: canonicalImport('buildRejectedWorkerResponse', './message-contract'),
       objectFreeze: canonicalGlobal('Object'),
       date: canonicalGlobal('Date'),
       sessionSchema: canonicalFileVariable('SESSION_STATE_SCHEMA'),
@@ -1049,6 +1059,17 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     if (!canonicalHelpers.objectFreeze) {
       report('Object.freeze intrinsic is shadowed or noncanonical');
     }
+    if (!canonicalHelpers.writeSessionState) {
+      report('inner session write helper is shadowed or noncanonical');
+    }
+    if (
+      !canonicalHelpers.liveFromSession
+      || !canonicalHelpers.readyLedger
+      || !canonicalHelpers.armUnresolvedLive
+      || !canonicalHelpers.cancelBeforeDispatch
+      || !canonicalHelpers.buildFixedWorkerResponse
+      || !canonicalHelpers.buildRejectedWorkerResponse
+    ) report('inner durability suffix helper is shadowed or noncanonical');
 
     const directFrozenObject = (expression: ts.Expression | undefined) => {
       if (
@@ -1415,23 +1436,314 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       }
     }
 
-    const canonicalWriteTargets = (target: ts.VariableDeclaration | null) => allInnerDeclarations.filter(
-      (declaration) => {
-        const call = directAwaitedCall(
-          declaration.initializer,
-          'writeSessionState',
-          canonicalHelpers.writeSessionState,
-        );
-        return call?.arguments.length === 1
-          && ts.isIdentifier(call.arguments[0]!)
-          && declarationForIdentifier(call.arguments[0]!) === target;
-      },
+    const exactDeclarationIdentifier = (
+      expression: ts.Expression | undefined,
+      declaration: ts.VariableDeclaration | null,
+    ) => Boolean(
+      expression
+      && declaration
+      && ts.isIdentifier(expression)
+      && declarationForIdentifier(expression) === declaration,
     );
-    if (
-      !canonicalHelpers.writeSessionState
-      || canonicalWriteTargets(armingDeclaration).length !== 1
-      || canonicalWriteTargets(consumingDeclaration).length !== 1
-    ) report('inner session write helper is shadowed or noncanonical');
+    const exactDeclarationProperty = (
+      expression: ts.Expression | undefined,
+      declaration: ts.VariableDeclaration | null,
+      member: string,
+    ) => Boolean(
+      expression
+      && declaration
+      && ts.isPropertyAccessExpression(expression)
+      && !expression.questionDotToken
+      && expression.name.text === member
+      && exactDeclarationIdentifier(expression.expression, declaration),
+    );
+    const exactStatusComparison = (
+      expression: ts.Expression | undefined,
+      declaration: ts.VariableDeclaration | null,
+      operator: ts.SyntaxKind,
+      status: string,
+    ) => Boolean(
+      expression
+      && ts.isBinaryExpression(expression)
+      && expression.operatorToken.kind === operator
+      && exactDeclarationProperty(expression.left, declaration, 'status')
+      && exactString(expression.right, status),
+    );
+    const exactOptionalSessionStateComparison = (
+      expression: ts.Expression | undefined,
+      declaration: ts.VariableDeclaration | null,
+      state: string,
+    ) => {
+      if (
+        !expression
+        || !ts.isBinaryExpression(expression)
+        || expression.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken
+        || !ts.isPropertyAccessExpression(expression.left)
+        || !expression.left.questionDotToken
+        || expression.left.name.text !== 'state'
+        || !exactString(expression.right, state)
+      ) return false;
+      return exactDeclarationProperty(expression.left.expression, declaration, 'session');
+    };
+    const innerRequest = inner.parameters.length === 1 && ts.isIdentifier(inner.parameters[0]!.name)
+      ? inner.parameters[0]!.name
+      : null;
+    const exactRequestCommand = (expression: ts.Expression | undefined) => Boolean(
+      expression
+      && innerRequest
+      && ts.isPropertyAccessExpression(expression)
+      && !expression.questionDotToken
+      && expression.name.text === 'command'
+      && ts.isIdentifier(expression.expression)
+      && expression.expression.text === innerRequest.text,
+    );
+    const exactResponseCall = (
+      expression: ts.Expression | undefined,
+      name: 'buildFixedWorkerResponse' | 'buildRejectedWorkerResponse',
+      reason: string,
+    ) => {
+      const call = directCall(expression, name, canonicalHelpers[name]);
+      return Boolean(
+        call
+        && call.arguments.length === 2
+        && exactRequestCommand(call.arguments[0])
+        && exactString(call.arguments[1], reason),
+      );
+    };
+    const exactCancellationCall = (
+      expression: ts.Expression | undefined,
+      session: ts.VariableDeclaration | null,
+    ) => {
+      const call = directCall(
+        expression,
+        'cancelBeforeDispatch',
+        canonicalHelpers.cancelBeforeDispatch,
+      );
+      return Boolean(
+        call
+        && call.arguments.length === 2
+        && exactDeclarationIdentifier(call.arguments[0], session)
+        && exactResponseCall(call.arguments[1], 'buildRejectedWorkerResponse', 'operation-failed'),
+      );
+    };
+    const directConstDeclaration = (statement: ts.Statement | undefined) => {
+      const declaration = singleDeclaration(statement, 'const');
+      return declaration && ts.isIdentifier(declaration.name) ? declaration : null;
+    };
+
+    const innerStatements = [...inner.body!.statements];
+    const armingStatement = armingDeclaration?.parent.parent;
+    const consumingStatement = consumingDeclaration?.parent.parent;
+    const armingStatementIndex = armingStatement && ts.isVariableStatement(armingStatement)
+      ? innerStatements.indexOf(armingStatement)
+      : -1;
+    const suffix = armingStatementIndex >= 0 ? innerStatements.slice(armingStatementIndex) : [];
+    let suffixMatches = Boolean(
+      canonicalHelpers.writeSessionState
+      && canonicalHelpers.liveFromSession
+      && canonicalHelpers.readyLedger
+      && canonicalHelpers.armUnresolvedLive
+      && canonicalHelpers.cancelBeforeDispatch
+      && canonicalHelpers.buildFixedWorkerResponse
+      && canonicalHelpers.buildRejectedWorkerResponse
+      && innerRequest
+      && suffix.length === 10
+      && suffix[0] === armingStatement,
+    );
+
+    const armedSessionDeclaration = directConstDeclaration(suffix[1]);
+    const armedSessionWrite = directAwaitedCall(
+      armedSessionDeclaration?.initializer,
+      'writeSessionState',
+      canonicalHelpers.writeSessionState,
+    );
+    suffixMatches &&= Boolean(
+      armedSessionWrite
+      && armedSessionWrite.arguments.length === 1
+      && exactDeclarationIdentifier(armedSessionWrite.arguments[0], armingDeclaration),
+    );
+
+    const armingGuard = suffix[2] && ts.isIfStatement(suffix[2]) ? suffix[2] : null;
+    const armingGuardCondition = armingGuard && ts.isBinaryExpression(armingGuard.expression)
+      ? armingGuard.expression
+      : null;
+    suffixMatches &&= Boolean(
+      armingGuard
+      && !armingGuard.elseStatement
+      && armingGuardCondition
+      && armingGuardCondition.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      && exactStatusComparison(
+        armingGuardCondition.left,
+        armedSessionDeclaration,
+        ts.SyntaxKind.ExclamationEqualsEqualsToken,
+        'ready',
+      )
+      && exactOptionalSessionStateComparison(
+        armingGuardCondition.right,
+        armedSessionDeclaration,
+        'arming',
+      )
+      && ts.isBlock(armingGuard.thenStatement)
+      && armingGuard.thenStatement.statements.length === 1,
+    );
+    const armingFailureReturn = armingGuard && ts.isBlock(armingGuard.thenStatement)
+      && armingGuard.thenStatement.statements.length === 1
+      && ts.isReturnStatement(armingGuard.thenStatement.statements[0])
+      ? armingGuard.thenStatement.statements[0]
+      : null;
+    const armingFailure = armingFailureReturn?.expression;
+    suffixMatches &&= Boolean(
+      armingFailure
+      && ts.isConditionalExpression(armingFailure)
+      && exactStatusComparison(
+        armingFailure.condition,
+        armedSessionDeclaration,
+        ts.SyntaxKind.EqualsEqualsEqualsToken,
+        'quarantined',
+      )
+      && exactResponseCall(armingFailure.whenTrue, 'buildFixedWorkerResponse', 'quarantined')
+      && exactResponseCall(
+        armingFailure.whenFalse,
+        'buildRejectedWorkerResponse',
+        'storage-unavailable',
+      ),
+    );
+
+    const liveDeclaration = directConstDeclaration(suffix[3]);
+    const liveCall = directCall(
+      liveDeclaration?.initializer,
+      'liveFromSession',
+      canonicalHelpers.liveFromSession,
+    );
+    suffixMatches &&= Boolean(
+      liveCall
+      && liveCall.arguments.length === 1
+      && exactDeclarationIdentifier(liveCall.arguments[0], armingDeclaration),
+    );
+
+    const armedLedgerDeclaration = directConstDeclaration(suffix[4]);
+    const armedLedgerCall = directAwaitedCall(
+      armedLedgerDeclaration?.initializer,
+      'armUnresolvedLive',
+      canonicalHelpers.armUnresolvedLive,
+    );
+    const readyLedgerCall = directCall(
+      armedLedgerCall?.arguments[0],
+      'readyLedger',
+      canonicalHelpers.readyLedger,
+    );
+    suffixMatches &&= Boolean(
+      armedLedgerCall
+      && armedLedgerCall.arguments.length === 2
+      && readyLedgerCall
+      && readyLedgerCall.arguments.length === 1
+      && exactDeclarationPath(readyLedgerCall.arguments[0], lifecycleDeclaration, ['ledger'])
+      && exactDeclarationIdentifier(armedLedgerCall.arguments[1], liveDeclaration),
+    );
+
+    const ledgerGuard = suffix[5] && ts.isIfStatement(suffix[5]) ? suffix[5] : null;
+    suffixMatches &&= Boolean(
+      ledgerGuard
+      && !ledgerGuard.elseStatement
+      && exactStatusComparison(
+        ledgerGuard.expression,
+        armedLedgerDeclaration,
+        ts.SyntaxKind.ExclamationEqualsEqualsToken,
+        'confirmed',
+      )
+      && ts.isBlock(ledgerGuard.thenStatement)
+      && ledgerGuard.thenStatement.statements.length === 2,
+    );
+    const cancellationDeclaration = ledgerGuard && ts.isBlock(ledgerGuard.thenStatement)
+      ? directConstDeclaration(ledgerGuard.thenStatement.statements[0])
+      : null;
+    const cancellationAwait = cancellationDeclaration?.initializer
+      && ts.isAwaitExpression(cancellationDeclaration.initializer)
+      ? cancellationDeclaration.initializer
+      : null;
+    suffixMatches &&= Boolean(
+      cancellationAwait
+      && exactCancellationCall(cancellationAwait.expression, armingDeclaration),
+    );
+    const cancellationReturn = ledgerGuard && ts.isBlock(ledgerGuard.thenStatement)
+      && ts.isReturnStatement(ledgerGuard.thenStatement.statements[1])
+      ? ledgerGuard.thenStatement.statements[1]
+      : null;
+    const cancellationBranch = cancellationReturn?.expression;
+    suffixMatches &&= Boolean(
+      cancellationBranch
+      && ts.isConditionalExpression(cancellationBranch)
+      && exactStatusComparison(
+        cancellationBranch.condition,
+        armedLedgerDeclaration,
+        ts.SyntaxKind.EqualsEqualsEqualsToken,
+        'quarantined',
+      )
+      && exactResponseCall(cancellationBranch.whenTrue, 'buildFixedWorkerResponse', 'quarantined')
+      && exactDeclarationIdentifier(cancellationBranch.whenFalse, cancellationDeclaration),
+    );
+
+    suffixMatches &&= suffix[6] === consumingStatement;
+    const consumedDeclaration = directConstDeclaration(suffix[7]);
+    const consumedWrite = directAwaitedCall(
+      consumedDeclaration?.initializer,
+      'writeSessionState',
+      canonicalHelpers.writeSessionState,
+    );
+    suffixMatches &&= Boolean(
+      consumedWrite
+      && consumedWrite.arguments.length === 1
+      && exactDeclarationIdentifier(consumedWrite.arguments[0], consumingDeclaration),
+    );
+
+    const consumingGuard = suffix[8] && ts.isIfStatement(suffix[8]) ? suffix[8] : null;
+    const consumingGuardCondition = consumingGuard && ts.isBinaryExpression(consumingGuard.expression)
+      ? consumingGuard.expression
+      : null;
+    suffixMatches &&= Boolean(
+      consumingGuard
+      && !consumingGuard.elseStatement
+      && consumingGuardCondition
+      && consumingGuardCondition.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      && exactStatusComparison(
+        consumingGuardCondition.left,
+        consumedDeclaration,
+        ts.SyntaxKind.ExclamationEqualsEqualsToken,
+        'ready',
+      )
+      && exactOptionalSessionStateComparison(
+        consumingGuardCondition.right,
+        consumedDeclaration,
+        'consuming',
+      )
+      && ts.isBlock(consumingGuard.thenStatement)
+      && consumingGuard.thenStatement.statements.length === 1,
+    );
+    const consumingFailureReturn = consumingGuard && ts.isBlock(consumingGuard.thenStatement)
+      && ts.isReturnStatement(consumingGuard.thenStatement.statements[0])
+      ? consumingGuard.thenStatement.statements[0]
+      : null;
+    suffixMatches &&= Boolean(
+      consumingFailureReturn?.expression
+      && exactCancellationCall(consumingFailureReturn.expression, armingDeclaration),
+    );
+
+    const preparedReturnStatement = suffix[9] && ts.isReturnStatement(suffix[9])
+      ? suffix[9]
+      : null;
+    const suffixPreparedEntries = directFrozenObject(preparedReturnStatement?.expression);
+    const exactSuffixPreparedEntries = exactObjectEntries(
+      suffixPreparedEntries,
+      PREPARED_DISPATCH_KEYS,
+      true,
+    );
+    suffixMatches &&= Boolean(
+      exactSuffixPreparedEntries
+      && PREPARED_DISPATCH_KEYS.every(
+        (key) => exactSuffixPreparedEntries.get(key) === innerReturn.get(key),
+      ),
+    );
+    if (!suffixMatches) report('inner durability suffix does not match closed grammar');
 
     const fillPlan = innerReturn.get('fillPlan')!;
     const fillPlanRoot = ts.isPropertyAccessExpression(fillPlan)
@@ -2067,6 +2379,187 @@ describe('serialized handoff lifecycle', () => {
       'Object.freeze intrinsic is shadowed or noncanonical',
     );
 
+    const expectDurabilitySuffixRejection = (mutated: string, label: string) => {
+      expect.soft(analyzeMutation(mutated, label, true), label).toContain(
+        'inner durability suffix does not match closed grammar',
+      );
+    };
+    const decoyArmingWriteMutation = replaceExactlyOnce(
+      source,
+      '  const armedSession = await writeSessionState(arming);',
+      [
+        '  const decoyArmedSession = await writeSessionState(arming);',
+        '  const armedSession = await writeSessionState(staged);',
+      ].join('\n'),
+      'decoy arming write with wrong checked write',
+    );
+    expectDurabilitySuffixRejection(
+      decoyArmingWriteMutation,
+      'decoy arming write with wrong checked write',
+    );
+    const decoyConsumingWriteMutation = replaceExactlyOnce(
+      source,
+      '  const consumed = await writeSessionState(consuming);',
+      [
+        '  const decoyConsumed = await writeSessionState(consuming);',
+        '  const consumed = await writeSessionState(staged);',
+      ].join('\n'),
+      'decoy consuming write with wrong checked write',
+    );
+    expectDurabilitySuffixRejection(
+      decoyConsumingWriteMutation,
+      'decoy consuming write with wrong checked write',
+    );
+
+    for (const [label, anchor, replacement] of [
+      [
+        'false-gated arming readback',
+        "  if (armedSession.status !== 'ready' || armedSession.session?.state !== 'arming') {",
+        "  if ((armedSession.status !== 'ready' || armedSession.session?.state !== 'arming') && Boolean(0)) {",
+      ],
+      [
+        'false-gated armed ledger',
+        "  if (armedLedger.status !== 'confirmed') {",
+        "  if (false && armedLedger.status !== 'confirmed') {",
+      ],
+      [
+        'false-gated consuming readback',
+        "  if (consumed.status !== 'ready' || consumed.session?.state !== 'consuming') {",
+        "  if ((consumed.status !== 'ready' || consumed.session?.state !== 'consuming') && false) {",
+      ],
+    ] as const) {
+      expectDurabilitySuffixRejection(
+        replaceExactlyOnce(source, anchor, replacement, label),
+        label,
+      );
+    }
+
+    const shadowDurabilityHelper = (name: string) => replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        '  const arming: ArmingSessionStateV1 = Object.freeze({',
+        [
+          `  const canonical${name[0]!.toUpperCase()}${name.slice(1)} = ${name};`,
+          '  {',
+          `    const ${name} = canonical${name[0]!.toUpperCase()}${name.slice(1)};`,
+          '    const arming: ArmingSessionStateV1 = Object.freeze({',
+        ].join('\n'),
+        `${name} shadow declaration`,
+      ),
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
+      [
+        '    sourceImportedAtMs,',
+        '  });',
+        '  }',
+        '}',
+        '',
+        'async function prepareFillDispatch(',
+      ].join('\n'),
+      `${name} shadow scope`,
+    );
+    for (const helper of [
+      'liveFromSession',
+      'readyLedger',
+      'armUnresolvedLive',
+      'cancelBeforeDispatch',
+      'buildFixedWorkerResponse',
+      'buildRejectedWorkerResponse',
+    ] as const) {
+      expectDurabilitySuffixRejection(
+        shadowDurabilityHelper(helper),
+        `${helper} local shadow`,
+      );
+    }
+
+    const wrongLedgerResultMutation = replaceExactlyOnce(
+      source,
+      '  const armedLedger = await armUnresolvedLive(readyLedger(lifecycle.ledger), live);',
+      [
+        '  const canonicalArmedLedger =',
+        '    await armUnresolvedLive(readyLedger(lifecycle.ledger), live);',
+        '  const armedLedger = await Promise.resolve(canonicalArmedLedger);',
+      ].join('\n'),
+      'wrong armed-ledger result declaration',
+    );
+    expectDurabilitySuffixRejection(
+      wrongLedgerResultMutation,
+      'wrong armed-ledger result declaration',
+    );
+
+    const wrongLiveRootMutation = replaceExactlyOnce(
+      source,
+      '  const live = liveFromSession(arming);',
+      [
+        '  const armingAlias: ArmingSessionStateV1 = arming;',
+        '  const decoyLive = liveFromSession(arming);',
+        '  const live = liveFromSession(armingAlias);',
+      ].join('\n'),
+      'wrong live root with decoy correct call',
+    );
+    expectDurabilitySuffixRejection(
+      wrongLiveRootMutation,
+      'wrong live root with decoy correct call',
+    );
+
+    const wrongLedgerRootMutation = replaceExactlyOnce(
+      source,
+      '  const armedLedger = await armUnresolvedLive(readyLedger(lifecycle.ledger), live);',
+      [
+        '  const alternateLedger = lifecycle.ledger;',
+        '  const armedLedger = await armUnresolvedLive(readyLedger(alternateLedger), live);',
+      ].join('\n'),
+      'wrong lifecycle ledger root',
+    );
+    expectDurabilitySuffixRejection(wrongLedgerRootMutation, 'wrong lifecycle ledger root');
+
+    const wrongCancellationRootMutation = replaceExactlyOnce(
+      source,
+      [
+        '    const cancelled = await cancelBeforeDispatch(',
+        '      arming,',
+        "      buildRejectedWorkerResponse(request.command, 'operation-failed'),",
+        '    );',
+      ].join('\n'),
+      [
+        '    const cancellationAlias: ArmingSessionStateV1 = arming;',
+        '    const decoyCancelled = await cancelBeforeDispatch(',
+        '      arming,',
+        "      buildRejectedWorkerResponse(request.command, 'operation-failed'),",
+        '    );',
+        '    const cancelled = await cancelBeforeDispatch(',
+        '      cancellationAlias,',
+        "      buildRejectedWorkerResponse(request.command, 'operation-failed'),",
+        '    );',
+      ].join('\n'),
+      'wrong cancellation root with decoy correct call',
+    );
+    expectDurabilitySuffixRejection(
+      wrongCancellationRootMutation,
+      'wrong cancellation root with decoy correct call',
+    );
+
+    const insertedSuffixStatementMutation = replaceExactlyOnce(
+      source,
+      [
+        '  if (consumed.status !== \'ready\' || consumed.session?.state !== \'consuming\') {',
+        "    return cancelBeforeDispatch(arming, buildRejectedWorkerResponse(request.command, 'operation-failed'));",
+        '  }',
+        '  return Object.freeze({',
+      ].join('\n'),
+      [
+        '  if (consumed.status !== \'ready\' || consumed.session?.state !== \'consuming\') {',
+        "    return cancelBeforeDispatch(arming, buildRejectedWorkerResponse(request.command, 'operation-failed'));",
+        '  }',
+        '  void consuming.attemptId;',
+        '  return Object.freeze({',
+      ].join('\n'),
+      'inserted statement before prepared return',
+    );
+    expectDurabilitySuffixRejection(
+      insertedSuffixStatementMutation,
+      'inserted statement before prepared return',
+    );
+
     const renamedAliasMutation = replaceExactlyOnce(
       source,
       '  prepared = null;\n  await clearAlarm(SESSION_EXPIRY_ALARM);',
@@ -2334,7 +2827,7 @@ describe('serialized handoff lifecycle', () => {
       visit(statement);
     }
     expect(forbiddenAwaits).toEqual([]);
-  }, 30_000);
+  }, 60_000);
 
   it('requires an exact own-data source tab URL before the source probe', async () => {
     const harness = makeChromeHarness();
