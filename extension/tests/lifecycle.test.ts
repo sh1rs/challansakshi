@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   digestCanonicalExtensionHandoffEnvelopeCore,
@@ -506,6 +508,47 @@ function preparedReturn(
   return matches.length === 1 ? matches[0]! : null;
 }
 
+function serviceWorkerProgramDiagnostics(source: string): readonly string[] {
+  const configPath = fileURLToPath(new URL('../tsconfig.json', import.meta.url));
+  const serviceWorkerPath = ts.sys.resolvePath(
+    fileURLToPath(new URL('../src/service-worker.ts', import.meta.url)),
+  );
+  const configRead = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (configRead.error) {
+    return [ts.flattenDiagnosticMessageText(configRead.error.messageText, '\n')];
+  }
+  const config = ts.parseJsonConfigFileContent(
+    configRead.config,
+    ts.sys,
+    dirname(configPath),
+    undefined,
+    configPath,
+  );
+  if (config.errors.length > 0) {
+    return config.errors.map((diagnostic) => (
+      ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+    ));
+  }
+  const host = ts.createCompilerHost(config.options, true);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => (
+    ts.sys.resolvePath(fileName) === serviceWorkerPath
+      ? ts.createSourceFile(fileName, source, languageVersion, true, ts.ScriptKind.TS)
+      : getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile)
+  );
+  const program = ts.createProgram({
+    rootNames: config.fileNames,
+    options: config.options,
+    host,
+  });
+  return ts.getPreEmitDiagnostics(program).map((diagnostic) => {
+    const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+    if (!diagnostic.file || diagnostic.start === undefined) return message;
+    const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+    return `${diagnostic.file.fileName}:${position.line + 1}:${position.character + 1}: ${message}`;
+  });
+}
+
 function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
   const file = ts.createSourceFile(
     'service-worker.analysis.ts',
@@ -892,9 +935,125 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     const declarationFor = (expression: ts.Expression | undefined) => (
       expression && ts.isIdentifier(expression) ? declarationForIdentifier(expression) : null
     );
+
+    const fileBindings = new Map<string, ts.Node[]>();
+    const addFileBinding = (name: string, node: ts.Node) => {
+      const bindings = fileBindings.get(name) ?? [];
+      bindings.push(node);
+      fileBindings.set(name, bindings);
+    };
+    for (const statement of file.statements) {
+      if (ts.isFunctionDeclaration(statement) && statement.name) {
+        addFileBinding(statement.name.text, statement);
+      } else if (ts.isClassDeclaration(statement) && statement.name) {
+        addFileBinding(statement.name.text, statement);
+      } else if (ts.isVariableStatement(statement)) {
+        for (const declaration of statement.declarationList.declarations) {
+          if (ts.isIdentifier(declaration.name)) addFileBinding(declaration.name.text, declaration);
+        }
+      } else if (ts.isImportDeclaration(statement) && statement.importClause) {
+        if (statement.importClause.name) {
+          addFileBinding(statement.importClause.name.text, statement.importClause);
+        }
+        const imports = statement.importClause.namedBindings;
+        if (imports && ts.isNamespaceImport(imports)) addFileBinding(imports.name.text, imports);
+        if (imports && ts.isNamedImports(imports)) {
+          for (const specifier of imports.elements) addFileBinding(specifier.name.text, specifier);
+        }
+      }
+    }
+
+    const protectedBindings = new Set([
+      'sourceBinding',
+      'buildDestinationFillPlan',
+      'reconcileLifecycle',
+      'writeSessionState',
+      'newOpaque',
+      'nextOperationDeadline',
+      'makePreviewPlan',
+      'Object',
+      'Date',
+      'SESSION_STATE_SCHEMA',
+    ]);
+    const innerShadows = new Set<string>();
+    const recordBindingName = (name: ts.BindingName) => {
+      if (ts.isIdentifier(name)) {
+        if (protectedBindings.has(name.text)) innerShadows.add(name.text);
+        return;
+      }
+      for (const element of name.elements) {
+        if (!ts.isOmittedExpression(element)) recordBindingName(element.name);
+      }
+    };
+    const collectInnerShadows = (node: ts.Node) => {
+      if (node !== inner && ts.isFunctionLike(node)) {
+        if (ts.isFunctionDeclaration(node) && node.name && protectedBindings.has(node.name.text)) {
+          innerShadows.add(node.name.text);
+        }
+        for (const parameter of node.parameters) recordBindingName(parameter.name);
+        return;
+      }
+      if (node !== inner && ts.isClassDeclaration(node) && node.name) {
+        if (protectedBindings.has(node.name.text)) innerShadows.add(node.name.text);
+        return;
+      }
+      if (ts.isVariableDeclaration(node)) recordBindingName(node.name);
+      if (ts.isParameter(node)) recordBindingName(node.name);
+      if (ts.isCatchClause(node) && node.variableDeclaration) {
+        recordBindingName(node.variableDeclaration.name);
+      }
+      ts.forEachChild(node, collectInnerShadows);
+    };
+    collectInnerShadows(inner);
+
+    const canonicalFileFunction = (name: string) => {
+      const bindings = fileBindings.get(name) ?? [];
+      return bindings.length === 1
+        && ts.isFunctionDeclaration(bindings[0]!)
+        && !innerShadows.has(name);
+    };
+    const canonicalFileVariable = (name: string) => {
+      const bindings = fileBindings.get(name) ?? [];
+      return bindings.length === 1
+        && ts.isVariableDeclaration(bindings[0]!)
+        && !innerShadows.has(name);
+    };
+    const canonicalImport = (name: string, moduleName: string) => {
+      const bindings = fileBindings.get(name) ?? [];
+      if (bindings.length !== 1 || !ts.isImportSpecifier(bindings[0]!) || innerShadows.has(name)) {
+        return false;
+      }
+      const specifier = bindings[0]! as ts.ImportSpecifier;
+      const importDeclaration = specifier.parent.parent.parent;
+      return (!specifier.propertyName || specifier.propertyName.text === name)
+        && specifier.name.text === name
+        && ts.isImportDeclaration(importDeclaration)
+        && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+        && importDeclaration.moduleSpecifier.text === moduleName;
+    };
+    const canonicalGlobal = (name: string) => (
+      (fileBindings.get(name) ?? []).length === 0 && !innerShadows.has(name)
+    );
+    const canonicalHelpers = Object.freeze({
+      sourceBinding: canonicalFileFunction('sourceBinding'),
+      buildDestinationFillPlan: canonicalImport('buildDestinationFillPlan', './destination-adapters'),
+      reconcileLifecycle: canonicalFileFunction('reconcileLifecycle'),
+      writeSessionState: canonicalFileFunction('writeSessionState'),
+      newOpaque: canonicalFileFunction('newOpaque'),
+      nextOperationDeadline: canonicalFileFunction('nextOperationDeadline'),
+      makePreviewPlan: canonicalFileFunction('makePreviewPlan'),
+      objectFreeze: canonicalGlobal('Object'),
+      date: canonicalGlobal('Date'),
+      sessionSchema: canonicalFileVariable('SESSION_STATE_SCHEMA'),
+    });
+    if (!canonicalHelpers.objectFreeze) {
+      report('Object.freeze intrinsic is shadowed or noncanonical');
+    }
+
     const directFrozenObject = (expression: ts.Expression | undefined) => {
       if (
         !expression
+        || !canonicalHelpers.objectFreeze
         || !ts.isCallExpression(expression)
         || expression.arguments.length !== 1
         || !ts.isPropertyAccessExpression(expression.expression)
@@ -905,20 +1064,6 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         || !ts.isObjectLiteralExpression(expression.arguments[0]!)
       ) return null;
       return expression.arguments[0]!;
-    };
-    const ordinaryPropertyExpression = (
-      object: ts.ObjectLiteralExpression | null,
-      key: string,
-    ): ts.Expression | null => {
-      if (!object) return null;
-      const properties = object.properties.filter((property) => (
-        property.name && ts.isIdentifier(property.name) && property.name.text === key
-      ));
-      if (properties.length !== 1) return null;
-      const property = properties[0]!;
-      if (ts.isPropertyAssignment(property)) return property.initializer;
-      if (ts.isShorthandPropertyAssignment(property)) return property.name;
-      return null;
     };
     const exactObjectEntries = (
       object: ts.ObjectLiteralExpression | null,
@@ -965,7 +1110,32 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         && JSON.stringify(path.members) === JSON.stringify(members),
       );
     };
-    const isStagedRoleDeclaration = (declaration: ts.VariableDeclaration | null) => {
+    const directCall = (
+      expression: ts.Expression | undefined,
+      name: string,
+      canonical: boolean,
+    ): ts.CallExpression | null => (
+      canonical
+      && expression
+      && ts.isCallExpression(expression)
+      && ts.isIdentifier(expression.expression)
+      && expression.expression.text === name
+        ? expression
+        : null
+    );
+    const directAwaitedCall = (
+      expression: ts.Expression | undefined,
+      name: string,
+      canonical: boolean,
+    ) => (
+      expression && ts.isAwaitExpression(expression)
+        ? directCall(expression.expression, name, canonical)
+        : null
+    );
+    const isStagedRoleDeclaration = (
+      declaration: ts.VariableDeclaration | null,
+      lifecycleDeclaration: ts.VariableDeclaration | null,
+    ) => {
       if (!declaration?.initializer || !ts.isConditionalExpression(declaration.initializer)) return false;
       const conditional = declaration.initializer;
       const condition = conditional.condition;
@@ -981,11 +1151,216 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       return Boolean(
         conditionPath
         && selectedPath
-        && conditionPath.root.text === selectedPath.root.text
+        && lifecycleDeclaration
+        && declarationForIdentifier(conditionPath.root) === lifecycleDeclaration
+        && declarationForIdentifier(selectedPath.root) === lifecycleDeclaration
         && JSON.stringify(conditionPath.members) === JSON.stringify(['session', 'state'])
         && JSON.stringify(selectedPath.members) === JSON.stringify(['session']),
       );
     };
+
+    const allInnerDeclarations = [...innerBindings.values()].flat();
+    const lifecycleCandidates = allInnerDeclarations.filter((declaration) => {
+      const call = directAwaitedCall(
+        declaration.initializer,
+        'reconcileLifecycle',
+        canonicalHelpers.reconcileLifecycle,
+      );
+      return call?.arguments.length === 0;
+    });
+    const lifecycleDeclaration = lifecycleCandidates.length === 1 ? lifecycleCandidates[0]! : null;
+    const stagedCandidates = allInnerDeclarations.filter((declaration) => (
+      isStagedRoleDeclaration(declaration, lifecycleDeclaration)
+    ));
+    const stagedDeclaration = stagedCandidates.length === 1 ? stagedCandidates[0]! : null;
+    if (!lifecycleDeclaration || !stagedDeclaration) {
+      report('inner staged root has an invalid canonical lifecycle origin');
+    }
+
+    const sourceBindingDeclaration = declarationFor(innerReturn.get('sourceAuthorization'));
+    const sourceBindingCall = directCall(
+      sourceBindingDeclaration?.initializer,
+      'sourceBinding',
+      canonicalHelpers.sourceBinding,
+    );
+    const sourceBindingArgument = sourceBindingCall?.arguments.length === 1
+      && ts.isIdentifier(sourceBindingCall.arguments[0]!)
+      ? sourceBindingCall.arguments[0]
+      : null;
+    const sourceAuthorizationValid = Boolean(
+      sourceBindingDeclaration?.type?.getText(file) === 'SourcePreviewBindingV1'
+      && sourceBindingCall
+      && sourceBindingArgument
+      && declarationForIdentifier(sourceBindingArgument) === stagedDeclaration,
+    );
+    if (!canonicalHelpers.sourceBinding) {
+      report('inner sourceAuthorization helper is shadowed or noncanonical');
+    }
+    if (!sourceAuthorizationValid) {
+      report('inner sourceAuthorization has an invalid staged origin');
+    }
+
+    const importedAtDeclaration = declarationFor(innerReturn.get('sourceImportedAtMs'));
+    if (!exactDeclarationPath(
+      importedAtDeclaration?.initializer,
+      sourceAuthorizationValid ? stagedDeclaration : null,
+      ['importedAtMs'],
+    )) report('inner sourceImportedAtMs has an invalid staged origin');
+
+    const previewPlanCandidates = allInnerDeclarations.filter((declaration) => {
+      const call = directCall(
+        declaration.initializer,
+        'makePreviewPlan',
+        canonicalHelpers.makePreviewPlan,
+      );
+      return Boolean(
+        call
+        && call.arguments.length === 2
+        && exactDeclarationPath(call.arguments[0], stagedDeclaration, ['envelope'])
+        && exactDeclarationPath(call.arguments[1], stagedDeclaration, ['effectiveExpiresAtMs']),
+      );
+    });
+    const previewPlanDeclaration = previewPlanCandidates.length === 1 ? previewPlanCandidates[0]! : null;
+    const attemptedAtCandidates = allInnerDeclarations.filter((declaration) => {
+      if (!canonicalHelpers.date || !declaration.initializer || !ts.isCallExpression(declaration.initializer)) {
+        return false;
+      }
+      const call = declaration.initializer;
+      return call.arguments.length === 0
+        && ts.isPropertyAccessExpression(call.expression)
+        && !call.expression.questionDotToken
+        && ts.isIdentifier(call.expression.expression)
+        && call.expression.expression.text === 'Date'
+        && call.expression.name.text === 'now';
+    });
+    const attemptedAtDeclaration = attemptedAtCandidates.length === 1 ? attemptedAtCandidates[0]! : null;
+    const adapterExpiryCandidates = allInnerDeclarations.filter((declaration) => {
+      if (!canonicalHelpers.date || !declaration.initializer || !ts.isCallExpression(declaration.initializer)) {
+        return false;
+      }
+      const call = declaration.initializer;
+      return call.arguments.length === 1
+        && ts.isPropertyAccessExpression(call.expression)
+        && !call.expression.questionDotToken
+        && ts.isIdentifier(call.expression.expression)
+        && call.expression.expression.text === 'Date'
+        && call.expression.name.text === 'parse'
+        && exactDeclarationPath(call.arguments[0], previewPlanDeclaration, ['adapter', 'expiresAt']);
+    });
+    const adapterExpiryDeclaration = adapterExpiryCandidates.length === 1
+      ? adapterExpiryCandidates[0]!
+      : null;
+
+    const attemptDeadlineCandidates = allInnerDeclarations.filter((declaration) => {
+      const call = directCall(
+        declaration.initializer,
+        'nextOperationDeadline',
+        canonicalHelpers.nextOperationDeadline,
+      );
+      return Boolean(
+        call
+        && call.arguments.length === 3
+        && declarationFor(call.arguments[0]) === attemptedAtDeclaration
+        && exactDeclarationPath(call.arguments[1], stagedDeclaration, ['effectiveExpiresAtMs'])
+        && declarationFor(call.arguments[2]) === adapterExpiryDeclaration,
+      );
+    });
+    const attemptDeadlineDeclaration = attemptDeadlineCandidates.length === 1
+      ? attemptDeadlineCandidates[0]!
+      : null;
+    if (!attemptDeadlineDeclaration) {
+      report('inner attemptNotAfterMs has an invalid canonical origin');
+    }
+
+    const exactArray = (expression: ts.Expression | undefined, length: number) => (
+      expression && ts.isArrayLiteralExpression(expression) && expression.elements.length === length
+        ? expression
+        : null
+    );
+    const nonceCandidates = allInnerDeclarations.filter((declaration) => {
+      const call = directCall(declaration.initializer, 'newOpaque', canonicalHelpers.newOpaque);
+      const exclusions = exactArray(call?.arguments.length === 1 ? call.arguments[0] : undefined, 2);
+      return Boolean(
+        exclusions
+        && exactDeclarationPath(exclusions.elements[0], stagedDeclaration, ['generation'])
+        && exactDeclarationPath(exclusions.elements[1], stagedDeclaration, ['envelope', 'packId']),
+      );
+    });
+    const nonceDeclaration = nonceCandidates.length === 1 ? nonceCandidates[0]! : null;
+    if (!nonceDeclaration) report('inner armNonce has an invalid canonical origin');
+
+    const attemptIdCandidates = allInnerDeclarations.filter((declaration) => {
+      const call = directCall(declaration.initializer, 'newOpaque', canonicalHelpers.newOpaque);
+      const exclusions = exactArray(call?.arguments.length === 1 ? call.arguments[0] : undefined, 3);
+      const nonceFallback = exclusions?.elements[2];
+      return Boolean(
+        exclusions
+        && exactDeclarationPath(exclusions.elements[0], stagedDeclaration, ['generation'])
+        && exactDeclarationPath(exclusions.elements[1], stagedDeclaration, ['envelope', 'packId'])
+        && nonceFallback
+        && ts.isBinaryExpression(nonceFallback)
+        && nonceFallback.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+        && declarationFor(nonceFallback.left) === nonceDeclaration
+        && ts.isStringLiteral(nonceFallback.right)
+        && nonceFallback.right.text === '',
+      );
+    });
+    const attemptIdDeclaration = attemptIdCandidates.length === 1 ? attemptIdCandidates[0]! : null;
+    if (!attemptIdDeclaration) report('inner attemptId has an invalid canonical origin');
+
+    const armingKeys = [
+      'schema', 'state', 'generation', 'envelope', 'importedAtMs', 'effectiveExpiresAtMs',
+      'sourceTabId', 'sourceDocumentId', 'destination', 'armNonce', 'attemptId', 'replayUntil',
+      'attemptNotAfterMs',
+    ] as const;
+    const armingCandidates = allInnerDeclarations.filter((declaration) => (
+      declaration.type?.getText(file) === 'ArmingSessionStateV1'
+      && directFrozenObject(declaration.initializer)
+    ));
+    const armingDeclaration = armingCandidates.length === 1 ? armingCandidates[0]! : null;
+    const armingEntries = exactObjectEntries(
+      directFrozenObject(armingDeclaration?.initializer),
+      armingKeys,
+      true,
+    );
+    const armingOrigins: Readonly<Record<typeof armingKeys[number], boolean>> = Object.freeze({
+      schema: Boolean(
+        canonicalHelpers.sessionSchema
+        && armingEntries?.get('schema')
+        && ts.isIdentifier(armingEntries.get('schema')!)
+        && (armingEntries.get('schema') as ts.Identifier).text === 'SESSION_STATE_SCHEMA',
+      ),
+      state: Boolean(
+        armingEntries?.get('state')
+        && ts.isStringLiteral(armingEntries.get('state')!)
+        && (armingEntries.get('state') as ts.StringLiteral).text === 'arming',
+      ),
+      generation: exactDeclarationPath(armingEntries?.get('generation'), stagedDeclaration, ['generation']),
+      envelope: exactDeclarationPath(armingEntries?.get('envelope'), stagedDeclaration, ['envelope']),
+      importedAtMs: exactDeclarationPath(
+        armingEntries?.get('importedAtMs'), stagedDeclaration, ['importedAtMs'],
+      ),
+      effectiveExpiresAtMs: exactDeclarationPath(
+        armingEntries?.get('effectiveExpiresAtMs'), stagedDeclaration, ['effectiveExpiresAtMs'],
+      ),
+      sourceTabId: exactDeclarationPath(armingEntries?.get('sourceTabId'), stagedDeclaration, ['sourceTabId']),
+      sourceDocumentId: exactDeclarationPath(
+        armingEntries?.get('sourceDocumentId'), stagedDeclaration, ['sourceDocumentId'],
+      ),
+      destination: exactDeclarationPath(
+        armingEntries?.get('destination'), stagedDeclaration, ['destination'],
+      ),
+      armNonce: declarationFor(armingEntries?.get('armNonce')) === nonceDeclaration,
+      attemptId: declarationFor(armingEntries?.get('attemptId')) === attemptIdDeclaration,
+      replayUntil: exactDeclarationPath(
+        armingEntries?.get('replayUntil'), stagedDeclaration, ['effectiveExpiresAtMs'],
+      ),
+      attemptNotAfterMs: declarationFor(armingEntries?.get('attemptNotAfterMs'))
+        === attemptDeadlineDeclaration,
+    });
+    if (!armingEntries || armingKeys.some((key) => !armingOrigins[key])) {
+      report('inner arming object has invalid durable shape or origins');
+    }
 
     const consumingDeclaration = declarationFor(innerReturn.get('consuming')!);
     const consumingKeys = [
@@ -997,21 +1372,10 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       consumingKeys,
       false,
     );
-
-    const allInnerDeclarations = [...innerBindings.values()].flat();
-    const armingCandidates = allInnerDeclarations.filter((declaration) => {
-      if (declaration.type?.getText(file) !== 'ArmingSessionStateV1') return false;
-      const armingObject = directFrozenObject(declaration.initializer);
-      const state = ordinaryPropertyExpression(armingObject, 'state');
-      return Boolean(state && ts.isStringLiteral(state) && state.text === 'arming');
-    });
-    const armingDeclaration = armingCandidates.length === 1 ? armingCandidates[0]! : null;
-    const armingObject = directFrozenObject(armingDeclaration?.initializer);
-    if (!armingDeclaration) report('inner arming root must resolve uniquely by declaration role');
-
     const consumingOrigins: Readonly<Record<typeof consumingKeys[number], boolean>> = Object.freeze({
       schema: Boolean(
-        consumingEntries?.get('schema')
+        canonicalHelpers.sessionSchema
+        && consumingEntries?.get('schema')
         && ts.isIdentifier(consumingEntries.get('schema')!)
         && (consumingEntries.get('schema') as ts.Identifier).text === 'SESSION_STATE_SCHEMA',
       ),
@@ -1051,36 +1415,23 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       }
     }
 
-    const sourceBindingDeclaration = declarationFor(innerReturn.get('sourceAuthorization'));
-    const sourceBindingCall = sourceBindingDeclaration?.initializer
-      && ts.isCallExpression(sourceBindingDeclaration.initializer)
-      ? sourceBindingDeclaration.initializer
-      : null;
-    const sourceBindingArgument = sourceBindingCall?.arguments.length === 1
-      && ts.isIdentifier(sourceBindingCall.arguments[0]!)
-      ? sourceBindingCall.arguments[0]
-      : null;
-    const stagedDeclaration = sourceBindingArgument
-      ? declarationForIdentifier(sourceBindingArgument)
-      : null;
-    const sourceAuthorizationValid = Boolean(
-      sourceBindingDeclaration?.type?.getText(file) === 'SourcePreviewBindingV1'
-      && sourceBindingCall
-      && ts.isIdentifier(sourceBindingCall.expression)
-      && sourceBindingCall.expression.text === 'sourceBinding'
-      && sourceBindingArgument
-      && isStagedRoleDeclaration(stagedDeclaration),
+    const canonicalWriteTargets = (target: ts.VariableDeclaration | null) => allInnerDeclarations.filter(
+      (declaration) => {
+        const call = directAwaitedCall(
+          declaration.initializer,
+          'writeSessionState',
+          canonicalHelpers.writeSessionState,
+        );
+        return call?.arguments.length === 1
+          && ts.isIdentifier(call.arguments[0]!)
+          && declarationForIdentifier(call.arguments[0]!) === target;
+      },
     );
-    if (!sourceAuthorizationValid) {
-      report('inner sourceAuthorization has an invalid staged origin');
-    }
-
-    const importedAtDeclaration = declarationFor(innerReturn.get('sourceImportedAtMs'));
-    if (!exactDeclarationPath(
-      importedAtDeclaration?.initializer,
-      sourceAuthorizationValid ? stagedDeclaration : null,
-      ['importedAtMs'],
-    )) report('inner sourceImportedAtMs has an invalid staged origin');
+    if (
+      !canonicalHelpers.writeSessionState
+      || canonicalWriteTargets(armingDeclaration).length !== 1
+      || canonicalWriteTargets(consumingDeclaration).length !== 1
+    ) report('inner session write helper is shadowed or noncanonical');
 
     const fillPlan = innerReturn.get('fillPlan')!;
     const fillPlanRoot = ts.isPropertyAccessExpression(fillPlan)
@@ -1089,9 +1440,11 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       && ts.isIdentifier(fillPlan.expression)
       ? declarationForIdentifier(fillPlan.expression)
       : null;
-    const fillPlanCall = fillPlanRoot?.initializer && ts.isCallExpression(fillPlanRoot.initializer)
-      ? fillPlanRoot.initializer
-      : null;
+    const fillPlanCall = directCall(
+      fillPlanRoot?.initializer,
+      'buildDestinationFillPlan',
+      canonicalHelpers.buildDestinationFillPlan,
+    );
     const fillPlanInputs = exactObjectEntries(
       fillPlanCall?.arguments.length === 1 && ts.isObjectLiteralExpression(fillPlanCall.arguments[0]!)
         ? fillPlanCall.arguments[0]!
@@ -1101,10 +1454,11 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     );
     const fillPlanShapeValid = Boolean(
       fillPlanCall
-      && ts.isIdentifier(fillPlanCall.expression)
-      && fillPlanCall.expression.text === 'buildDestinationFillPlan'
       && fillPlanInputs,
     );
+    if (!canonicalHelpers.buildDestinationFillPlan) {
+      report('inner fillPlan helper is shadowed or noncanonical');
+    }
     if (!fillPlanShapeValid) report('inner fillPlan must originate from the closed fill-plan builder');
     if (
       !fillPlanShapeValid
@@ -1118,16 +1472,12 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       )
     ) report('inner fillPlan has invalid staged inputs');
 
-    const armingAttemptId = declarationFor(ordinaryPropertyExpression(armingObject, 'attemptId') ?? undefined);
-    const armingAttemptDeadline = declarationFor(
-      ordinaryPropertyExpression(armingObject, 'attemptNotAfterMs') ?? undefined,
-    );
     if (
       !fillPlanShapeValid
-      || !armingAttemptId
-      || !armingAttemptDeadline
-      || declarationFor(fillPlanInputs?.get('attemptId')) !== armingAttemptId
-      || declarationFor(fillPlanInputs?.get('operationNotAfterMs')) !== armingAttemptDeadline
+      || !attemptIdDeclaration
+      || !attemptDeadlineDeclaration
+      || declarationFor(fillPlanInputs?.get('attemptId')) !== attemptIdDeclaration
+      || declarationFor(fillPlanInputs?.get('operationNotAfterMs')) !== attemptDeadlineDeclaration
     ) report('inner fillPlan has invalid attempt inputs');
   }
 
@@ -1374,7 +1724,7 @@ describe('serialized handoff lifecycle', () => {
       expect(mutated, `${label} insertion anchor`).not.toBe(input);
       return mutated;
     };
-    const analyzeMutation = (mutated: string, label: string) => {
+    const analyzeMutation = (mutated: string, label: string, typecheck = false) => {
       const parsed = ts.createSourceFile(
         `${label}.mutation.ts`,
         mutated,
@@ -1386,6 +1736,12 @@ describe('serialized handoff lifecycle', () => {
         readonly parseDiagnostics: readonly ts.Diagnostic[];
       }).parseDiagnostics;
       expect.soft(diagnostics, `${label} parse diagnostics`).toEqual([]);
+      if (typecheck) {
+        expect.soft(
+          serviceWorkerProgramDiagnostics(mutated),
+          `${label} extension-program diagnostics`,
+        ).toEqual([]);
+      }
       return analyzePayloadFreeFillPreparation(mutated);
     };
 
@@ -1527,6 +1883,189 @@ describe('serialized handoff lifecycle', () => {
     expect.soft(
       analyzeMutation(alternateFillAttemptInputsMutation, 'alternate fill-plan attempt inputs'),
     ).toContain('inner fillPlan has invalid attempt inputs');
+
+    const computedArmingOverrideMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        '  const arming: ArmingSessionStateV1 = Object.freeze({',
+        [
+          "  const computedAttemptKey = ['attempt', 'Id'].join('');",
+          '  const arming: ArmingSessionStateV1 = Object.freeze({',
+        ].join('\n'),
+        'computed spread arming key',
+      ),
+      [
+        '    attemptId,',
+        '    replayUntil: staged.effectiveExpiresAtMs,',
+      ].join('\n'),
+      [
+        '    attemptId,',
+        '    ...{ [computedAttemptKey]: staged.envelope.resultRevisionId },',
+        '    replayUntil: staged.effectiveExpiresAtMs,',
+      ].join('\n'),
+      'computed spread arming override',
+    );
+    expect.soft(
+      analyzeMutation(computedArmingOverrideMutation, 'computed spread arming override', true),
+    ).toContain('inner arming object has invalid durable shape or origins');
+
+    const alternateLifecycleMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        [
+          "): Promise<WorkerResponseV1 | PreparedFillDispatch> {",
+          '  const lifecycle = await reconcileLifecycle();',
+          '  const blocker = fixedBlocker(request.command, lifecycle);',
+        ].join('\n'),
+        [
+          "): Promise<WorkerResponseV1 | PreparedFillDispatch> {",
+          '  const lifecycle = await reconcileLifecycle();',
+          '  const alternateLifecycle = await reconcileLifecycle();',
+          "  if (alternateLifecycle.status !== 'ready') {",
+          "    return buildFixedWorkerResponse(request.command, 'quarantined');",
+          '  }',
+          '  const blocker = fixedBlocker(request.command, lifecycle);',
+        ].join('\n'),
+        'alternate lifecycle declaration',
+      ),
+      "  const staged = lifecycle.session?.state === 'staged' ? lifecycle.session : null;",
+      [
+        "  const staged = alternateLifecycle.session?.state === 'staged'",
+        '    ? alternateLifecycle.session',
+        '    : null;',
+      ].join('\n'),
+      'alternate lifecycle staged root',
+    );
+    expect.soft(
+      analyzeMutation(alternateLifecycleMutation, 'alternate lifecycle staged root', true),
+    ).toContain('inner staged root has an invalid canonical lifecycle origin');
+
+    const sourceBindingShadowMutation = replaceExactlyOnce(
+      source,
+      '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+      [
+        '  function sourceBinding(',
+        '    session: StagedSessionStateV1 | ArmingSessionStateV1,',
+        '  ): SourcePreviewBindingV1 {',
+        '    return Object.freeze({',
+        "      schema: 'challansakshi.source-preview-binding/v1',",
+        '      sourceTabId: session.sourceTabId,',
+        '      sourceDocumentId: session.sourceDocumentId,',
+        '      canonicalEnvelopeDigest: digestCanonicalExtensionHandoffEnvelopeCore(session.envelope),',
+        '      previewNotAfterMs: Date.parse(session.envelope.expiresAt),',
+        '    });',
+        '  }',
+        '  const sourceAuthorization: SourcePreviewBindingV1 = sourceBinding(staged);',
+      ].join('\n'),
+      'local sourceBinding shadow',
+    );
+    expect.soft(
+      analyzeMutation(sourceBindingShadowMutation, 'local sourceBinding shadow', true),
+    ).toContain('inner sourceAuthorization helper is shadowed or noncanonical');
+
+    const fillBuilderShadowMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        '  const fillBuilt = buildDestinationFillPlan({',
+        [
+          '  const canonicalFillPlanBuilder = buildDestinationFillPlan;',
+          '  {',
+          '    const buildDestinationFillPlan = canonicalFillPlanBuilder;',
+          '    const fillBuilt = buildDestinationFillPlan({',
+        ].join('\n'),
+        'local fill-plan builder shadow declaration',
+      ),
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
+      [
+        '    sourceImportedAtMs,',
+        '  });',
+        '  }',
+        '}',
+        '',
+        'async function prepareFillDispatch(',
+      ].join('\n'),
+      'local fill-plan builder shadow scope',
+    );
+    expect.soft(
+      analyzeMutation(fillBuilderShadowMutation, 'local fill-plan builder shadow', true),
+    ).toContain('inner fillPlan helper is shadowed or noncanonical');
+
+    const sessionWriterShadowMutation = replaceExactlyOnce(
+      replaceExactlyOnce(
+        source,
+        '  const arming: ArmingSessionStateV1 = Object.freeze({',
+        [
+          '  const canonicalSessionWriter = writeSessionState;',
+          '  {',
+          '    const writeSessionState = canonicalSessionWriter;',
+          '    const arming: ArmingSessionStateV1 = Object.freeze({',
+        ].join('\n'),
+        'local session writer shadow declaration',
+      ),
+      '    sourceImportedAtMs,\n  });\n}\n\nasync function prepareFillDispatch(',
+      [
+        '    sourceImportedAtMs,',
+        '  });',
+        '  }',
+        '}',
+        '',
+        'async function prepareFillDispatch(',
+      ].join('\n'),
+      'local session writer shadow scope',
+    );
+    expect.soft(
+      analyzeMutation(sessionWriterShadowMutation, 'local session writer shadow', true),
+    ).toContain('inner session write helper is shadowed or noncanonical');
+
+    for (const [label, anchor, replacement, diagnostic] of [
+      [
+        'nonce input substitution',
+        '  const armNonce = newOpaque([staged.generation, staged.envelope.packId]);',
+        '  const armNonce = newOpaque([staged.envelope.packId, staged.generation]);',
+        'inner armNonce has an invalid canonical origin',
+      ],
+      [
+        'attempt ID input substitution',
+        "  const attemptId = newOpaque([staged.generation, staged.envelope.packId, armNonce ?? '']);",
+        '  const attemptId = newOpaque([staged.generation, staged.envelope.packId, staged.generation]);',
+        'inner attemptId has an invalid canonical origin',
+      ],
+      [
+        'attempt deadline input substitution',
+        [
+          '  const attemptNotAfterMs = nextOperationDeadline(',
+          '    attemptedAtMs,',
+          '    staged.effectiveExpiresAtMs,',
+          '    adapterExpiresAtMs,',
+          '  );',
+        ].join('\n'),
+        [
+          '  const attemptNotAfterMs = nextOperationDeadline(',
+          '    adapterExpiresAtMs,',
+          '    staged.effectiveExpiresAtMs,',
+          '    attemptedAtMs,',
+          '  );',
+        ].join('\n'),
+        'inner attemptNotAfterMs has an invalid canonical origin',
+      ],
+    ] as const) {
+      const generatedOriginMutation = replaceExactlyOnce(source, anchor, replacement, label);
+      expect.soft(analyzeMutation(generatedOriginMutation, label, true), label).toContain(diagnostic);
+    }
+
+    const objectShadowMutation = replaceExactlyOnce(
+      source,
+      "declare const __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__:",
+      [
+        'const Object = globalThis.Object;',
+        '',
+        "declare const __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__:",
+      ].join('\n'),
+      'file-scope Object shadow',
+    );
+    expect.soft(analyzeMutation(objectShadowMutation, 'file-scope Object shadow', true)).toContain(
+      'Object.freeze intrinsic is shadowed or noncanonical',
+    );
 
     const renamedAliasMutation = replaceExactlyOnce(
       source,
@@ -1795,7 +2334,7 @@ describe('serialized handoff lifecycle', () => {
       visit(statement);
     }
     expect(forbiddenAwaits).toEqual([]);
-  });
+  }, 30_000);
 
   it('requires an exact own-data source tab URL before the source probe', async () => {
     const harness = makeChromeHarness();
