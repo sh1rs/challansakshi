@@ -64,6 +64,7 @@ type StorageFailure =
   | 'read'
   | 'write'
   | 'readback'
+  | 'missing-readback'
   | 'invalid-readback'
   | 'mismatched-readback'
   | null;
@@ -86,6 +87,7 @@ function makeLocalStorage(initial: unknown = undefined, failure: StorageFailure 
       if (failure === 'invalid-readback' && readCount > 1) {
         return { [EXTENSION_SAFETY_LEDGER_KEY]: { schema: 'invalid', records: [] } };
       }
+      if (failure === 'missing-readback') return {};
       if (failure === 'mismatched-readback' && readCount > 1) {
         return { [EXTENSION_SAFETY_LEDGER_KEY]: emptyLedger() };
       }
@@ -94,6 +96,7 @@ function makeLocalStorage(initial: unknown = undefined, failure: StorageFailure 
     async set(items: Record<string, unknown>) {
       calls.push(['set', items]);
       if (failure === 'write') throw new Error('private platform detail');
+      if (failure === 'missing-readback') return;
       stored = JSON.parse(JSON.stringify(items[EXTENSION_SAFETY_LEDGER_KEY]));
     },
     async remove(key: unknown) {
@@ -302,6 +305,21 @@ describe('raw trusted-context local I/O', () => {
     expect(result).toEqual({ status: 'unavailable', reason });
     expect(local.calls.filter(([operation]) => operation === 'set')).toHaveLength(1);
     expect(local.calls.some(([operation]) => operation === 'remove' || operation === 'clear')).toBe(false);
+    expect(JSON.stringify(result)).not.toContain('private platform detail');
+  });
+
+  it('rejects missing exact-key readback after writing canonical empty state', async () => {
+    local = makeLocalStorage(warning(), 'missing-readback');
+    vi.stubGlobal('chrome', { storage: { local: local.api } });
+    const result = await acknowledgeNeedsReview(
+      ready({ schema: SAFETY_LEDGER_SCHEMA, records: [warning()] }),
+      { packId: PACK_A, replayUntil: REPLAY_UNTIL, warningExpiresAt: WARNING_EXPIRES_AT },
+      REPLAY_UNTIL,
+    );
+    expect(result).toEqual({ status: 'unavailable', reason: 'readback-invalid' });
+    expect(local.calls.map(([operation]) => operation)).toEqual([
+      'set', 'get',
+    ]);
     expect(JSON.stringify(result)).not.toContain('private platform detail');
   });
 });
