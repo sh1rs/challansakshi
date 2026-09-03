@@ -13,6 +13,7 @@ export default defineConfig({
       sourceRegistry: testProfile.sourceRegistry,
       envelopeValidationAuthority: testProfile.envelopeValidationAuthority,
     }),
+    __CHALLANSAKSHI_EXTENSION_VISIBLE_ENVIRONMENT_LABEL__: JSON.stringify(testProfile.visibleEnvironmentLabel),
   },
   test: {
     environment: 'node',

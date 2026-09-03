@@ -9,9 +9,52 @@
   </head>
   <body>
     <main>
-      <h1>ChallanSakshi Assisted Handoff</h1>
-      <p id="extension-environment">Internal extension scaffold</p>
-      <p>This scaffold does not read a page or fill any field.</p>
+      <header class="product-identity">
+        <h1>ChallanSakshi Assisted Handoff</h1>
+        <p class="product-identity-hindi" lang="hi">ChallanSakshi सहायक हस्तांतरण</p>
+        <p id="extension-environment" class="environment-label"></p>
+        <p class="independence">
+          <span lang="en">Independent helper · Not a government service</span>
+          <span lang="hi">स्वतंत्र सहायक · सरकारी सेवा नहीं</span>
+        </p>
+      </header>
+      <section id="state-root" class="state-root">
+        <h2 id="state-heading" tabindex="-1">
+          <span lang="en">Before this popup looks at anything</span>
+          <span lang="hi">इससे पहले कि यह पॉपअप कुछ भी देखे</span>
+        </h2>
+        <p class="state-body">
+          <span lang="en">Continue asks this extension to check only the exact current page for ChallanSakshi handoff data. Until you continue, nothing is read.</span>
+          <span lang="hi">आगे बढ़ें दबाने पर यह एक्सटेंशन केवल वर्तमान पेज को ChallanSakshi हस्तांतरण डेटा के लिए जाँचता है। जब तक आप आगे नहीं बढ़ते, कुछ भी नहीं पढ़ा जाता।</span>
+        </p>
+        <p class="boundary-line">
+          <span lang="en">The affected person must inspect these fields and independently authenticate, declare, and submit</span>
+          <span lang="hi">प्रभावित व्यक्ति को इन फ़ील्डों की जाँच करनी होगी और स्वयं प्रमाणीकरण, घोषणा और सबमिट करना होगा</span>
+        </p>
+        <p class="boundary-line">
+          <span lang="en">The extension will not click or call Submit</span>
+          <span lang="hi">एक्सटेंशन Submit पर क्लिक नहीं करेगा और न ही Submit को कॉल करेगा</span>
+        </p>
+        <p class="boundary-line">
+          <span lang="en">Untouched: challan number, CAPTCHA, OTP, Aadhaar, payment, attachment, declaration, Submit</span>
+          <span lang="hi">इनको नहीं छुआ जाएगा: चालान नंबर, CAPTCHA, OTP, Aadhaar, भुगतान, अटैचमेंट, घोषणा, Submit</span>
+        </p>
+        <p class="fallback-line">
+          <span lang="en">Use the assisted-copy steps already shown on ChallanSakshi. This popup does not open a website or copy to the clipboard.</span>
+          <span lang="hi">ChallanSakshi पर पहले से दिखाए गए सहायक-कॉपी चरणों का उपयोग करें। यह पॉपअप कोई वेबसाइट नहीं खोलता और क्लिपबोर्ड पर कॉपी नहीं करता।</span>
+        </p>
+        <div class="action-row">
+          <button type="button" id="continue-action" class="action action-primary">
+            <span lang="en">Continue to preview this page</span>
+            <span lang="hi">इस पेज का पूर्वावलोकन देखने के लिए आगे बढ़ें</span>
+          </button>
+          <button type="button" id="not-now-action" class="action action-secondary">
+            <span lang="en">Not now</span>
+            <span lang="hi">अभी नहीं</span>
+          </button>
+        </div>
+      </section>
+      <div id="status-region" class="status-region" aria-live="polite" aria-atomic="true"></div>
     </main>
     <script type="module" src="virtual:challansakshi-popup.ts"></script>
   </body>

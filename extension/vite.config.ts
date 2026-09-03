@@ -73,6 +73,7 @@ export function createExtensionViteConfig(
     define: {
       __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__: JSON.stringify(profile.id),
       __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__: JSON.stringify(selectedSourceAuthority),
+      __CHALLANSAKSHI_EXTENSION_VISIBLE_ENVIRONMENT_LABEL__: JSON.stringify(profile.visibleEnvironmentLabel),
     },
     build: {
       target: `chrome${profile.minimumChromeVersion}`,
