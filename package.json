@@ -8,11 +8,21 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
+    "build:all": "vinext build && node extension/scripts/build.mjs production-disabled",
     "deploy:cloudflare": "vinext build && wrangler deploy --config dist/server/wrangler.json",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "extension:typecheck": "tsc -p extension/tsconfig.json --noEmit",
+    "extension:test": "vitest run --config extension/vitest.config.ts",
+    "extension:build:synthetic": "node extension/scripts/build.mjs synthetic-development",
+    "extension:build:production-disabled": "node extension/scripts/build.mjs production-disabled",
+    "extension:browser": "playwright test --config extension/playwright.config.ts --project=loaded-package-standalone",
+    "extension:browser:strict": "playwright test --config extension/playwright.config.ts --project=loaded-package-chromium-152-required",
+    "extension:scan": "node extension/scripts/package.mjs scan",
+    "extension:package": "node extension/scripts/package.mjs package",
+    "extension:verify": "tsc -p extension/tsconfig.json --noEmit && vitest run --config extension/vitest.config.ts && node extension/scripts/build.mjs synthetic-development && node extension/scripts/build.mjs production-disabled && node extension/scripts/package.mjs scan && playwright test --config extension/playwright.config.ts --project=loaded-package-chromium-152-required"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -22,21 +32,28 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "4.2.1",
+    "@types/chrome": "0.2.8",
+    "@types/jsdom": "30.0.0",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/yazl": "3.3.1",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "jsdom": "30.0.1",
     "react-server-dom-webpack": "19.2.6",
+    "sharp": "0.34.5",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.3",
     "vite": "8.0.13",
     "vitest": "^4.1.11",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "yazl": "3.3.1"
   },
   "type": "module"
 }

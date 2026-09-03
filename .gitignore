@@ -41,3 +41,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# generated extension artifacts
+/extension/dist/
+/extension/release/
+/extension/test-results/
+/extension/playwright-report/
+/extension/.playwright/
