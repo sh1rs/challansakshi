@@ -19,5 +19,9 @@ export default defineConfig({
     environment: 'node',
     include: ['extension/tests/**/*.test.ts'],
     passWithNoTests: false,
+    // Verification-discovered defect fix: manifest.test.ts and package.test.ts
+    // both spawn real builds into extension/dist/<profile>; parallel test files
+    // would race those writes, so extension test files run serially.
+    fileParallelism: false,
   },
 });
