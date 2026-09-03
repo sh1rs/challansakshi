@@ -9,6 +9,12 @@ import { getExtensionBuildProfile, type ExtensionBuildProfileId } from '../src/m
 import { probeChallanSakshiSource } from '../src/source-probe';
 import { probeProductionChallanSakshiSource } from '../src/source-probe-production';
 import { probeSyntheticChallanSakshiSource } from '../src/source-probe-synthetic';
+import {
+  buildDestinationFillPlan,
+  buildDestinationPreviewPlan,
+  selectedDestinationAdapterRegistry,
+} from '../src/destination-adapters';
+import { preflightOrFillDestination } from '../src/fill-page';
 
 const envelope = {
   schema: 'challansakshi.extension-handoff/v1',
@@ -147,6 +153,59 @@ globalThis.__challanSakshiProbeFixture = {
       body: string;
       plan: typeof plan;
       validatePreview: (envelope: unknown, context: unknown) => unknown;
+    }),
+    bundle: chunks[0]?.code ?? '',
+  };
+}
+
+async function buildSelectedDestinationFixture(profileId: ExtensionBuildProfileId) {
+  const virtualEntry = '\0challansakshi:destination-isolation-test';
+  const destinationPath = resolve(import.meta.dirname, '../src/destination-adapters.ts');
+  const baseConfig = createExtensionViteConfig(profileId, 'worker');
+  const result = await build({
+    ...baseConfig,
+    logLevel: 'silent',
+    plugins: [
+      {
+        name: 'challansakshi-destination-isolation-test',
+        resolveId(id) {
+          return id === 'virtual:destination-isolation-test' ? virtualEntry : null;
+        },
+        load(id) {
+          if (id !== virtualEntry) return null;
+          return `import {
+  buildDestinationPreviewPlan,
+  selectedDestinationAdapterRegistry,
+  selectedDestinationInjectedFunction,
+} from ${JSON.stringify(destinationPath)};
+globalThis.__challanSakshiDestinationFixture = {
+  registry: selectedDestinationAdapterRegistry,
+  hasInjectedFunction: typeof selectedDestinationInjectedFunction === 'function',
+  buildPreview: buildDestinationPreviewPlan,
+};`;
+        },
+      },
+      ...(baseConfig.plugins ?? []),
+    ],
+    build: {
+      ...baseConfig.build,
+      write: false,
+      rollupOptions: {
+        input: 'virtual:destination-isolation-test',
+        output: { format: 'iife' },
+      },
+    },
+  });
+  const output = (Array.isArray(result) ? result[0] : result) as NoWriteBuildOutput;
+  const chunks = output.output.filter((item) => item.type === 'chunk');
+  expect(chunks).toHaveLength(1);
+  const realm: Record<string, unknown> = { URL };
+  vm.runInNewContext(chunks[0]?.code ?? '', realm);
+  return {
+    ...(realm.__challanSakshiDestinationFixture as {
+      registry: readonly Record<string, unknown>[];
+      hasInjectedFunction: boolean;
+      buildPreview: (value: unknown) => unknown;
     }),
     bundle: chunks[0]?.code ?? '',
   };
@@ -318,5 +377,84 @@ describe('serialized injected source probe', () => {
       expect(source).not.toMatch(/getElementById|getElementsBy|querySelector\(/);
       expect(source.match(/document\.querySelectorAll/g)).toHaveLength(2);
     }
+  });
+});
+
+describe('serialized destination preflight and fill', () => {
+  it('tree-shakes the opposite destination family and preserves selected plan authority', async () => {
+    const syntheticFixture = await buildSelectedDestinationFixture('synthetic-development');
+    const productionFixture = await buildSelectedDestinationFixture('production-disabled');
+
+    expect(syntheticFixture.registry).toHaveLength(1);
+    expect(syntheticFixture.registry[0]?.adapterRevision).toBe('challansakshi.synthetic-destination/v1');
+    expect(syntheticFixture.hasInjectedFunction).toBe(true);
+    for (const forbidden of [
+      'echallan.parivahan.gov.in', 'echallan.parivahan.nic.in', '/gsticket', '/grievance',
+      'legacy-national-grievance', 'nextgen-national-grievance',
+    ]) expect(syntheticFixture.bundle, `synthetic destination bundle leaked ${forbidden}`).not.toContain(forbidden);
+
+    expect(productionFixture.registry).toHaveLength(2);
+    expect(productionFixture.registry.map((adapter) => adapter.id)).toEqual([
+      'legacy-national-grievance', 'nextgen-national-grievance',
+    ]);
+    expect(productionFixture.hasInjectedFunction).toBe(false);
+    for (const forbidden of [
+      '127.0.0.1', ':3000', '/demo/extension-fixture/source',
+      '/demo/extension-fixture/destination', 'synthetic-fixture',
+      'challansakshi-synthetic-destination-form', 'challansakshi-synthetic-category',
+      'challansakshi-synthetic-description', '4 Wheeler Challan On 2 Wheeler',
+      'challansakshi.destination-injection-plan/v1',
+    ]) expect(productionFixture.bundle, `production destination bundle leaked ${forbidden}`).not.toContain(forbidden);
+    expect(productionFixture.buildPreview({
+      envelope: { routeKey: 'legacy' },
+      effectiveExpiresAtMs: 1,
+      operationNotAfterMs: 1,
+    })).toMatchObject({ status: 'adapter-disabled' });
+  });
+
+  it('is self-contained, generic, and free of registry and Chrome authority', () => {
+    const source = Function.prototype.toString.call(preflightOrFillDestination);
+    expect(source).toContain('challansakshi.destination-injection-plan/v1');
+    expect(source).not.toMatch(/SYNTHETIC_EXTENSION_FIXTURE|selectedDestinationAdapterRegistry|getExtensionBuildProfile/);
+    expect(source).not.toMatch(/\bchrome\b|\bbrowser\b|executeScript|sendMessage|storage\./);
+    expect(source).not.toMatch(/fetch|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|cookie/);
+    expect(source).not.toMatch(/dispatchEvent|\.click\(|\.submit\(|requestSubmit|innerHTML|outerHTML|MutationObserver/);
+  });
+
+  it('reconstructs preview and fill from Function.prototype.toString with only DOM globals and JSON data', async () => {
+    const preview = buildDestinationPreviewPlan({
+      envelope,
+      effectiveExpiresAtMs: Date.now() + 60_000,
+      operationNotAfterMs: Date.now() + 30_000,
+    });
+    const fill = buildDestinationFillPlan({
+      envelope,
+      effectiveExpiresAtMs: Date.now() + 60_000,
+      operationNotAfterMs: Date.now() + 30_000,
+      attemptId: '00112233445566778899aabbccddeeff',
+    });
+    expect(preview.status).toBe('built');
+    expect(fill.status).toBe('built');
+    if (preview.status !== 'built' || fill.status !== 'built') return;
+
+    const fixture = selectedDestinationAdapterRegistry[0];
+    expect(fixture?.enabled).toBe(true);
+    const markup = '<!doctype html><body><form id="challansakshi-synthetic-destination-form" name="challansakshiSyntheticDestination" method="post" action="/demo/extension-fixture/destination" data-challansakshi-fixture-form="v1"><section data-challansakshi-fixture-container="category"><label for="challansakshi-synthetic-category">Fictional review category</label><select id="challansakshi-synthetic-category" name="syntheticCategory"><option value="">Choose a fictional category</option><option value="4 Wheeler Challan On 2 Wheeler">4 Wheeler Challan On 2 Wheeler</option></select></section><section data-challansakshi-fixture-container="description"><label for="challansakshi-synthetic-description">Fictional reviewed description</label><textarea id="challansakshi-synthetic-description" name="syntheticDescription" minlength="1" maxlength="500" required></textarea></section></form></body>';
+    const dom = new JSDOM(markup, {
+      url: 'http://127.0.0.1:3000/demo/extension-fixture/destination',
+      pretendToBeVisual: true,
+      runScripts: 'outside-only',
+    });
+    Object.defineProperty(dom.window.Element.prototype, 'getClientRects', {
+      configurable: true,
+      value: () => [{ width: 100, height: 20 }],
+    });
+    const implementation = dom.window.eval(`(${Function.prototype.toString.call(preflightOrFillDestination)})`) as (value: unknown) => Promise<unknown>;
+    await expect(implementation(dom.window.JSON.parse(JSON.stringify(preview.plan)) as unknown)).resolves.toMatchObject({
+      operation: 'preview', status: 'ready',
+    });
+    await expect(implementation(dom.window.JSON.parse(JSON.stringify(fill.plan)) as unknown)).resolves.toMatchObject({
+      operation: 'fill', status: 'complete',
+    });
   });
 });
