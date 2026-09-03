@@ -1,5 +1,6 @@
 import vm from 'node:vm';
 import { resolve } from 'node:path';
+import { TextEncoder } from 'node:util';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { build } from 'vite';
@@ -104,10 +105,24 @@ async function buildSelectedProbeFixture(profileId: ExtensionBuildProfileId) {
         },
         load(id) {
           if (id !== virtualEntry) return null;
-          return `import { createSourceProbePlan, probeChallanSakshiSource } from ${JSON.stringify(sourceProbePath)};
+          return `import {
+  createSourceProbePlan,
+  probeChallanSakshiSource,
+  validateSourcePreviewInjectionResult,
+  validateSourceReprobeInjectionResult,
+} from ${JSON.stringify(sourceProbePath)};
 globalThis.__challanSakshiProbeFixture = {
   body: Function.prototype.toString.call(probeChallanSakshiSource),
   plan: createSourceProbePlan(4102444800000),
+  validatePreview(envelope, context) {
+    return validateSourcePreviewInjectionResult(
+      [{ frameId: 0, documentId: 'document-A', result: {
+        status: 'accepted', envelope: JSON.parse(JSON.stringify(envelope)),
+      } }],
+      JSON.parse(JSON.stringify(context)),
+    );
+  },
+  validateSourceReprobeInjectionResult,
 };`;
         },
       },
@@ -125,10 +140,14 @@ globalThis.__challanSakshiProbeFixture = {
   const output = (Array.isArray(result) ? result[0] : result) as NoWriteBuildOutput;
   const chunks = output.output.filter((item) => item.type === 'chunk');
   expect(chunks).toHaveLength(1);
-  const realm: Record<string, unknown> = {};
+  const realm: Record<string, unknown> = { TextEncoder };
   vm.runInNewContext(chunks[0]?.code ?? '', realm);
   return {
-    ...(realm.__challanSakshiProbeFixture as { body: string; plan: typeof plan }),
+    ...(realm.__challanSakshiProbeFixture as {
+      body: string;
+      plan: typeof plan;
+      validatePreview: (envelope: unknown, context: unknown) => unknown;
+    }),
     bundle: chunks[0]?.code ?? '',
   };
 }
@@ -206,14 +225,65 @@ describe('serialized injected source probe', () => {
     expect(syntheticFixture.body).not.toContain('challansakshi.sh1rs.com');
     expect(productionFixture.body).toContain('challansakshi.sh1rs.com');
     expect(productionFixture.body).not.toContain('127.0.0.1');
-    expect(syntheticFixture.bundle).not.toContain('challansakshi.sh1rs.com');
-    expect(syntheticFixture.bundle).not.toContain('?goal=verify');
-    expect(productionFixture.bundle).not.toContain('127.0.0.1');
-    expect(productionFixture.bundle).not.toContain('/demo/extension-fixture/source');
+    for (const forbidden of [
+      'challansakshi.sh1rs.com',
+      '?goal=verify',
+      'echallan.parivahan.gov.in',
+      'echallan.parivahan.nic.in',
+      'traffic.delhipolice.gov.in',
+      'vcourts.gov.in',
+      '/gsticket',
+      '/grievance',
+      '/index/challan-services',
+      '/index/accused-challan',
+      '/challan/challan-services',
+      '/virtualcourt/index.php',
+      'legacy-national-grievance',
+      'nextgen-national-grievance',
+      'national-record-lookup',
+      'nextgen-service-landing',
+      'national-services-directory',
+      'virtual-courts',
+      'delhi-manual',
+      'production-disabled',
+      'production-candidate',
+    ]) {
+      expect(syntheticFixture.bundle, `synthetic bundle leaked ${forbidden}`).not.toContain(forbidden);
+    }
+    expect(syntheticFixture.bundle).not.toMatch(/["'`]real["'`]/);
+    expect(syntheticFixture.bundle).not.toMatch(/["'`]legacy["'`]/);
+    expect(syntheticFixture.bundle).not.toMatch(/["'`]nextgen["'`]/);
+    for (const forbidden of [
+      '127.0.0.1',
+      ':3000',
+      '/demo/extension-fixture/source',
+      '/demo/extension-fixture/destination',
+      'synthetic-development',
+    ]) {
+      expect(productionFixture.bundle, `production bundle leaked ${forbidden}`).not.toContain(forbidden);
+    }
+    expect(productionFixture.bundle).not.toMatch(/["'`]synthetic["'`]/);
+    expect(productionFixture.bundle).not.toMatch(/["'`]synthetic-fixture["'`]/);
     expect(syntheticFixture.plan.expectedLocation).toEqual(syntheticProfile?.sourceRegistry);
     expect(syntheticFixture.plan.expectedEnvelopeMode).toBe(syntheticProfile?.envelopeMode);
     expect(productionFixture.plan.expectedLocation).toEqual(productionProfile?.sourceRegistry);
     expect(productionFixture.plan.expectedEnvelopeMode).toBe(productionProfile?.envelopeMode);
+    expect(syntheticFixture.validatePreview(envelope, {
+      profile: 'synthetic-development', sourceTabId: 17,
+      nowMs: 1788422460000, importedAtMs: 1788422460000,
+    })).toMatchObject({ status: 'accepted' });
+    expect(syntheticFixture.validatePreview(productionEnvelope, {
+      profile: 'synthetic-development', sourceTabId: 17,
+      nowMs: 1788422460000, importedAtMs: 1788422460000,
+    })).toEqual({ status: 'rejected', reason: 'invalid-envelope' });
+    expect(productionFixture.validatePreview(productionEnvelope, {
+      profile: 'production-disabled', sourceTabId: 17,
+      nowMs: 1788422460000, importedAtMs: 1788422460000,
+    })).toMatchObject({ status: 'accepted' });
+    expect(productionFixture.validatePreview(envelope, {
+      profile: 'production-disabled', sourceTabId: 17,
+      nowMs: 1788422460000, importedAtMs: 1788422460000,
+    })).toEqual({ status: 'rejected', reason: 'invalid-envelope' });
   });
 
   it('reconstructs from Function.prototype.toString in a fresh realm with only DOM platform globals and JSON data', () => {

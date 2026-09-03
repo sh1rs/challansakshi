@@ -62,6 +62,7 @@ export function createExtensionViteConfig(
     profileId: profile.id,
     envelopeMode: profile.envelopeMode,
     sourceRegistry: profile.sourceRegistry,
+    envelopeValidationAuthority: profile.envelopeValidationAuthority,
   };
   return {
     configFile: false,

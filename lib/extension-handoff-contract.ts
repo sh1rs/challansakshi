@@ -1,26 +1,35 @@
 import { OFFICIAL_ROUTE_REGISTRY_VERSION } from './official-destinations';
 import {
-  findBoundedExportSafetyMatches,
   isAuthenticConfirmedExtensionHandoffSource,
-  type BoundedExportSafetyMatch,
   type ConfirmedExtensionHandoffSource,
   type LegacyIssueMapping,
 } from './official-handoff';
-import { sha256Hex } from './local-sha256';
+import {
+  findBoundedExportSafetyMatches,
+  type BoundedExportSafetyMatch,
+} from './export-safety';
+import {
+  EXTENSION_ADAPTER_CONTRACT_VERSION,
+  EXTENSION_HANDOFF_MAX_LIFETIME_MS,
+  EXTENSION_HANDOFF_SCHEMA,
+  canonicalExtensionHandoffEnvelopeJsonCore,
+  digestCanonicalExtensionHandoffEnvelopeCore,
+  digestExtensionDescriptionCore,
+  parseCanonicalExtensionHandoffEnvelopeJsonAgainstAuthority,
+  validateExtensionHandoffEnvelopeAgainstAuthority,
+  type ExtensionEnvelopeRejectionReason,
+  type ExtensionEnvelopeValidationAuthority,
+} from './extension-handoff-envelope-core';
 
-export const EXTENSION_HANDOFF_SCHEMA = 'challansakshi.extension-handoff/v1' as const;
-export const EXTENSION_ADAPTER_CONTRACT_VERSION = 'challansakshi.adapter-contract/v1' as const;
-export const EXTENSION_HANDOFF_MAX_CODE_POINTS = 500;
-export const EXTENSION_HANDOFF_MAX_UTF8_BYTES = 8192;
-export const EXTENSION_HANDOFF_MAX_LIFETIME_MS = 600_000;
-export const EXTENSION_HANDOFF_FUTURE_TOLERANCE_MS = 60_000;
-
-export const EXTENSION_ENVELOPE_KEYS = Object.freeze([
-  'schema', 'mode', 'packId', 'resultRevisionId', 'packRevisionId',
-  'routeRegistryVersion', 'adapterContractVersion', 'description',
-  'descriptionDigest', 'language', 'simpleMode', 'confirmed', 'deviceMode',
-  'issuedAt', 'expiresAt', 'routeKey', 'issueCode',
-] as const);
+export {
+  EXTENSION_ADAPTER_CONTRACT_VERSION,
+  EXTENSION_ENVELOPE_KEYS,
+  EXTENSION_HANDOFF_FUTURE_TOLERANCE_MS,
+  EXTENSION_HANDOFF_MAX_CODE_POINTS,
+  EXTENSION_HANDOFF_MAX_LIFETIME_MS,
+  EXTENSION_HANDOFF_MAX_UTF8_BYTES,
+  EXTENSION_HANDOFF_SCHEMA,
+} from './extension-handoff-envelope-core';
 
 export type SupportedExtensionIssueCode =
   | 'wrong-evidence'
@@ -92,34 +101,7 @@ export type ExtensionHandoffValidationContext = Readonly<{
   importedAtMs: number;
 }>;
 
-export type ExtensionHandoffRejectionReason =
-  | 'not-plain-record'
-  | 'invalid-property-set'
-  | 'invalid-schema'
-  | 'invalid-scalar'
-  | 'malformed-unicode'
-  | 'description-not-canonical'
-  | 'description-empty'
-  | 'description-too-long'
-  | 'description-not-export-safe'
-  | 'description-digest-mismatch'
-  | 'envelope-too-large'
-  | 'invalid-id'
-  | 'route-registry-version-mismatch'
-  | 'adapter-contract-version-mismatch'
-  | 'invalid-presentation'
-  | 'confirmation-or-device-mismatch'
-  | 'route-issue-mismatch'
-  | 'profile-mismatch'
-  | 'invalid-timestamp'
-  | 'invalid-validation-context'
-  | 'issued-too-far-in-future'
-  | 'issued-too-old'
-  | 'invalid-lifetime'
-  | 'envelope-expired'
-  | 'effective-expiry-reached'
-  | 'invalid-json'
-  | 'non-canonical-json';
+export type ExtensionHandoffRejectionReason = ExtensionEnvelopeRejectionReason;
 
 export type ExtensionHandoffValidationResult =
   | Readonly<{
@@ -149,15 +131,82 @@ const INTERNAL_TO_EXTENSION_ISSUE = Object.freeze({
   'duplicate-number-plate': 'possible-duplicate-number-plate',
 } as const satisfies Record<LegacyIssueMapping['issueCode'], SupportedExtensionIssueCode>);
 
-const SUPPORTED_EXTENSION_ISSUES: ReadonlySet<string> = new Set(Object.values(INTERNAL_TO_EXTENSION_ISSUE));
+export const SUPPORTED_EXTENSION_ISSUE_CODES = Object.freeze([
+  'wrong-evidence',
+  'wrong-vehicle-number',
+  'two-wheeler-on-four-wheeler',
+  'four-wheeler-on-two-wheeler',
+  'possible-duplicate-number-plate',
+] as const satisfies readonly SupportedExtensionIssueCode[]);
+
+const SUPPORTED_EXTENSION_ISSUES: ReadonlySet<string> = new Set(SUPPORTED_EXTENSION_ISSUE_CODES);
+const REAL_EXTENSION_ROUTES = Object.freeze([
+  Object.freeze({
+    routeKey: 'legacy',
+    issueCodes: SUPPORTED_EXTENSION_ISSUE_CODES,
+  }),
+  Object.freeze({
+    routeKey: 'nextgen',
+    issueCodes: Object.freeze([null] as const),
+  }),
+] as const);
+const SYNTHETIC_EXTENSION_ROUTES = Object.freeze([
+  Object.freeze({
+    routeKey: 'synthetic-fixture',
+    issueCodes: Object.freeze([null, ...SUPPORTED_EXTENSION_ISSUE_CODES]),
+  }),
+] as const);
+
+const EXTENSION_ENVELOPE_PROFILE_AUTHORITIES = Object.freeze({
+  'synthetic-development': Object.freeze({
+    profile: 'synthetic-development',
+    envelopeMode: 'synthetic',
+    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
+    routes: SYNTHETIC_EXTENSION_ROUTES,
+  }),
+  'production-disabled': Object.freeze({
+    profile: 'production-disabled',
+    envelopeMode: 'real',
+    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
+    routes: REAL_EXTENSION_ROUTES,
+  }),
+  'production-candidate': Object.freeze({
+    profile: 'production-candidate',
+    envelopeMode: 'real',
+    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
+    routes: REAL_EXTENSION_ROUTES,
+  }),
+} as const satisfies Record<ExtensionHandoffProfile, ExtensionEnvelopeValidationAuthority['profiles'][number]>);
+
+const ALL_EXTENSION_ENVELOPE_AUTHORITIES: ExtensionEnvelopeValidationAuthority = Object.freeze({
+  profiles: Object.freeze([
+    EXTENSION_ENVELOPE_PROFILE_AUTHORITIES['synthetic-development'],
+    EXTENSION_ENVELOPE_PROFILE_AUTHORITIES['production-disabled'],
+    EXTENSION_ENVELOPE_PROFILE_AUTHORITIES['production-candidate'],
+  ]),
+});
+
+export function getExtensionEnvelopeValidationAuthority(
+  profile: unknown,
+): ExtensionEnvelopeValidationAuthority | null {
+  if (
+    profile !== 'synthetic-development'
+    && profile !== 'production-disabled'
+    && profile !== 'production-candidate'
+  ) return null;
+  return Object.freeze({
+    profiles: Object.freeze([EXTENSION_ENVELOPE_PROFILE_AUTHORITIES[profile]]),
+  });
+}
+
 const SYNTHETIC_SOURCE_KEYS = Object.freeze([
   'resultRevisionId', 'packRevisionId', 'routeRegistryVersion', 'description',
   'confirmed', 'issuedAt', 'routeKey', 'issueCode',
 ] as const);
 const BUILD_OPTION_KEYS = Object.freeze(['language', 'simpleMode', 'nowMs'] as const);
-const VALIDATION_CONTEXT_KEYS = Object.freeze(['profile', 'nowMs', 'importedAtMs'] as const);
-const OPAQUE_ID_PATTERN = /^[0-9a-f]{32}$/;
-const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const CANONICAL_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 type PlainDataRecordRead =
@@ -206,46 +255,11 @@ function isWellFormedUnicode(value: string): boolean {
   return true;
 }
 
-function allScalarStringsAreWellFormed(values: Readonly<Record<string, unknown>>): boolean {
-  for (const key of EXTENSION_ENVELOPE_KEYS) {
-    const value = values[key];
-    if (key === 'simpleMode' || key === 'confirmed') {
-      if (typeof value !== 'boolean') return false;
-      continue;
-    }
-    if (key === 'issueCode' && value === null) continue;
-    if (typeof value !== 'string' || !isWellFormedUnicode(value)) return false;
-  }
-  return true;
-}
-
 function canonicalTimestampMilliseconds(value: unknown): number | null {
   if (typeof value !== 'string' || !CANONICAL_UTC_PATTERN.test(value)) return null;
   const milliseconds = new Date(value).getTime();
   if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) return null;
   return milliseconds;
-}
-
-function reconstructCanonicalEnvelope(values: Readonly<Record<string, unknown>>): ExtensionHandoffEnvelope {
-  return Object.freeze({
-    schema: values.schema,
-    mode: values.mode,
-    packId: values.packId,
-    resultRevisionId: values.resultRevisionId,
-    packRevisionId: values.packRevisionId,
-    routeRegistryVersion: values.routeRegistryVersion,
-    adapterContractVersion: values.adapterContractVersion,
-    description: values.description,
-    descriptionDigest: values.descriptionDigest,
-    language: values.language,
-    simpleMode: values.simpleMode,
-    confirmed: values.confirmed,
-    deviceMode: values.deviceMode,
-    issuedAt: values.issuedAt,
-    expiresAt: values.expiresAt,
-    routeKey: values.routeKey,
-    issueCode: values.issueCode,
-  } as ExtensionHandoffEnvelope);
 }
 
 function readBuildOptions(options: unknown): ExtensionHandoffBuildOptions | null {
@@ -334,12 +348,7 @@ export function findExtensionDescriptionSafetyMatches(value: unknown): readonly 
 }
 
 export function digestExtensionDescription(value: unknown): string {
-  if (typeof value !== 'string') throw new TypeError('Description must be a primitive string.');
-  if (!isWellFormedUnicode(value)) throw new Error('Description must contain well-formed Unicode.');
-  if (value.includes('\r') || value.normalize('NFC') !== value) {
-    throw new Error('Description must already use canonical NFC/LF text.');
-  }
-  return sha256Hex(new TextEncoder().encode(value));
+  return digestExtensionDescriptionCore(value);
 }
 
 export function generateOpaqueExtensionId(): string {
@@ -356,168 +365,33 @@ export function generateOpaqueExtensionId(): string {
 }
 
 export function canonicalExtensionHandoffEnvelopeJson(value: unknown): string {
-  const read = readPlainDataRecord(value, EXTENSION_ENVELOPE_KEYS);
-  if (!read.ok || read.values.schema !== EXTENSION_HANDOFF_SCHEMA) {
-    throw new Error('A closed extension handoff envelope is required.');
-  }
-  if (!allScalarStringsAreWellFormed(read.values)) {
-    throw new Error('Envelope strings must contain well-formed Unicode.');
-  }
-  return JSON.stringify(reconstructCanonicalEnvelope(read.values));
+  return canonicalExtensionHandoffEnvelopeJsonCore(value);
 }
 
 export function digestCanonicalExtensionHandoffEnvelope(value: unknown): string {
-  return sha256Hex(new TextEncoder().encode(canonicalExtensionHandoffEnvelopeJson(value)));
+  return digestCanonicalExtensionHandoffEnvelopeCore(value);
 }
 
 export function validateExtensionHandoffEnvelope(
   value: unknown,
   context: ExtensionHandoffValidationContext,
 ): ExtensionHandoffValidationResult {
-  const read = readPlainDataRecord(value, EXTENSION_ENVELOPE_KEYS);
-  if (!read.ok) return { status: 'rejected', reason: read.reason };
-  const candidate = read.values;
-
-  if (candidate.schema !== EXTENSION_HANDOFF_SCHEMA) return { status: 'rejected', reason: 'invalid-schema' };
-  if (!allScalarStringsAreWellFormed(candidate)) {
-    const containsMalformedString = EXTENSION_ENVELOPE_KEYS.some((key) => (
-      typeof candidate[key] === 'string' && !isWellFormedUnicode(candidate[key] as string)
-    ));
-    return { status: 'rejected', reason: containsMalformedString ? 'malformed-unicode' : 'invalid-scalar' };
-  }
-
-  const description = candidate.description as string;
-  if (description.includes('\r') || description.normalize('NFC') !== description) {
-    return { status: 'rejected', reason: 'description-not-canonical' };
-  }
-  if (description.trim().length === 0) return { status: 'rejected', reason: 'description-empty' };
-  if (Array.from(description).length > EXTENSION_HANDOFF_MAX_CODE_POINTS) {
-    return { status: 'rejected', reason: 'description-too-long' };
-  }
-  if (findExtensionDescriptionSafetyMatches(description).length > 0) {
-    return { status: 'rejected', reason: 'description-not-export-safe' };
-  }
-
-  if (
-    typeof candidate.descriptionDigest !== 'string'
-    || !DIGEST_PATTERN.test(candidate.descriptionDigest)
-    || digestExtensionDescription(description) !== candidate.descriptionDigest
-  ) return { status: 'rejected', reason: 'description-digest-mismatch' };
-
-  const canonicalEnvelope = reconstructCanonicalEnvelope(candidate);
-  const canonicalJson = JSON.stringify(canonicalEnvelope);
-  if (new TextEncoder().encode(canonicalJson).byteLength > EXTENSION_HANDOFF_MAX_UTF8_BYTES) {
-    return { status: 'rejected', reason: 'envelope-too-large' };
-  }
-
-  if (
-    typeof candidate.packId !== 'string' || !OPAQUE_ID_PATTERN.test(candidate.packId)
-    || typeof candidate.resultRevisionId !== 'string' || !OPAQUE_ID_PATTERN.test(candidate.resultRevisionId)
-    || typeof candidate.packRevisionId !== 'string' || !OPAQUE_ID_PATTERN.test(candidate.packRevisionId)
-  ) return { status: 'rejected', reason: 'invalid-id' };
-  if (candidate.routeRegistryVersion !== OFFICIAL_ROUTE_REGISTRY_VERSION) {
-    return { status: 'rejected', reason: 'route-registry-version-mismatch' };
-  }
-  if (candidate.adapterContractVersion !== EXTENSION_ADAPTER_CONTRACT_VERSION) {
-    return { status: 'rejected', reason: 'adapter-contract-version-mismatch' };
-  }
-  if (
-    (candidate.language !== 'en' && candidate.language !== 'hi')
-    || typeof candidate.simpleMode !== 'boolean'
-  ) return { status: 'rejected', reason: 'invalid-presentation' };
-  if (candidate.confirmed !== true || candidate.deviceMode !== 'private') {
-    return { status: 'rejected', reason: 'confirmation-or-device-mismatch' };
-  }
-
-  const routeIssueMatches = (
-    candidate.mode === 'real'
-    && candidate.routeKey === 'legacy'
-    && typeof candidate.issueCode === 'string'
-    && SUPPORTED_EXTENSION_ISSUES.has(candidate.issueCode)
-  ) || (
-    candidate.mode === 'real'
-    && candidate.routeKey === 'nextgen'
-    && candidate.issueCode === null
-  ) || (
-    candidate.mode === 'synthetic'
-    && candidate.routeKey === 'synthetic-fixture'
-    && (candidate.issueCode === null
-      || (typeof candidate.issueCode === 'string' && SUPPORTED_EXTENSION_ISSUES.has(candidate.issueCode)))
-  );
-  if (!routeIssueMatches) return { status: 'rejected', reason: 'route-issue-mismatch' };
-
-  const contextRead = readPlainDataRecord(context, VALIDATION_CONTEXT_KEYS);
-  if (!contextRead.ok) return { status: 'rejected', reason: 'invalid-validation-context' };
-  const checkedContext = contextRead.values;
-  if (
-    (checkedContext.profile !== 'synthetic-development'
-      && checkedContext.profile !== 'production-disabled'
-      && checkedContext.profile !== 'production-candidate')
-    || !Number.isSafeInteger(checkedContext.nowMs)
-    || !Number.isSafeInteger(checkedContext.importedAtMs)
-    || (checkedContext.nowMs as number) < 0
-    || (checkedContext.importedAtMs as number) < 0
-    || (checkedContext.importedAtMs as number) > (checkedContext.nowMs as number)
-  ) return { status: 'rejected', reason: 'invalid-validation-context' };
-
-  const profileMatches = checkedContext.profile === 'synthetic-development'
-    ? candidate.mode === 'synthetic'
-    : (checkedContext.profile === 'production-disabled' || checkedContext.profile === 'production-candidate')
-      && candidate.mode === 'real';
-  if (!profileMatches) return { status: 'rejected', reason: 'profile-mismatch' };
-
-  const issuedAtMs = canonicalTimestampMilliseconds(candidate.issuedAt);
-  const expiresAtMs = canonicalTimestampMilliseconds(candidate.expiresAt);
-  if (issuedAtMs === null || expiresAtMs === null) return { status: 'rejected', reason: 'invalid-timestamp' };
-  const nowMs = checkedContext.nowMs as number;
-  const importedAtMs = checkedContext.importedAtMs as number;
-  if (issuedAtMs > nowMs + EXTENSION_HANDOFF_FUTURE_TOLERANCE_MS) {
-    return { status: 'rejected', reason: 'issued-too-far-in-future' };
-  }
-  if (issuedAtMs < nowMs - EXTENSION_HANDOFF_MAX_LIFETIME_MS) {
-    return { status: 'rejected', reason: 'issued-too-old' };
-  }
-  if (
-    expiresAtMs <= issuedAtMs
-    || expiresAtMs - issuedAtMs > EXTENSION_HANDOFF_MAX_LIFETIME_MS
-  ) return { status: 'rejected', reason: 'invalid-lifetime' };
-  if (nowMs >= expiresAtMs) return { status: 'rejected', reason: 'envelope-expired' };
-
-  const effectiveExpiresAtMs = Math.min(
-    expiresAtMs,
-    importedAtMs + EXTENSION_HANDOFF_MAX_LIFETIME_MS,
-  );
-  if (!Number.isSafeInteger(effectiveExpiresAtMs) || nowMs >= effectiveExpiresAtMs) {
-    return { status: 'rejected', reason: 'effective-expiry-reached' };
-  }
-
-  return Object.freeze({
-    status: 'accepted',
-    envelope: canonicalEnvelope,
-    canonicalJson,
-    effectiveExpiresAtMs,
-  });
+  return validateExtensionHandoffEnvelopeAgainstAuthority(
+    value,
+    context,
+    ALL_EXTENSION_ENVELOPE_AUTHORITIES,
+  ) as ExtensionHandoffValidationResult;
 }
 
 export function parseCanonicalExtensionHandoffEnvelopeJson(
   serialized: unknown,
   context: ExtensionHandoffValidationContext,
 ): ExtensionHandoffValidationResult {
-  if (typeof serialized !== 'string' || !isWellFormedUnicode(serialized)) {
-    return { status: 'rejected', reason: 'invalid-json' };
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(serialized);
-  } catch {
-    return { status: 'rejected', reason: 'invalid-json' };
-  }
-  const validation = validateExtensionHandoffEnvelope(parsed, context);
-  if (validation.status !== 'accepted') return validation;
-  if (serialized !== validation.canonicalJson) {
-    return { status: 'rejected', reason: 'non-canonical-json' };
-  }
-  return validation;
+  return parseCanonicalExtensionHandoffEnvelopeJsonAgainstAuthority(
+    serialized,
+    context,
+    ALL_EXTENSION_ENVELOPE_AUTHORITIES,
+  ) as ExtensionHandoffValidationResult;
 }
 
 export function buildRealExtensionHandoffEnvelope(

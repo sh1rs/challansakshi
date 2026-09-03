@@ -11,6 +11,7 @@ export default defineConfig({
       profileId: testProfile.id,
       envelopeMode: testProfile.envelopeMode,
       sourceRegistry: testProfile.sourceRegistry,
+      envelopeValidationAuthority: testProfile.envelopeValidationAuthority,
     }),
   },
   test: {

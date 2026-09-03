@@ -1,8 +1,9 @@
 import {
-  digestCanonicalExtensionHandoffEnvelope,
-  validateExtensionHandoffEnvelope,
-  type ExtensionHandoffEnvelope,
-} from '../../lib/extension-handoff-contract';
+  digestCanonicalExtensionHandoffEnvelopeCore,
+  validateExtensionHandoffEnvelopeAgainstAuthority,
+  type CanonicalExtensionHandoffEnvelope,
+  type ExtensionEnvelopeValidationAuthority,
+} from '../../lib/extension-handoff-envelope-core';
 import { probeProductionChallanSakshiSource } from './source-probe-production';
 import { probeSyntheticChallanSakshiSource } from './source-probe-synthetic';
 import type { ExtensionBuildProfileId, ExtensionEnvelopeMode, ExtensionSourceRegistry } from './manifest';
@@ -12,7 +13,10 @@ declare const __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__: Readonly<{
   profileId: ExtensionBuildProfileId;
   envelopeMode: ExtensionEnvelopeMode;
   sourceRegistry: ExtensionSourceRegistry;
+  envelopeValidationAuthority: ExtensionEnvelopeValidationAuthority;
 }>;
+
+type ExtensionHandoffEnvelope = CanonicalExtensionHandoffEnvelope;
 
 export const SOURCE_CONTRACT_VERSION = 'challansakshi.source-contract/v1' as const;
 export const SOURCE_PROBE_PLAN_SCHEMA = 'challansakshi.source-probe-plan/v1' as const;
@@ -134,7 +138,7 @@ const REJECTED_PROBE_RESULT_KEYS = Object.freeze(['status', 'code'] as const);
 const BINDING_KEYS = Object.freeze([
   'schema', 'sourceTabId', 'sourceDocumentId', 'canonicalEnvelopeDigest', 'previewNotAfterMs',
 ] as const);
-const DOCUMENT_ID_PATTERN = /^[\x21-\x7e]{1,256}$/;
+const DOCUMENT_ID_PATTERN = /^[\x21-\x7e]{1,128}$/;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const PROBE_REJECTION_CODES: ReadonlySet<string> = new Set([
   'invalid-plan',
@@ -227,7 +231,7 @@ function readValidationContext(value: unknown): SourceValidationContext | null {
   if (!read.ok) return null;
   const { profile, sourceTabId, nowMs, importedAtMs } = read.values;
   if (
-    (profile !== 'synthetic-development' && profile !== 'production-disabled')
+    profile !== __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__
     || !Number.isSafeInteger(sourceTabId)
     || (sourceTabId as number) < 0
     || !Number.isSafeInteger(nowMs)
@@ -237,7 +241,7 @@ function readValidationContext(value: unknown): SourceValidationContext | null {
     || (importedAtMs as number) > (nowMs as number)
   ) return null;
   return Object.freeze({
-    profile,
+    profile: __CHALLANSAKSHI_EXTENSION_BUILD_PROFILE__,
     sourceTabId: sourceTabId as number,
     nowMs: nowMs as number,
     importedAtMs: importedAtMs as number,
@@ -294,11 +298,15 @@ export function validateSourcePreviewInjectionResult(
   if (injection.result.status !== 'accepted') {
     return Object.freeze({ status: 'rejected', reason: 'source-probe-rejected' });
   }
-  const validation = validateExtensionHandoffEnvelope(injection.result.envelope, {
-    profile: checkedContext.profile,
-    nowMs: checkedContext.nowMs,
-    importedAtMs: checkedContext.importedAtMs,
-  });
+  const validation = validateExtensionHandoffEnvelopeAgainstAuthority(
+    injection.result.envelope,
+    Object.freeze({
+      profile: checkedContext.profile,
+      nowMs: checkedContext.nowMs,
+      importedAtMs: checkedContext.importedAtMs,
+    }),
+    __CHALLANSAKSHI_EXTENSION_SOURCE_AUTHORITY__.envelopeValidationAuthority,
+  );
   if (validation.status !== 'accepted') {
     return Object.freeze({ status: 'rejected', reason: 'invalid-envelope' });
   }
@@ -310,7 +318,7 @@ export function validateSourcePreviewInjectionResult(
     schema: SOURCE_PREVIEW_BINDING_SCHEMA,
     sourceTabId: checkedContext.sourceTabId,
     sourceDocumentId: injection.documentId,
-    canonicalEnvelopeDigest: digestCanonicalExtensionHandoffEnvelope(validation.envelope),
+    canonicalEnvelopeDigest: digestCanonicalExtensionHandoffEnvelopeCore(validation.envelope),
     previewNotAfterMs: expiresAtMs,
   });
   return Object.freeze({

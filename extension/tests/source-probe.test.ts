@@ -433,7 +433,7 @@ describe('trusted Chrome InjectionResult validation', () => {
       [{ ...accepted, frameId: '0' }],
       [{ ...accepted, documentId: '' }],
       [{ ...accepted, documentId: 'contains space' }],
-      [{ ...accepted, documentId: 'x'.repeat(257) }],
+      [{ ...accepted, documentId: 'x'.repeat(129) }],
       [{ ...accepted, documentId: 'document-A', extra: true }],
       [{ frameId: 0, documentId: 'document-A' }],
       [accessor],
@@ -449,6 +449,9 @@ describe('trusted Chrome InjectionResult validation', () => {
       expect(() => validateSourcePreviewInjectionResult(candidate, context)).not.toThrow();
       expect(validateSourcePreviewInjectionResult(candidate, context).status).toBe('rejected');
     }
+    expect(validateSourcePreviewInjectionResult(
+      injectionResult(syntheticEnvelope, 'x'.repeat(128)), context,
+    ).status).toBe('accepted');
     expect(getterCalls).toBe(0);
   });
 

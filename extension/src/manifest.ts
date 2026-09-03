@@ -1,4 +1,8 @@
-import { validateExtensionHandoffEnvelope } from '../../lib/extension-handoff-contract';
+import {
+  getExtensionEnvelopeValidationAuthority,
+  validateExtensionHandoffEnvelope,
+} from '../../lib/extension-handoff-contract';
+import type { ExtensionEnvelopeValidationAuthority } from '../../lib/extension-handoff-envelope-core';
 import { SYNTHETIC_EXTENSION_FIXTURE } from '../../lib/synthetic-extension-fixture-contract';
 
 export const EXTENSION_BUILD_PROFILE_SCHEMA = 'challansakshi.extension-build-profile/v1' as const;
@@ -54,6 +58,7 @@ type ExtensionBuildProfileBase = Readonly<{
   visibleEnvironmentLabel: string;
   manifestVersion: '0.1.0';
   minimumChromeVersion: '152';
+  envelopeValidationAuthority: ExtensionEnvelopeValidationAuthority;
 }>;
 
 export type SyntheticDevelopmentBuildProfile = ExtensionBuildProfileBase & Readonly<{
@@ -119,6 +124,11 @@ export type ExtensionManifest = Readonly<{
 
 const syntheticSourceUrl = new URL(SYNTHETIC_EXTENSION_FIXTURE.source.url);
 const syntheticDestinationUrl = new URL(SYNTHETIC_EXTENSION_FIXTURE.destination.url);
+const syntheticEnvelopeValidationAuthority = getExtensionEnvelopeValidationAuthority('synthetic-development');
+const productionEnvelopeValidationAuthority = getExtensionEnvelopeValidationAuthority('production-disabled');
+if (!syntheticEnvelopeValidationAuthority || !productionEnvelopeValidationAuthority) {
+  throw new Error('Extension envelope validation authority is unavailable.');
+}
 
 const syntheticDevelopmentProfile: SyntheticDevelopmentBuildProfile = Object.freeze({
   schema: EXTENSION_BUILD_PROFILE_SCHEMA,
@@ -128,6 +138,7 @@ const syntheticDevelopmentProfile: SyntheticDevelopmentBuildProfile = Object.fre
   visibleEnvironmentLabel: 'Synthetic development · fictional fixtures only',
   manifestVersion: '0.1.0',
   minimumChromeVersion: '152',
+  envelopeValidationAuthority: syntheticEnvelopeValidationAuthority,
   validatorProfile: 'synthetic-development',
   sourceRegistry: Object.freeze({
     protocol: syntheticSourceUrl.protocol as 'http:',
@@ -161,6 +172,7 @@ const productionDisabledProfile: ProductionDisabledBuildProfile = Object.freeze(
   visibleEnvironmentLabel: 'Production disabled · internal review only',
   manifestVersion: '0.1.0',
   minimumChromeVersion: '152',
+  envelopeValidationAuthority: productionEnvelopeValidationAuthority,
   validatorProfile: 'production-disabled',
   sourceRegistry: Object.freeze({
     protocol: 'https:',
