@@ -490,6 +490,68 @@ const EXPECTED_FILL_CALLEES: readonly string[] = Object.freeze([
   'runSourceReprobe',
 ]);
 const EXPECTED_FILL_NEW_CALLEES: readonly string[] = Object.freeze(['Error']);
+const EXPECTED_INNER_CALL_COUNTS: Readonly<Record<string, number>> = Object.freeze({
+  'Date.now': 3,
+  'Date.parse': 1,
+  'Object.freeze': 3,
+  actionTabMatches: 1,
+  armUnresolvedLive: 1,
+  buildDestinationFillPlan: 1,
+  buildFixedWorkerResponse: 8,
+  buildRejectedWorkerResponse: 12,
+  cancelBeforeDispatch: 2,
+  'chrome.scripting.executeScript': 1,
+  expireStaged: 7,
+  fixedBlocker: 1,
+  invalidateStaged: 2,
+  isPositiveTime: 1,
+  liveFromSession: 1,
+  makePreviewPlan: 1,
+  newOpaque: 2,
+  nextOperationDeadline: 1,
+  readyLedger: 1,
+  reconcileLifecycle: 1,
+  routeFailure: 2,
+  runSourceReprobe: 1,
+  sourceBinding: 1,
+  stagedPreviewTiming: 2,
+  validateDestinationRepreflightInjectionResult: 1,
+  writeSessionState: 2,
+});
+const EXPECTED_INNER_NEW_COUNTS: Readonly<Record<string, number>> = Object.freeze({});
+const EXPECTED_FILL_CALL_COUNTS: Readonly<Record<string, number>> = Object.freeze({
+  'Date.now': 3,
+  'Object.freeze': 2,
+  'Promise.reject': 1,
+  actionTabMatches: 1,
+  buildFixedWorkerResponse: 3,
+  buildRejectedWorkerResponse: 4,
+  cancelBeforeDispatch: 4,
+  'chrome.scripting.executeScript': 1,
+  completeFill: 2,
+  deliver: 2,
+  'dispatch.then': 1,
+  'dispatch.then().then': 1,
+  enqueueLifecycle: 2,
+  prepareFillDispatch: 1,
+  runSourceReprobe: 1,
+});
+const EXPECTED_FILL_NEW_COUNTS: Readonly<Record<string, number>> = Object.freeze({ Error: 1 });
+
+function callChainCountsMatch(
+  expressions: readonly (ts.CallExpression | ts.NewExpression)[],
+  expected: Readonly<Record<string, number>>,
+): boolean {
+  const observed: Record<string, number> = {};
+  for (const expression of expressions) {
+    const chain = canonicalCalleeChain(expression.expression);
+    if (chain === null) return false;
+    observed[chain] = (observed[chain] ?? 0) + 1;
+  }
+  const expectedNames = Object.keys(expected);
+  if (Object.keys(observed).length !== expectedNames.length) return false;
+  return expectedNames.every((name) => observed[name] === expected[name]);
+}
 
 function canonicalCalleeChain(expression: ts.Expression): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
@@ -2496,6 +2558,10 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       return chain !== null && EXPECTED_INNER_NEW_CALLEES.includes(chain);
     });
     if (!innerCalleeShapesValid) report('inner call callees must match the canonical set');
+    if (
+      !callChainCountsMatch(innerCalls, EXPECTED_INNER_CALL_COUNTS)
+      || !callChainCountsMatch(innerNewExpressions, EXPECTED_INNER_NEW_COUNTS)
+    ) report('inner call occurrences must match the canonical counts');
     const certifiedCalls = new Set<ts.CallExpression>();
     const certifiedAggregates = new Set<ts.ObjectLiteralExpression | ts.ArrayLiteralExpression>();
     const certifiedAssignments = new Set<ts.BinaryExpression>();
@@ -3373,6 +3439,10 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         return chain !== null && EXPECTED_FILL_NEW_CALLEES.includes(chain);
       });
       if (!fillCalleeShapesValid) report('fill call callees must match the canonical set');
+      if (
+        !callChainCountsMatch(fillCalls, EXPECTED_FILL_CALL_COUNTS)
+        || !callChainCountsMatch(fillNewExpressions, EXPECTED_FILL_NEW_COUNTS)
+      ) report('fill call occurrences must match the canonical counts');
       const fillCertifiedCalls = new Set<ts.CallExpression>();
       const fillCertifiedAggregates = new Set<ts.Node>();
       const fillCertifiedAssignments = new Set<ts.BinaryExpression>();
@@ -5399,6 +5469,33 @@ describe('serialized handoff lifecycle', () => {
       analyzeMutation(taggedTemplateInvocationMutation, 'tagged template canonical invocation', true),
       'tagged template canonical invocation',
     ).toContain('inner call callees must match the canonical set');
+
+    const forgedDeliveryMutation = replaceExactlyOnce(
+      source,
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+      ].join('\n'),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+        "  void deliver(buildFixedWorkerResponse(request.command, 'success'), request.command);",
+      ].join('\n'),
+      'forged success delivery',
+    );
+    expect.soft(
+      analyzeMutation(forgedDeliveryMutation, 'forged success delivery', true),
+      'forged success delivery',
+    ).toContain('fill call occurrences must match the canonical counts');
+
+    const duplicateTimeReadMutation = insertBeforeArming(
+      '  void Date.now();',
+      'duplicate inner time read',
+    );
+    expect.soft(
+      analyzeMutation(duplicateTimeReadMutation, 'duplicate inner time read', true),
+      'duplicate inner time read',
+    ).toContain('inner call occurrences must match the canonical counts');
 
     const postUsePreviewPlanWriteMutation = insertBeforeArming(
       '  (previewPlan as unknown as { adapter: unknown }).adapter = 0;',
