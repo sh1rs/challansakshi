@@ -1539,7 +1539,19 @@ async function cancelBeforeDispatch(
       ? buildFixedWorkerResponse('fill-empty-reviewed-fields', 'quarantined')
       : buildRejectedWorkerResponse('fill-empty-reviewed-fields', 'storage-unavailable');
   }
-  await scheduleCanonical(null, settled.ledger);
+  const prunedBeforeScheduling = await pruneLedger(settled.ledger, Date.now());
+  if (prunedBeforeScheduling.status !== 'ready') {
+    return prunedBeforeScheduling.status === 'quarantined'
+      ? buildFixedWorkerResponse('fill-empty-reviewed-fields', 'quarantined')
+      : buildRejectedWorkerResponse('fill-empty-reviewed-fields', 'storage-unavailable');
+  }
+  await scheduleCanonical(null, prunedBeforeScheduling.ledger);
+  const prunedAfterScheduling = await pruneLedger(prunedBeforeScheduling.ledger, Date.now());
+  if (prunedAfterScheduling.status !== 'ready') {
+    return prunedAfterScheduling.status === 'quarantined'
+      ? buildFixedWorkerResponse('fill-empty-reviewed-fields', 'quarantined')
+      : buildRejectedWorkerResponse('fill-empty-reviewed-fields', 'storage-unavailable');
+  }
   return failure;
 }
 
@@ -1548,6 +1560,9 @@ async function completeFill(
   raw: unknown,
   transportFailed: boolean,
 ): Promise<WorkerResponseV1> {
+  if (closedInFlightTuples.delete(inFlightTupleKey(consuming))) {
+    return buildRejectedWorkerResponse('fill-empty-reviewed-fields', 'operation-failed');
+  }
   const lifecycle = await reconcileLifecycle(false);
   if (lifecycle.status !== 'ready') {
     return lifecycle.status === 'quarantined'
@@ -1556,9 +1571,6 @@ async function completeFill(
   }
   const session = lifecycle.session;
   if (!session || session.state !== 'consuming' || JSON.stringify(session) !== JSON.stringify(consuming)) {
-    if (closedInFlightTuples.delete(inFlightTupleKey(consuming))) {
-      return buildRejectedWorkerResponse('fill-empty-reviewed-fields', 'operation-failed');
-    }
     const record = lifecycle.ledger.records.find((item) => item.packId === consuming.packId);
     if (record?.state === 'unresolved-orphaned') {
       return buildFixedWorkerResponse('fill-empty-reviewed-fields', 'unresolved-orphaned');
@@ -1640,7 +1652,7 @@ async function completeFill(
   }, 'fill-empty-reviewed-fields');
 }
 
-async function prepareFillDispatch(
+async function preparePayloadBearingFill(
   request: Extract<WorkerRequestV1, { command: 'fill-empty-reviewed-fields' }>,
 ): Promise<WorkerResponseV1 | PreparedFillDispatch> {
   const lifecycle = await reconcileLifecycle();
@@ -1648,7 +1660,7 @@ async function prepareFillDispatch(
   if (blocker) return blocker;
   if (lifecycle.status !== 'ready') return buildFixedWorkerResponse(request.command, 'quarantined');
   if (lifecycle.stagedExpired) return buildFixedWorkerResponse(request.command, 'expired');
-  let staged = lifecycle.session?.state === 'staged' ? lifecycle.session : null;
+  const staged = lifecycle.session?.state === 'staged' ? lifecycle.session : null;
   if (!staged) return buildRejectedWorkerResponse(request.command, 'no-staged-fields');
   if (Date.now() >= staged.effectiveExpiresAtMs) return expireStaged(request.command);
   if (
@@ -1758,7 +1770,7 @@ async function prepareFillDispatch(
   if (fillRoute || fillBuilt.status !== 'built') {
     return fillRoute ?? buildRejectedWorkerResponse(request.command, 'operation-failed');
   }
-  let arming: ArmingSessionStateV1 | null = Object.freeze({
+  const arming: ArmingSessionStateV1 = Object.freeze({
     schema: SESSION_STATE_SCHEMA,
     state: 'arming',
     generation: staged.generation,
@@ -1806,8 +1818,31 @@ async function prepareFillDispatch(
   if (consumed.status !== 'ready' || consumed.session?.state !== 'consuming') {
     return cancelBeforeDispatch(arming, buildRejectedWorkerResponse(request.command, 'operation-failed'));
   }
-  staged = null;
-  arming = null;
+  return Object.freeze({
+    status: 'prepared',
+    consuming,
+    fillPlan: fillBuilt.plan,
+    sourceAuthorization,
+    sourceImportedAtMs,
+  });
+}
+
+async function prepareFillDispatch(
+  request: Extract<WorkerRequestV1, { command: 'fill-empty-reviewed-fields' }>,
+): Promise<WorkerResponseV1 | PreparedFillDispatch> {
+  let prepared: PreparedFillDispatch | null = null;
+  {
+    const preparationResult = await preparePayloadBearingFill(request);
+    if (!('status' in preparationResult) || preparationResult.status !== 'prepared') {
+      return preparationResult as WorkerResponseV1;
+    }
+    prepared = preparationResult as PreparedFillDispatch;
+  }
+  const consuming = prepared.consuming;
+  const fillPlan = prepared.fillPlan;
+  const sourceAuthorization = prepared.sourceAuthorization;
+  const sourceImportedAtMs = prepared.sourceImportedAtMs;
+  prepared = null;
   await clearAlarm(SESSION_EXPIRY_ALARM);
   await clearAlarm(ATTEMPT_WATCHDOG_ALARM);
   if (!(await createAlarm(ATTEMPT_WATCHDOG_ALARM, consuming.attemptNotAfterMs))) {
@@ -1816,7 +1851,7 @@ async function prepareFillDispatch(
   return Object.freeze({
     status: 'prepared',
     consuming,
-    fillPlan: fillBuilt.plan,
+    fillPlan,
     sourceAuthorization,
     sourceImportedAtMs,
   });

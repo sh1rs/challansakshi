@@ -608,19 +608,14 @@ describe('serialized handoff lifecycle', () => {
       expect(found, `${name} must exist`).toBeDefined();
       return found!;
     };
+    const payloadPreparation = namedFunction('preparePayloadBearingFill');
     const preparation = namedFunction('prepareFillDispatch');
     const fill = namedFunction('fillEmptyReviewedFields');
+    expect(payloadPreparation.body).toBeDefined();
     expect(preparation.body).toBeDefined();
     expect(fill.body).toBeDefined();
 
-    const directFillIdentifiers = new Set<string>();
-    const collectDirect = (node: ts.Node) => {
-      if (ts.isFunctionLike(node) && node !== fill) return;
-      if (ts.isIdentifier(node)) directFillIdentifiers.add(node.text);
-      ts.forEachChild(node, collectDirect);
-    };
-    collectDirect(fill);
-    expect([...directFillIdentifiers].filter((name) => new Set([
+    const payloadAliases = new Set([
       'lifecycle',
       'staged',
       'source',
@@ -632,7 +627,25 @@ describe('serialized handoff lifecycle', () => {
       'armedLedger',
       'live',
       'consumed',
-    ]).has(name))).toEqual([]);
+    ]);
+
+    const directPreparationIdentifiers = new Set<string>();
+    const collectDirectPreparation = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== preparation) return;
+      if (ts.isIdentifier(node)) directPreparationIdentifiers.add(node.text);
+      ts.forEachChild(node, collectDirectPreparation);
+    };
+    collectDirectPreparation(preparation);
+    expect([...directPreparationIdentifiers].filter((name) => payloadAliases.has(name))).toEqual([]);
+
+    const directFillIdentifiers = new Set<string>();
+    const collectDirect = (node: ts.Node) => {
+      if (ts.isFunctionLike(node) && node !== fill) return;
+      if (ts.isIdentifier(node)) directFillIdentifiers.add(node.text);
+      ts.forEachChild(node, collectDirect);
+    };
+    collectDirect(fill);
+    expect([...directFillIdentifiers].filter((name) => payloadAliases.has(name))).toEqual([]);
 
     const preparedReturns: string[][] = [];
     const collectPreparedReturns = (node: ts.Node) => {
@@ -650,7 +663,7 @@ describe('serialized handoff lifecycle', () => {
       }
       ts.forEachChild(node, collectPreparedReturns);
     };
-    collectPreparedReturns(preparation);
+    collectPreparedReturns(payloadPreparation);
     expect(preparedReturns).toEqual([[
       'status',
       'consuming',
@@ -658,6 +671,26 @@ describe('serialized handoff lifecycle', () => {
       'sourceAuthorization',
       'sourceImportedAtMs',
     ]]);
+
+    const payloadStatements = payloadPreparation.body!.statements;
+    const consumingWriteIndex = payloadStatements.findIndex((statement) => (
+      statement.getText(file).includes('await writeSessionState(consuming)')
+    ));
+    expect(consumingWriteIndex).toBeGreaterThanOrEqual(0);
+    const confirmationIndex = consumingWriteIndex + 1;
+    expect(payloadStatements[confirmationIndex]?.getText(file)).toContain("consumed.status !== 'ready'");
+    const immediateReturnIndex = confirmationIndex + 1;
+    expect(payloadStatements[immediateReturnIndex]?.getText(file)).toContain('return Object.freeze({');
+    expect(immediateReturnIndex).toBe(payloadStatements.length - 1);
+    const awaitsAfterConsumingWrite: string[] = [];
+    for (const statement of payloadStatements.slice(consumingWriteIndex + 1)) {
+      const visit = (node: ts.Node) => {
+        if (ts.isAwaitExpression(node)) awaitsAfterConsumingWrite.push(node.getText(file));
+        ts.forEachChild(node, visit);
+      };
+      visit(statement);
+    }
+    expect(awaitsAfterConsumingWrite).toEqual([]);
 
     const statements = fill.body!.statements;
     const statementIndex = (needle: string) => statements.findIndex(
@@ -1825,6 +1858,102 @@ describe('serialized handoff lifecycle', () => {
     expect(harness.local()).toEqual(closedReplay);
   });
 
+  it.each(['session.get', 'local.get'] as const)(
+    'ignores an exactly closed callback before a failing %s and performs zero canonical work',
+    async (operation) => {
+      const harness = makeChromeHarness();
+      let finish!: (value: unknown) => void;
+      const deferred = new Promise<unknown>((resolve) => { finish = resolve; });
+      const response = beginFill(harness, deferred);
+      await settleUntil(() => (
+        (harness.session() as { state?: unknown } | undefined)?.state === 'consuming'
+        && harness.calls.filter((call) => call.name === 'scripting.executeScript').length === 4
+      ));
+      harness.events.onRemoved.listeners[0]?.(29, {});
+      await settleUntil(() => harness.session() === undefined && (
+        harness.local() as { records?: Array<{ outcome?: unknown }> } | undefined
+      )?.records?.[0]?.outcome === 'closed-unresolved' && harness.calls.some(
+        (call) => call.name === 'alarms.create:ledger-cleanup',
+      ));
+      await settleMicrotasks();
+      const canonicalAfterClose = clone(harness.local());
+      harness.calls.length = 0;
+      harness.failNext(operation);
+
+      finish(fillComplete('02020202020202020202020202020202'));
+
+      expect(await response).toEqual({
+        schema: WORKER_RESPONSE_SCHEMA,
+        command: 'fill-empty-reviewed-fields',
+        state: 'rejected',
+        code: 'operation-failed',
+      });
+      expect(harness.calls).toEqual([]);
+      expect(harness.session()).toBeUndefined();
+      expect(harness.local()).toEqual(canonicalAfterClose);
+    },
+  );
+
+  it('does not apply one closed tuple marker to a distinct later fill tuple', async () => {
+    const harness = makeChromeHarness();
+    let finishFirst!: (value: unknown) => void;
+    const firstDeferred = new Promise<unknown>((resolve) => { finishFirst = resolve; });
+    const firstResponse = beginFill(harness, firstDeferred);
+    await settleUntil(() => (
+      (harness.session() as { state?: unknown } | undefined)?.state === 'consuming'
+      && harness.calls.filter((call) => call.name === 'scripting.executeScript').length === 4
+    ));
+    harness.events.onRemoved.listeners[0]?.(29, {});
+    await settleUntil(() => harness.session() === undefined && (
+      harness.local() as { records?: Array<{ outcome?: unknown }> } | undefined
+    )?.records?.[0]?.outcome === 'closed-unresolved');
+
+    const secondEnvelope = Object.freeze({
+      ...clone(envelope),
+      packId: '55555555555555555555555555555555',
+      resultRevisionId: '66666666666666666666666666666666',
+      packRevisionId: '77777777777777777777777777777777',
+    });
+    const secondGeneration = '88888888888888888888888888888888';
+    harness.setSession({
+      ...stagedState(),
+      generation: secondGeneration,
+      envelope: secondEnvelope,
+    });
+    const secondSourceAccepted = () => [{
+      frameId: 0,
+      documentId: 'source-document-A',
+      result: { status: 'accepted', envelope: clone(secondEnvelope) },
+    }];
+    let finishSecond!: (value: unknown) => void;
+    const secondDeferred = new Promise<unknown>((resolve) => { finishSecond = resolve; });
+    harness.calls.length = 0;
+    harness.scriptResults.push(
+      secondSourceAccepted(), destinationReady(), secondSourceAccepted(), secondDeferred,
+    );
+    const secondResponse = sendMessage(harness, buildFillEmptyReviewedFieldsRequest(
+      29, secondGeneration, secondEnvelope.packId, stagedState().effectiveExpiresAtMs,
+    ));
+    await settleUntil(() => (
+      harness.calls.filter((call) => call.name === 'scripting.executeScript').length === 4
+    ));
+    const secondDispatch = harness.calls.filter(
+      (call) => call.name === 'scripting.executeScript',
+    ).at(-1)?.value as { args?: Array<{ attemptId?: string }> } | undefined;
+    const secondAttemptId = secondDispatch?.args?.[0]?.attemptId;
+    expect(secondAttemptId).toMatch(/^[0-9a-f]{32}$/);
+    finishSecond(fillComplete(secondAttemptId!));
+
+    expect(await secondResponse).toMatchObject({ state: 'success' });
+    finishFirst(fillComplete('02020202020202020202020202020202'));
+    expect(await firstResponse).toEqual({
+      schema: WORKER_RESPONSE_SCHEMA,
+      command: 'fill-empty-reviewed-fields',
+      state: 'rejected',
+      code: 'operation-failed',
+    });
+  });
+
   it('classifies a late fill as closed even when the expired close replay was pruned', async () => {
     const harness = makeChromeHarness();
     let finish!: (value: unknown) => void;
@@ -2207,6 +2336,83 @@ describe('serialized handoff lifecycle', () => {
     });
   });
 
+  it('prunes a cancellation replay that expires while canonical scheduling is delayed', async () => {
+    const harness = makeChromeHarness();
+    harness.setSession(stagedState());
+    harness.setActiveTabId(29);
+    await loadWorker(harness);
+    harness.calls.length = 0;
+    let finishScheduling!: () => void;
+    const scheduling = new Promise<void>((resolve) => { finishScheduling = resolve; });
+    harness.queueAlarmCreateDelays('ledger-cleanup', scheduling);
+    const changedEnvelope = {
+      ...envelope,
+      expiresAt: '2026-09-03T08:09:00.000Z',
+    };
+    harness.scriptResults.push(
+      sourceAccepted(),
+      destinationReady(),
+      [{
+        frameId: 0,
+        documentId: 'source-document-A',
+        result: { status: 'accepted', envelope: changedEnvelope },
+      }],
+    );
+    const response = sendMessage(harness, buildFillEmptyReviewedFieldsRequest(
+      29, stagedState().generation, envelope.packId, stagedState().effectiveExpiresAtMs,
+    ));
+    await settleUntil(() => harness.calls.some(
+      (call) => call.name === 'alarms.create:ledger-cleanup',
+    ));
+    expect(harness.local()).toMatchObject({
+      records: [{ state: 'replay', outcome: 'cancelled-before-dispatch' }],
+    });
+
+    vi.setSystemTime(stagedState().effectiveExpiresAtMs);
+    finishScheduling();
+
+    expect(await response).toEqual({
+      schema: WORKER_RESPONSE_SCHEMA,
+      command: 'fill-empty-reviewed-fields',
+      state: 'rejected',
+      code: 'source-binding-changed',
+    });
+    expect(harness.local()).toEqual({
+      schema: 'challansakshi.safety-ledger/v1', records: [],
+    });
+  });
+
+  it('reports storage unavailable when expired cancellation pruning cannot be confirmed', async () => {
+    const harness = makeChromeHarness();
+    harness.setSession(stagedState());
+    harness.setActiveTabId(29);
+    await loadWorker(harness);
+    harness.calls.length = 0;
+    harness.failOnFutureOccurrence('local.set', 3);
+    let finishProbe!: (value: unknown) => void;
+    const deferredProbe = new Promise<unknown>((resolve) => { finishProbe = resolve; });
+    harness.scriptResults.push(sourceAccepted(), destinationReady(), deferredProbe);
+    const response = sendMessage(harness, buildFillEmptyReviewedFieldsRequest(
+      29, stagedState().generation, envelope.packId, stagedState().effectiveExpiresAtMs,
+    ));
+    await settleUntil(() => (
+      harness.calls.filter((call) => call.name === 'scripting.executeScript').length === 3
+    ));
+    vi.setSystemTime(stagedState().effectiveExpiresAtMs);
+    finishProbe(sourceAccepted());
+
+    expect(await response).toEqual({
+      schema: WORKER_RESPONSE_SCHEMA,
+      command: 'fill-empty-reviewed-fields',
+      state: 'rejected',
+      code: 'storage-unavailable',
+    });
+    expect(harness.session()).toBeUndefined();
+    expect(harness.local()).toMatchObject({
+      records: [{ state: 'replay', outcome: 'cancelled-before-dispatch' }],
+    });
+  });
+
   it('cancels before dispatch as expired if the binding elapses during the final source recheck', async () => {
     const harness = makeChromeHarness();
     harness.setSession(stagedState());
@@ -2229,8 +2435,21 @@ describe('serialized handoff lifecycle', () => {
     expect(await responsePromise).toMatchObject({ state: 'expired' });
     expect(harness.calls.filter((call) => call.name === 'scripting.executeScript')).toHaveLength(3);
     expect(harness.session()).toBeUndefined();
-    expect(harness.local()).toMatchObject({
-      records: [{ state: 'replay', outcome: 'cancelled-before-dispatch' }],
+    expect(harness.calls.filter((call) => call.name === 'local.set').map(
+      (call) => call.value,
+    )).toContainEqual({
+      'challansakshi.safety-ledger.v1': {
+        schema: 'challansakshi.safety-ledger/v1',
+        records: [{
+          state: 'replay',
+          packId: envelope.packId,
+          replayUntil: stagedState().effectiveExpiresAtMs,
+          outcome: 'cancelled-before-dispatch',
+        }],
+      },
+    });
+    expect(harness.local()).toEqual({
+      schema: 'challansakshi.safety-ledger/v1', records: [],
     });
   });
 
