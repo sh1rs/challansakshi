@@ -2482,7 +2482,13 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       ts.forEachChild(node, collectInnerNews);
     };
     collectInnerNews(inner);
-    const innerCalleeShapesValid = innerCalls.every((call) => {
+    let innerTaggedTemplateCount = 0;
+    const collectInnerTaggedTemplates = (node: ts.Node) => {
+      if (ts.isTaggedTemplateExpression(node)) innerTaggedTemplateCount += 1;
+      ts.forEachChild(node, collectInnerTaggedTemplates);
+    };
+    collectInnerTaggedTemplates(inner);
+    const innerCalleeShapesValid = innerTaggedTemplateCount === 0 && innerCalls.every((call) => {
       const chain = canonicalCalleeChain(call.expression);
       return chain !== null && EXPECTED_INNER_CALLEES.includes(chain);
     }) && innerNewExpressions.every((expression) => {
@@ -3353,7 +3359,13 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
         ts.forEachChild(node, collectFillNews);
       };
       collectFillNews(fillFunction);
-      const fillCalleeShapesValid = fillCalls.every((call) => {
+      let fillTaggedTemplateCount = 0;
+      const collectFillTaggedTemplates = (node: ts.Node) => {
+        if (ts.isTaggedTemplateExpression(node)) fillTaggedTemplateCount += 1;
+        ts.forEachChild(node, collectFillTaggedTemplates);
+      };
+      collectFillTaggedTemplates(fillFunction);
+      const fillCalleeShapesValid = fillTaggedTemplateCount === 0 && fillCalls.every((call) => {
         const chain = canonicalCalleeChain(call.expression);
         return chain !== null && EXPECTED_FILL_CALLEES.includes(chain);
       }) && fillNewExpressions.every((expression) => {
@@ -5378,6 +5390,15 @@ describe('serialized handoff lifecycle', () => {
       analyzeMutation(parenthesizedChromeFillCalleeMutation, 'parenthesized chrome fill callee', true),
       'parenthesized chrome fill callee',
     ).toContain('fill call callees must match the canonical set');
+
+    const taggedTemplateInvocationMutation = insertBeforeArming(
+      '  void (writeSessionState as unknown as (parts: TemplateStringsArray) => unknown)` `;',
+      'tagged template canonical invocation',
+    );
+    expect.soft(
+      analyzeMutation(taggedTemplateInvocationMutation, 'tagged template canonical invocation', true),
+      'tagged template canonical invocation',
+    ).toContain('inner call callees must match the canonical set');
 
     const postUsePreviewPlanWriteMutation = insertBeforeArming(
       '  (previewPlan as unknown as { adapter: unknown }).adapter = 0;',
