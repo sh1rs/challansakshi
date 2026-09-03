@@ -416,7 +416,7 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
       || !Number.isSafeInteger(fingerprint[61])
       || (fingerprint[61] as number) < 0
       || typeof fingerprint[62] !== 'boolean'
-      || typeof fingerprint[63] !== 'boolean'
+      || fingerprint[63] !== false
       || fingerprint[64] !== plan.adapterRevision
     ) return rejected() as DestinationOperationResultV1;
 
@@ -477,11 +477,13 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
     const getAttribute = (node: Element, name: string) => Element.prototype.getAttribute.call(node, name);
     const hasAttribute = (node: Element, name: string) => Element.prototype.hasAttribute.call(node, name);
     const matches = (node: Element, selector: string) => Element.prototype.matches.call(node, selector);
-    const allByTag = (root: Document | Element, tag: string): Element[] => {
-      const collection = root instanceof Document
-        ? Document.prototype.getElementsByTagName.call(root, tag)
-        : Element.prototype.getElementsByTagName.call(root, tag);
+    const exactDocumentMatches = (selector: string): Element[] => {
+      const collection = Document.prototype.querySelectorAll.call(document, selector);
       return Array.from(collection) as Element[];
+    };
+    const exactIdTarget = (id: string): Element | null => {
+      const candidates = exactDocumentMatches(`#${id}`);
+      return candidates.length === 1 ? candidates[0]! : null;
     };
     const ownValueIsUnshadowed = (node: Element) => Object.getOwnPropertyDescriptor(node, 'value') === undefined;
     const readNative = (prototype: object, property: string, target: object) => {
@@ -535,11 +537,8 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
       return false;
     };
     const findForm = (): HTMLFormElement | null => {
-      const forms = allByTag(document, 'form').filter((candidate) => (
-        getAttribute(candidate, 'id') === expectedForm.id
-      ));
-      if (forms.length !== 1 || !(forms[0] instanceof HTMLFormElement)) return null;
-      return forms[0];
+      const form = exactIdTarget(expectedForm.id as string);
+      return form instanceof HTMLFormElement ? form : null;
     };
     const inspectTarget = (
       form: HTMLFormElement,
@@ -550,10 +549,13 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
       containerAttribute: string,
       containerValue: string,
     ) => {
-      const targets = allByTag(form, tag).filter((candidate) => getAttribute(candidate, 'id') === id);
-      if (targets.length !== 1) return null;
-      const target = targets[0];
-      if (getAttribute(target, 'name') !== name || !ownValueIsUnshadowed(target)) return null;
+      const target = exactIdTarget(id);
+      if (
+        !target
+        || target.tagName.toLowerCase() !== tag
+        || getAttribute(target, 'name') !== name
+        || !ownValueIsUnshadowed(target)
+      ) return null;
       const container = target.parentElement;
       if (
         !(container instanceof HTMLElement)
@@ -561,9 +563,7 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
         || getAttribute(container, containerAttribute) !== containerValue
         || target.parentElement !== container
       ) return null;
-      const labels = allByTag(container, 'label').filter((candidate) => (
-        candidate.parentElement === container && getAttribute(candidate, 'for') === id
-      ));
+      const labels = exactDocumentMatches(`label[for="${id}"]`);
       if (
         labels.length !== 1
         || !(labels[0] instanceof HTMLLabelElement)
@@ -633,7 +633,7 @@ export async function preflightOrFillDestination(planValue: unknown): Promise<De
         || readNative(HTMLSelectElement.prototype, 'multiple', categoryTarget) !== false
         || readNative(HTMLTextAreaElement.prototype, 'disabled', descriptionTarget) !== false
         || matches(descriptionTarget, ':disabled')
-        || readNative(HTMLTextAreaElement.prototype, 'readOnly', descriptionTarget) !== fingerprint[63]
+        || readNative(HTMLTextAreaElement.prototype, 'readOnly', descriptionTarget) !== false
         || hasAttribute(descriptionTarget, 'minlength') !== fingerprint[56]
         || getAttribute(descriptionTarget, 'minlength') !== fingerprint[57]
         || hasAttribute(descriptionTarget, 'maxlength') !== fingerprint[58]
@@ -835,9 +835,26 @@ function readPlainDataRecord(value: unknown, expectedKeys: readonly string[], or
 
 function readFieldIds(value: unknown): DestinationFieldIdsV1 | null {
   try {
-    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length !== 2) return null;
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
     if (Reflect.ownKeys(value).join(',') !== '0,1,length') return null;
-    return value[0] === 'category' && value[1] === 'description'
+    const first = Object.getOwnPropertyDescriptor(value, '0');
+    const second = Object.getOwnPropertyDescriptor(value, '1');
+    const length = Object.getOwnPropertyDescriptor(value, 'length');
+    if (
+      !first
+      || !first.enumerable
+      || !('value' in first)
+      || !second
+      || !second.enumerable
+      || !('value' in second)
+      || !length
+      || length.enumerable
+      || length.configurable
+      || length.writable !== true
+      || !('value' in length)
+      || length.value !== 2
+    ) return null;
+    return first.value === 'category' && second.value === 'description'
       ? Object.freeze(['category', 'description'] as const)
       : null;
   } catch {

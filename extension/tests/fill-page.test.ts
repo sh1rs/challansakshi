@@ -397,6 +397,63 @@ describe('self-contained destination preview and fill', () => {
     });
   });
 
+  it('rejects globally duplicated target IDs and associated labels without mutating', async () => {
+    const dom = createFixtureDom();
+    const duplicateId = dom.window.document.createElement('input');
+    duplicateId.id = SYNTHETIC_EXTENSION_FIXTURE.destination.category.id;
+    duplicateId.value = 'protected duplicate';
+    const duplicateLabel = dom.window.document.createElement('label');
+    duplicateLabel.htmlFor = SYNTHETIC_EXTENSION_FIXTURE.destination.category.id;
+    duplicateLabel.textContent = SYNTHETIC_EXTENSION_FIXTURE.destination.category.label;
+    dom.window.document.body.append(duplicateId, duplicateLabel);
+
+    await expect(executeInDom(dom, buildPreviewPlan())).resolves.toEqual({
+      schema: 'challansakshi.destination-operation-result/v1',
+      operation: 'preview',
+      status: 'mismatch',
+      code: 'target-mismatch',
+    });
+    expect(category(dom).value).toBe('');
+    expect(description(dom).value).toBe('');
+    expect(duplicateId.value).toBe('protected duplicate');
+  });
+
+  it('does not enumerate unrelated select or textarea controls during exact-ID resolution', async () => {
+    const dom = createFixtureDom();
+    const unrelatedSelect = dom.window.document.createElement('select');
+    unrelatedSelect.id = 'unrelated-select';
+    unrelatedSelect.append(dom.window.document.createElement('option'));
+    const unrelatedTextarea = dom.window.document.createElement('textarea');
+    unrelatedTextarea.id = 'unrelated-textarea';
+    dom.window.document.querySelector('form')?.append(unrelatedSelect, unrelatedTextarea);
+    let unrelatedIdReads = 0;
+    const nativeGetAttribute = dom.window.Element.prototype.getAttribute;
+    dom.window.Element.prototype.getAttribute = function instrumentedGetAttribute(name: string) {
+      if ((this === unrelatedSelect || this === unrelatedTextarea) && name === 'id') unrelatedIdReads += 1;
+      return nativeGetAttribute.call(this, name);
+    };
+
+    await expect(executeInDom(dom, buildPreviewPlan())).resolves.toMatchObject({
+      operation: 'preview', status: 'ready',
+    });
+    expect(unrelatedIdReads).toBe(0);
+  });
+
+  it('rejects a plan that attempts to authorize a read-only description contract', async () => {
+    const dom = createFixtureDom();
+    description(dom).readOnly = true;
+    const plan = JSON.parse(JSON.stringify(buildPreviewPlan())) as DestinationInjectionPlanV1;
+    (plan.structuralFingerprint as unknown as unknown[])[63] = true;
+
+    await expect(executeInDom(dom, plan)).resolves.toEqual({
+      schema: 'challansakshi.destination-operation-result/v1',
+      status: 'rejected',
+      code: 'invalid-plan',
+    });
+    expect(category(dom).value).toBe('');
+    expect(description(dom).value).toBe('');
+  });
+
   it('rejects form, topology, target, native-blankness, and option drift before any mutation', async () => {
     const cases: Array<readonly [string, (dom: JSDOM) => void, string]> = [
       ['form method', (dom) => dom.window.document.querySelector('form')?.setAttribute('method', 'get'), 'form-mismatch'],
@@ -679,5 +736,40 @@ describe('pure destination InjectionResult validators', () => {
     expect(validateDestinationPreviewInjectionResult([accessor])).toEqual({
       status: 'rejected', reason: 'invalid-injection-result',
     });
+  });
+
+  it('rejects getter-backed field tuples without invoking their accessors', () => {
+    let getterCalls = 0;
+    const getterFieldIds = ['category', 'description'];
+    for (const [index, value] of [['0', 'category'], ['1', 'description']] as const) {
+      Object.defineProperty(getterFieldIds, index, {
+        configurable: true,
+        enumerable: true,
+        get() { getterCalls += 1; return value; },
+      });
+    }
+    expect(validateDestinationPreviewInjectionResult([
+      { frameId: 0, documentId: 'document-A', result: { ...ready, fieldIds: getterFieldIds } },
+    ])).toEqual({ status: 'rejected', reason: 'destination-preview-mismatch' });
+    expect(validateDestinationFillInjectionResult([
+      { frameId: 0, documentId: 'document-A', result: { ...complete, fieldIds: getterFieldIds } },
+    ], 'document-A', attemptId)).toEqual({ status: 'rejected', reason: 'destination-fill-mismatch' });
+    expect(getterCalls).toBe(0);
+
+    const nonordinaryLength = ['category', 'description'];
+    Object.defineProperty(nonordinaryLength, 'length', { writable: false });
+    expect(validateDestinationPreviewInjectionResult([
+      { frameId: 0, documentId: 'document-A', result: { ...ready, fieldIds: nonordinaryLength } },
+    ])).toEqual({ status: 'rejected', reason: 'destination-preview-mismatch' });
+
+    const hostileFields = new Proxy(['category', 'description'], {
+      getPrototypeOf() { throw new Error('must fail closed'); },
+    });
+    expect(() => validateDestinationPreviewInjectionResult([
+      { frameId: 0, documentId: 'document-A', result: { ...ready, fieldIds: hostileFields } },
+    ])).not.toThrow();
+    expect(validateDestinationPreviewInjectionResult([
+      { frameId: 0, documentId: 'document-A', result: { ...ready, fieldIds: hostileFields } },
+    ])).toEqual({ status: 'rejected', reason: 'destination-preview-mismatch' });
   });
 });
