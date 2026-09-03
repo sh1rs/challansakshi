@@ -50,6 +50,10 @@ function caseButton(html: string, caseId: string) {
   return html.match(new RegExp(`<button\\b[^>]*data-test-case="${escapedId}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0] ?? '';
 }
 
+function judgeEntry(html: string) {
+  return html.match(/<section\b[^>]*data-challansakshi-judge-entry="v1"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? '';
+}
+
 type SelectionState = {
   filter: 'all' | 'potential-evidence-discrepancy' | 'appears-consistent' | 'inconclusive';
   selectedId: string;
@@ -116,6 +120,29 @@ function renderProof(View: ComponentType<{ state: unknown; dispatch: (action: un
 }
 
 describe('synthetic Test Lab product contract', () => {
+  it('opens on one compact citizen problem pair boundary and primary 90-second action', () => {
+    const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
+    const entry = judgeEntry(html);
+
+    expect(entry).not.toBe('');
+    expect(entry).toContain('Does this fictional image show the same vehicle as the record?');
+    expect(entry).toContain('Synthetic demonstration data');
+    expect(entry).toContain('Blue Honda Activa 6G · Two-wheeler');
+    expect(entry).toContain('White Maruti Swift · Four-wheeler');
+    expect(entry).toContain('AI extracts');
+    expect(entry).toContain('Rules compare');
+    expect(entry).toContain('Citizen controls');
+    expect(entry.match(/<button\b/g)).toHaveLength(1);
+    expect(entry.match(/primaryButton/g)).toHaveLength(1);
+    expect(entry).toContain('>Start the 90-second proof</button>');
+    expect(entry).not.toMatch(/10 fictional cases|Run all 10 cases|Open flagship walkthrough/);
+
+    const suiteIndex = html.indexOf('id="suite-heading"');
+    expect(suiteIndex).toBeGreaterThan(html.indexOf('data-challansakshi-judge-entry="v1"'));
+    expect(html.indexOf('Run all 10 cases')).toBeGreaterThan(suiteIndex);
+    expect(html.indexOf('10 fictional cases')).toBeGreaterThan(suiteIndex);
+  });
+
   it('renders ten fully clickable fictional cases inside the shared demo boundary', () => {
     const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
 
@@ -308,11 +335,12 @@ describe('synthetic Test Lab product contract', () => {
     const extension = renderProof(states.View, states.extension);
 
     expect(before).toContain('Show guardrails');
-    expect(before).toContain('Open optional synthetic extension simulation');
+    expect(before).not.toContain('Open optional synthetic extension simulation');
     expect(before).not.toContain('id="challansakshi-proof-extension-heading"');
     expect(guardrails).toContain('id="challansakshi-proof-guardrails-heading"');
     expect(guardrails).toContain('Guardrails: abstain when the evidence does not support action');
     expect(guardrails.indexOf('TL-05')).toBeLessThan(guardrails.indexOf('TL-01'));
+    expect(guardrails).toContain('Open optional synthetic extension simulation');
     expect(extension).toContain('id="challansakshi-proof-extension-heading"');
     expect(extension).toContain('Synthetic extension simulation');
     expect(extension).toContain('/demo/extension-fixture/source');
@@ -321,8 +349,25 @@ describe('synthetic Test Lab product contract', () => {
   });
 
   it('provides visible focus indication for every programmatically focused proof heading', () => {
-    expect(styles).toMatch(/\.proofLane\s+\[tabindex=['"]-1['"]\]:focus-visible/);
+    expect(styles).toMatch(/\.proofLane\s+\[tabindex=['"]-1['"]\]:focus\s*\{/);
     expect(styles).toMatch(/outline:\s*3px solid/);
+    expect(styles).toMatch(/outline-offset:\s*5px/);
+  });
+
+  it('keeps the judge entry vertically isolated and fluid at 390px 320px and zoom-equivalent widths', () => {
+    expect(ruleFor(styles, '.judgeEntry')).toMatch(/min-height:\s*calc\(100svh\s*-\s*\d+px\)/);
+    expect(ruleFor(styles, '.judgeEntry')).toMatch(/align-content:\s*center/);
+    expect(ruleFor(styles, '.judgePair strong')).toMatch(/overflow-wrap:\s*anywhere/);
+
+    const mobile = mediaBlock(styles, '(max-width: 560px)');
+    expect(ruleFor(mobile, '.judgePair')).toMatch(/grid-template-columns:\s*1fr/);
+    expect(ruleFor(mobile, '.judgeEntry .primaryButton')).toMatch(/min-height:\s*48px/);
+    expect(ruleFor(mobile, '.judgeEntry .primaryButton')).toMatch(/font-size:\s*16px/);
+
+    const narrow = mediaBlock(styles, '(max-width: 390px)');
+    expect(ruleFor(narrow, '.judgeEntry')).toMatch(/padding-inline:\s*0/);
+    const narrowest = mediaBlock(styles, '(max-width: 320px)');
+    expect(ruleFor(narrowest, '.judgeEntry')).toMatch(/min-width:\s*0/);
   });
 
   it('keeps lab controls at 48px and essential copy at 16px on narrow screens', () => {

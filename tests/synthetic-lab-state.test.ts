@@ -21,6 +21,7 @@ type ProofState = {
   } | null;
   routeSimulation: Record<string, unknown> | null;
   returnSimulation: Record<string, unknown> | null;
+  correctionApplied: boolean;
   guardrailCaseIds: readonly string[];
   extensionSimulationVisible: boolean;
   focusTargetId: string | null;
@@ -265,6 +266,9 @@ describe('90-second vertical proof state', () => {
       },
     });
     expect(JSON.stringify(packed.simulation)).not.toMatch(/https?:|canonicalUrl|official-handoff-pack/);
+    expect(JSON.stringify(packed)).not.toMatch(
+      /official-evidence-image|independent-vehicle-record|official-record|citizen-attestation/,
+    );
   });
 
   it('models opening and return as synthetic-only local states with no URL or government request', () => {
@@ -349,6 +353,63 @@ describe('90-second vertical proof state', () => {
     const { state, reduce } = startedProof();
 
     expect(reduce(state, { type: 'CORRECT_IMAGE_OBSERVATIONS' })).toBe(state);
+  });
+
+  it('accepts each proof action only from its exact predecessor and rejects skips rewinds and repeats', () => {
+    const { create, reduce } = proofStateApi();
+    expect(create).toBeTypeOf('function');
+    expect(reduce).toBeTypeOf('function');
+    if (!create || !reduce) return;
+    const idle = create(flagshipCase());
+    const started = reduce(idle, { type: 'START_90_SECOND_PROOF' });
+    const compared = reduce(started, { type: 'CONFIRM_AND_COMPARE', resultRevisionId: RESULT_REVISION });
+    const packed = reduce(compared, {
+      type: 'CONFIRM_SYNTHETIC_PACK',
+      packRevisionId: PACK_REVISION,
+      generatedAt: GENERATED_AT,
+    });
+    const opened = reduce(packed, { type: 'SIMULATE_OFFICIAL_ROUTE_OPEN' });
+    const recorded = reduce(opened, { type: 'RECORD_SYNTHETIC_RETURN' });
+    const corrected = reduce(recorded, { type: 'CORRECT_IMAGE_OBSERVATIONS' });
+    const complete = reduce(corrected, {
+      type: 'CONFIRM_AND_COMPARE',
+      resultRevisionId: CORRECTED_REVISION,
+    });
+    const guardrails = reduce(complete, { type: 'SHOW_GUARDRAILS' });
+    const extension = reduce(guardrails, { type: 'OPEN_EXTENSION_SIMULATION' });
+    const confirm = { type: 'CONFIRM_AND_COMPARE', resultRevisionId: RESULT_REVISION } as const;
+    const confirmPack = {
+      type: 'CONFIRM_SYNTHETIC_PACK',
+      packRevisionId: PACK_REVISION,
+      generatedAt: GENERATED_AT,
+    } as const;
+
+    expect(reduce(idle, confirm)).toBe(idle);
+    expect(reduce(compared, confirm)).toBe(compared);
+    const invalidReconfirm = { ...corrected, correctionApplied: false };
+    expect(reduce(invalidReconfirm, {
+      type: 'CONFIRM_AND_COMPARE',
+      resultRevisionId: CORRECTED_REVISION,
+    })).toBe(invalidReconfirm);
+
+    expect(reduce(started, confirmPack)).toBe(started);
+    expect(reduce(packed, confirmPack)).toBe(packed);
+
+    expect(reduce(compared, { type: 'SIMULATE_OFFICIAL_ROUTE_OPEN' })).toBe(compared);
+    expect(reduce(opened, { type: 'SIMULATE_OFFICIAL_ROUTE_OPEN' })).toBe(opened);
+
+    expect(reduce(packed, { type: 'RECORD_SYNTHETIC_RETURN' })).toBe(packed);
+    expect(reduce(recorded, { type: 'RECORD_SYNTHETIC_RETURN' })).toBe(recorded);
+
+    expect(reduce(opened, { type: 'CORRECT_IMAGE_OBSERVATIONS' })).toBe(opened);
+    expect(reduce(corrected, { type: 'CORRECT_IMAGE_OBSERVATIONS' })).toBe(corrected);
+
+    expect(reduce(started, { type: 'SHOW_GUARDRAILS' })).toBe(started);
+    expect(reduce(guardrails, { type: 'SHOW_GUARDRAILS' })).toBe(guardrails);
+    expect(reduce(extension, { type: 'SHOW_GUARDRAILS' })).toBe(extension);
+
+    expect(reduce(complete, { type: 'OPEN_EXTENSION_SIMULATION' })).toBe(complete);
+    expect(reduce(extension, { type: 'OPEN_EXTENSION_SIMULATION' })).toBe(extension);
   });
 
   it('clears confirmation, pack, route, and return on any material edit', () => {

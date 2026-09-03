@@ -586,13 +586,12 @@ function Landing({ language, onStart, textFirst, imageRevealed, onRevealImage }:
           <h1>{language === 'hi' ? 'क्या फ़ोटो में आपका वाहन है?' : 'Does the photo show your vehicle?'}</h1>
           <p className="hero-lede">{language === 'hi' ? 'एक काल्पनिक वाहन रिकॉर्ड को सिंथेटिक प्रवर्तन फ़ोटो से मिलाएँ, जो दिखता है उसकी पुष्टि करें, फिर नियम नतीजा निकालेंगे।' : 'Compare one fictional vehicle record with a synthetic enforcement photo, confirm what you see, and let deterministic rules produce the result.'}</p>
           <div className="hero-actions">
-            <Button type="button" onClick={onStart}>{language === 'hi' ? 'काल्पनिक डेमो शुरू करें' : 'Start fictional demo'}</Button>
-            <a className="button button-secondary" href="/review">{language === 'hi' ? 'असली चालान की समीक्षा करें' : 'Review a real challan'}</a>
             <a
-              className="button button-quiet"
+              className="button button-primary"
               href="/demo/test-lab"
-              aria-label={language === 'hi' ? '90-सेकंड प्रमाण शुरू करें' : 'Start the 90-second proof'}
-            >{language === 'hi' ? 'टेस्ट लैब खोलें' : 'Open Test Lab'}<small aria-hidden="true"> · {language === 'hi' ? '90-सेकंड प्रमाण' : '90-second proof'}</small></a>
+            >{language === 'hi' ? '90-सेकंड प्रमाण शुरू करें' : 'Start the 90-second proof'}</a>
+            <Button variant="secondary" type="button" onClick={onStart}>{language === 'hi' ? 'लंबा काल्पनिक वॉकथ्रू देखें' : 'Explore the longer fictional walkthrough'}</Button>
+            <a className="button button-quiet" href="/review">{language === 'hi' ? 'असली चालान की समीक्षा करें' : 'Review a real challan'}</a>
           </div>
           <p className="microcopy"><span aria-hidden="true">◉</span>{language === 'hi' ? 'केवल काल्पनिक डेटा · कोई अपलोड या सरकारी कनेक्शन नहीं' : 'Fictional data only · no uploads or government connection'}</p>
         </div>

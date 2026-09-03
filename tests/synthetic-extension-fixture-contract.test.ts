@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -55,11 +56,13 @@ type FixtureContractModule = {
     counters: Record<string, number>;
     dispatchedEventSequence: readonly string[];
     ready: boolean;
+    inert: boolean;
   };
   resetSyntheticFixtureInstrumentationState: () => {
     counters: Record<string, number>;
     dispatchedEventSequence: readonly string[];
     ready: boolean;
+    inert: boolean;
   };
 };
 
@@ -70,6 +73,11 @@ type SourcePageModule = {
 type DestinationPageModule = {
   default: ComponentType;
 };
+
+const destinationSource = readFileSync(
+  new URL('../app/demo/extension-fixture/destination/page.tsx', import.meta.url),
+  'utf8',
+);
 
 async function loadFixtureContract(): Promise<FixtureContractModule | null> {
   const modulePath = '../lib/' + 'synthetic-extension-fixture-contract.ts';
@@ -236,7 +244,9 @@ describe('synthetic extension fixture contract', () => {
     const initial = fixtureModule.createSyntheticFixtureInstrumentationState();
     const reset = fixtureModule.resetSyntheticFixtureInstrumentationState();
     expect(initial.ready).toBe(false);
+    expect(initial.inert).toBe(true);
     expect(reset.ready).toBe(true);
+    expect(reset.inert).toBe(false);
     expect(reset.dispatchedEventSequence).toEqual([]);
     expect(Object.values(reset.counters)).toEqual(Array(17).fill(0));
   });
@@ -261,6 +271,7 @@ describe('synthetic extension fixture contract', () => {
     const html = renderToStaticMarkup(createElement(page.default));
 
     expect(html).toContain('data-product-mode="demo"');
+    expect(html).toMatch(/^<div\b[^>]*\binert=""/);
     expect(html).toContain('id="challansakshi-synthetic-destination-form"');
     expect(html).toContain('name="challansakshiSyntheticDestination"');
     expect(html).toContain('method="post"');
@@ -289,5 +300,32 @@ describe('synthetic extension fixture contract', () => {
     expect(html.match(/data-challansakshi-fixture-counter=/g)).toHaveLength(17);
     expect(html.match(/<output\b[^>]*>0<\/output>/g)).toHaveLength(17);
     expect(html).toContain('data-challansakshi-fixture-event-sequence="true">[]</output>');
+  });
+
+  it('installs the pre-hydration POST interlock before activating the ready fixture', () => {
+    const submitCapture = destinationSource.indexOf("form.addEventListener('submit', onSubmit, true)");
+    const instrumentationInstalled = destinationSource.indexOf('history.replaceState =');
+    const reset = destinationSource.indexOf('resetBaseline();', instrumentationInstalled);
+    const unlock = destinationSource.indexOf('root.inert = false', reset);
+    const ready = destinationSource.indexOf('root.setAttribute(fixture.ready.attribute, fixture.ready.value)', reset);
+
+    expect(submitCapture).toBeGreaterThan(-1);
+    expect(instrumentationInstalled).toBeGreaterThan(submitCapture);
+    expect(reset).toBeGreaterThan(instrumentationInstalled);
+    expect(unlock).toBeGreaterThan(reset);
+    expect(ready).toBeGreaterThan(unlock);
+    expect(destinationSource).toContain('root.inert = true');
+    expect(destinationSource.indexOf('root.removeAttribute(fixture.ready.attribute)'))
+      .toBeGreaterThan(destinationSource.indexOf('root.inert = true'));
+  });
+
+  it('emits every adapter-facing form literal through the shared fixture authority', () => {
+    expect(destinationSource).toContain('for (const { token, id } of fixture.counters)');
+    expect(destinationSource).toContain('method={fixture.form.method}');
+    expect(destinationSource).toContain('defaultValue={fixture.category.options[0].value}');
+    expect(destinationSource.match(/type=\{control\.type\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(destinationSource).not.toContain('`challansakshi-fixture-counter-${token}`');
+    expect(destinationSource).not.toContain('method="post"');
+    expect(destinationSource).not.toContain('defaultValue=""');
   });
 });

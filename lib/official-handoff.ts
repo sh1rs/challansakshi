@@ -36,6 +36,11 @@ export const EXPORT_SAFE_NEUTRAL_LIMITATIONS = Object.freeze({
   'citizen-attestation': 'Based only on the affected person’s explicit report for this review; ChallanSakshi did not independently verify it.',
 } as const satisfies Record<ReviewFactSource, string>);
 
+export const SYNTHETIC_EXPORT_SAFE_LIMITATIONS = Object.freeze({
+  'bundled-synthetic-vehicle-record': 'Bundled fictional vehicle-record observation; not independent or official verification.',
+  'bundled-synthetic-evidence-image': 'Bundled fictional image observation; no live model or government request ran in this proof.',
+} as const);
+
 const OFFICIAL_PACK_BRAND = Symbol('challansakshi.authentic-official-handoff-pack');
 const OFFICIAL_PACK_BRAND_VALUE = Object.freeze({ kind: 'builder-issued-official-pack' as const });
 
@@ -68,8 +73,27 @@ export type FieldPackConfirmation = Readonly<{
   roleConfirmation: PackRoleConfirmation;
 }>;
 
-type SharedHandoffBuildInput = Readonly<{
-  facts: ActionReadyReviewFacts;
+export type SyntheticReviewFactSource = keyof typeof SYNTHETIC_EXPORT_SAFE_LIMITATIONS;
+
+export type SyntheticReviewFact<T> = Readonly<{
+  value: T;
+  source: SyntheticReviewFactSource;
+  confidence: 'high';
+  limitation: string;
+  confirmation: 'citizen-confirmed';
+  reviewRevisionId: string;
+}>;
+
+export type SyntheticReviewedFactProjection = Readonly<{
+  reviewRevisionId: string;
+  vehicleRecordClass: SyntheticReviewFact<'two-wheeler' | 'four-wheeler'>;
+  evidenceImageClass: SyntheticReviewFact<'two-wheeler' | 'four-wheeler'>;
+  readableVehicleRecord: SyntheticReviewFact<true>;
+  supportedSignals: readonly ['vehicle-class-conflict'];
+}>;
+
+type SharedHandoffBuildInput<TFacts> = Readonly<{
+  facts: TFacts;
   resultClass: HandoffResultClass;
   resultRevisionId: string;
   packRevisionId: string;
@@ -78,7 +102,7 @@ type SharedHandoffBuildInput = Readonly<{
   generatedAt: string;
 }>;
 
-export type RealHandoffBuildInput = SharedHandoffBuildInput & Readonly<{
+export type RealHandoffBuildInput = SharedHandoffBuildInput<ActionReadyReviewFacts> & Readonly<{
   mode: 'real';
   sourceKind: 'official-service' | 'official-download';
   route: OfficialDestination;
@@ -86,7 +110,7 @@ export type RealHandoffBuildInput = SharedHandoffBuildInput & Readonly<{
   now: string | Date;
 }>;
 
-export type SyntheticHandoffBuildInput = SharedHandoffBuildInput & Readonly<{
+export type SyntheticHandoffBuildInput = SharedHandoffBuildInput<SyntheticReviewedFactProjection> & Readonly<{
   mode: 'synthetic';
   sourceKind: 'bundled-synthetic-record';
   routeKey: 'synthetic-fixture';
@@ -127,6 +151,15 @@ export type ReviewedFactProjection = Readonly<{
 type PackFactBullet = Readonly<{
   statement: string;
   source: ReviewFactSource;
+  confidence: 'high';
+  limitation: string;
+  confirmation: 'citizen-confirmed';
+  reviewRevisionId: string;
+}>;
+
+type SyntheticPackFactBullet = Readonly<{
+  statement: string;
+  source: SyntheticReviewFactSource;
   confidence: 'high';
   limitation: string;
   confirmation: 'citizen-confirmed';
@@ -209,8 +242,8 @@ export type SyntheticHandoffSimulation = Readonly<{
   resultRevisionId: string;
   packRevisionId: string;
   issueFamily: 'wrong-photo-or-wrong-vehicle';
-  facts: ReviewedFactProjection;
-  factualBullets: readonly PackFactBullet[];
+  facts: SyntheticReviewedFactProjection;
+  factualBullets: readonly SyntheticPackFactBullet[];
   legacyIssueSimulation: LegacyIssueMapping | null;
   description: string;
   checklist: readonly string[];
@@ -554,6 +587,87 @@ function twoVersusFour(left: unknown, right: unknown): boolean {
     || (left === 'four-wheeler' && right === 'two-wheeler');
 }
 
+function readExactDataProperties(
+  value: unknown,
+  expectedKeys: readonly string[],
+): Readonly<Record<string, unknown>> | null {
+  try {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length
+      || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+    ) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const entries: Array<readonly [string, unknown]> = [];
+    for (const key of expectedKeys) {
+      const descriptor = descriptors[key];
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+      entries.push([key, descriptor.value]);
+    }
+    return Object.freeze(Object.fromEntries(entries));
+  } catch {
+    return null;
+  }
+}
+
+function isExactSyntheticSignalTuple(value: unknown): value is readonly ['vehicle-class-conflict'] {
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== 2 || !keys.includes('0') || !keys.includes('length')) return false;
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    const itemDescriptor = Object.getOwnPropertyDescriptor(value, '0');
+    return Boolean(
+      lengthDescriptor
+      && 'value' in lengthDescriptor
+      && lengthDescriptor.value === 1
+      && itemDescriptor
+      && itemDescriptor.enumerable
+      && 'value' in itemDescriptor
+      && itemDescriptor.value === 'vehicle-class-conflict',
+    );
+  } catch {
+    return false;
+  }
+}
+
+const syntheticFactKeys = Object.freeze([
+  'value',
+  'source',
+  'confidence',
+  'limitation',
+  'confirmation',
+  'reviewRevisionId',
+] as const);
+
+function cloneSyntheticFact<T>(
+  candidate: unknown,
+  revisionId: string,
+  source: SyntheticReviewFactSource,
+  acceptsValue: (value: unknown) => value is T,
+): SyntheticReviewFact<T> | null {
+  const fact = readExactDataProperties(candidate, syntheticFactKeys);
+  if (
+    !fact
+    || !acceptsValue(fact.value)
+    || fact.source !== source
+    || fact.confidence !== 'high'
+    || fact.limitation !== SYNTHETIC_EXPORT_SAFE_LIMITATIONS[source]
+    || fact.confirmation !== 'citizen-confirmed'
+    || fact.reviewRevisionId !== revisionId
+  ) return null;
+  return Object.freeze({
+    value: fact.value,
+    source,
+    confidence: 'high',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS[source],
+    confirmation: 'citizen-confirmed',
+    reviewRevisionId: revisionId,
+  });
+}
+
 /** Rebuilds only the neutral, provenance-bearing fields approved by Task 1. */
 export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): ReviewedFactProjection {
   if (!isRecord(facts)) throw new Error('Action-ready facts are invalid.');
@@ -652,6 +766,76 @@ export function buildReviewedFactProjection(facts: ActionReadyReviewFacts): Revi
   return Object.freeze(projection);
 }
 
+/** Rebuilds the proof lane's closed fictional facts without admitting real provenance labels. */
+export function buildSyntheticReviewedFactProjection(
+  facts: SyntheticReviewedFactProjection,
+): SyntheticReviewedFactProjection {
+  const candidate = readExactDataProperties(facts, [
+    'reviewRevisionId',
+    'vehicleRecordClass',
+    'evidenceImageClass',
+    'readableVehicleRecord',
+    'supportedSignals',
+  ]);
+  if (!candidate || !isOpaqueRevisionId(candidate.reviewRevisionId)) {
+    throw new Error('Synthetic reviewed facts are invalid.');
+  }
+  const reviewRevisionId = candidate.reviewRevisionId;
+  const vehicleRecordClass = cloneSyntheticFact(
+    candidate.vehicleRecordClass,
+    reviewRevisionId,
+    'bundled-synthetic-vehicle-record',
+    (value): value is 'two-wheeler' | 'four-wheeler' => value === 'two-wheeler' || value === 'four-wheeler',
+  );
+  const evidenceImageClass = cloneSyntheticFact(
+    candidate.evidenceImageClass,
+    reviewRevisionId,
+    'bundled-synthetic-evidence-image',
+    (value): value is 'two-wheeler' | 'four-wheeler' => value === 'two-wheeler' || value === 'four-wheeler',
+  );
+  const readableVehicleRecord = cloneSyntheticFact(
+    candidate.readableVehicleRecord,
+    reviewRevisionId,
+    'bundled-synthetic-vehicle-record',
+    (value): value is true => value === true,
+  );
+  if (
+    !vehicleRecordClass
+    || !evidenceImageClass
+    || !readableVehicleRecord
+    || !twoVersusFour(vehicleRecordClass.value, evidenceImageClass.value)
+    || !isExactSyntheticSignalTuple(candidate.supportedSignals)
+  ) throw new Error('Synthetic class-conflict facts are invalid.');
+  return Object.freeze({
+    reviewRevisionId,
+    vehicleRecordClass,
+    evidenceImageClass,
+    readableVehicleRecord,
+    supportedSignals: Object.freeze(['vehicle-class-conflict'] as const),
+  });
+}
+
+function mapVehicleClassIssue(
+  recordClass: 'two-wheeler' | 'four-wheeler',
+  evidenceClass: 'two-wheeler' | 'four-wheeler',
+): LegacyIssueMapping | null {
+  if (recordClass === 'four-wheeler' && evidenceClass === 'two-wheeler') {
+    return Object.freeze({
+      issueCode: 'two-wheeler-on-four-wheeler',
+      label: '2 Wheeler Challan On 4 Wheeler',
+      value: '2 Wheeler Challan On 4 Wheeler',
+    });
+  }
+  if (recordClass === 'two-wheeler' && evidenceClass === 'four-wheeler') {
+    return Object.freeze({
+      issueCode: 'four-wheeler-on-two-wheeler',
+      label: '4 Wheeler Challan On 2 Wheeler',
+      value: '4 Wheeler Challan On 2 Wheeler',
+    });
+  }
+  return null;
+}
+
 /** Maps only exact currently specified Legacy labels and values; otherwise abstains. */
 export function mapLegacyIssue(facts: ActionReadyReviewFacts | ReviewedFactProjection): LegacyIssueMapping | null {
   let projection: ReviewedFactProjection;
@@ -684,25 +868,18 @@ export function mapLegacyIssue(facts: ActionReadyReviewFacts | ReviewedFactProje
   if (
     projection.supportedSignals.includes('vehicle-class-conflict')
     && projection.citizenVehicleClass?.source === 'independent-vehicle-record'
-    && projection.citizenVehicleClass.value === 'four-wheeler'
     && projection.observedEvidenceVehicleClass?.source === 'official-evidence-image'
-    && projection.observedEvidenceVehicleClass.value === 'two-wheeler'
-  ) matches.push(Object.freeze({
-    issueCode: 'two-wheeler-on-four-wheeler',
-    label: '2 Wheeler Challan On 4 Wheeler',
-    value: '2 Wheeler Challan On 4 Wheeler',
-  }));
-  if (
-    projection.supportedSignals.includes('vehicle-class-conflict')
-    && projection.citizenVehicleClass?.source === 'independent-vehicle-record'
-    && projection.citizenVehicleClass.value === 'two-wheeler'
-    && projection.observedEvidenceVehicleClass?.source === 'official-evidence-image'
-    && projection.observedEvidenceVehicleClass.value === 'four-wheeler'
-  ) matches.push(Object.freeze({
-    issueCode: 'four-wheeler-on-two-wheeler',
-    label: '4 Wheeler Challan On 2 Wheeler',
-    value: '4 Wheeler Challan On 2 Wheeler',
-  }));
+    && (projection.citizenVehicleClass.value === 'two-wheeler'
+      || projection.citizenVehicleClass.value === 'four-wheeler')
+    && (projection.observedEvidenceVehicleClass.value === 'two-wheeler'
+      || projection.observedEvidenceVehicleClass.value === 'four-wheeler')
+  ) {
+    const classIssue = mapVehicleClassIssue(
+      projection.citizenVehicleClass.value,
+      projection.observedEvidenceVehicleClass.value,
+    );
+    if (classIssue) matches.push(classIssue);
+  }
   if (
     projection.supportedSignals.includes('duplicate-plate')
     && projection.duplicatePlateIndependentBasis?.source === 'citizen-attestation'
@@ -731,10 +908,13 @@ function roleConfirmationIsComplete(value: unknown): value is PackRoleConfirmati
     && value.affectedPersonRequestedPreparation === true;
 }
 
-function validateSharedInput(input: SharedHandoffBuildInput):
+function validateSharedInput<TFacts, TProjection>(
+  input: SharedHandoffBuildInput<TFacts>,
+  projectFacts: (candidate: unknown) => TProjection,
+):
   | Readonly<{
     ok: true;
-    facts: ReviewedFactProjection;
+    facts: TProjection;
     description: string;
     role: ReviewRole;
     resultRevisionId: string;
@@ -776,9 +956,9 @@ function validateSharedInput(input: SharedHandoffBuildInput):
   const generatedAtCandidate: unknown = input.generatedAt;
   if (!isCanonicalTimestamp(generatedAtCandidate)) return { ok: false, reason: 'invalid-timestamp' };
 
-  let facts: ReviewedFactProjection;
+  let facts: TProjection;
   try {
-    facts = buildReviewedFactProjection(factsCandidate as unknown as ActionReadyReviewFacts);
+    facts = projectFacts(factsCandidate);
   } catch {
     return { ok: false, reason: 'invalid-reviewed-facts' };
   }
@@ -839,6 +1019,29 @@ function projectFactBullets(facts: ReviewedFactProjection): readonly PackFactBul
     add('The affected person confirmed that an independent readable vehicle record was reviewed.', facts.independentReadableVehicleRecord);
   }
   return Object.freeze(bullets);
+}
+
+function projectSyntheticFactBullets(
+  facts: SyntheticReviewedFactProjection,
+): readonly SyntheticPackFactBullet[] {
+  return Object.freeze([
+    Object.freeze({
+      statement: `The bundled fictional vehicle record shows a ${facts.vehicleRecordClass.value}.`,
+      source: facts.vehicleRecordClass.source,
+      confidence: 'high' as const,
+      limitation: facts.vehicleRecordClass.limitation,
+      confirmation: 'citizen-confirmed' as const,
+      reviewRevisionId: facts.vehicleRecordClass.reviewRevisionId,
+    }),
+    Object.freeze({
+      statement: `The bundled fictional image appears to show a ${facts.evidenceImageClass.value}.`,
+      source: facts.evidenceImageClass.source,
+      confidence: 'high' as const,
+      limitation: facts.evidenceImageClass.limitation,
+      confirmation: 'citizen-confirmed' as const,
+      reviewRevisionId: facts.evidenceImageClass.reviewRevisionId,
+    }),
+  ]);
 }
 
 function projectSources(facts: ReviewedFactProjection): OfficialHandoffPack['evidenceSourceAndLimitations'] {
@@ -1186,7 +1389,10 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
   if (!isActionReadyOfficialDestination(input.route, input.jurisdictionConfirmation, routeReadyNow)) {
     return { status: 'abstained', reason: 'route-not-action-ready' };
   }
-  const shared = validateSharedInput(input);
+  const shared = validateSharedInput(
+    input,
+    (candidate) => buildReviewedFactProjection(candidate as ActionReadyReviewFacts),
+  );
   if (!shared.ok) return { status: 'abstained', reason: shared.reason };
   const routeReadyInstant = instantMilliseconds(routeReadyNow);
   if (routeReadyInstant === null || new Date(shared.generatedAt).getTime() !== routeReadyInstant) {
@@ -1256,7 +1462,10 @@ export function buildOfficialHandoffPack(input: RealHandoffBuildInput): Official
 
 export function buildSyntheticHandoffSimulation(input: SyntheticHandoffBuildInput): SyntheticHandoffBuildResult {
   if (!isSyntheticWrapperInput(input)) return { status: 'abstained', reason: 'invalid-synthetic-input' };
-  const shared = validateSharedInput(input);
+  const shared = validateSharedInput(
+    input,
+    (candidate) => buildSyntheticReviewedFactProjection(candidate as SyntheticReviewedFactProjection),
+  );
   if (!shared.ok) return { status: 'abstained', reason: shared.reason };
 
   const simulation: SyntheticHandoffSimulation = Object.freeze({
@@ -1272,8 +1481,11 @@ export function buildSyntheticHandoffSimulation(input: SyntheticHandoffBuildInpu
     packRevisionId: shared.packRevisionId,
     issueFamily: 'wrong-photo-or-wrong-vehicle',
     facts: shared.facts,
-    factualBullets: projectFactBullets(shared.facts),
-    legacyIssueSimulation: mapLegacyIssue(shared.facts),
+    factualBullets: projectSyntheticFactBullets(shared.facts),
+    legacyIssueSimulation: mapVehicleClassIssue(
+      shared.facts.vehicleRecordClass.value,
+      shared.facts.evidenceImageClass.value,
+    ),
     description: shared.description,
     checklist: syntheticChecklist,
     nonLegalLimitation: 'This is a fictional proof artifact, not an official pack, filing, legal opinion, or government result.',

@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react';
 import {
   SYNTHETIC_EXTENSION_FIXTURE,
-  SYNTHETIC_FIXTURE_COUNTER_TOKENS,
   resetSyntheticFixtureInstrumentationState,
   type SyntheticFixtureCounterToken,
 } from '../../../../lib/synthetic-extension-fixture-contract';
@@ -11,19 +10,19 @@ import styles from '../../../../components/test-lab/SyntheticTestLabApp.module.c
 
 function protectedControl(control: (typeof SYNTHETIC_EXTENSION_FIXTURE.destination.protectedControls)[number]) {
   if (control.element === 'button') {
-    return <button id={control.id} name={control.name} type="submit">{control.label}</button>;
+    return <button id={control.id} name={control.name} type={control.type}>{control.label}</button>;
   }
   if (control.type === 'file') {
-    return <input id={control.id} name={control.name} type="file" />;
+    return <input id={control.id} name={control.name} type={control.type} />;
   }
   if (control.type === 'checkbox') {
-    return <input id={control.id} name={control.name} type="checkbox" defaultChecked={control.initialChecked} />;
+    return <input id={control.id} name={control.name} type={control.type} defaultChecked={control.initialChecked} />;
   }
   return (
     <input
       id={control.id}
       name={control.name}
-      type="text"
+      type={control.type}
       defaultValue={control.initialValue}
       autoComplete={control.autoComplete}
     />
@@ -43,8 +42,8 @@ export default function SyntheticExtensionFixtureDestinationPage() {
     let counters = { ...resetSyntheticFixtureInstrumentationState().counters };
     let dispatchedEventSequence: string[] = [];
     const renderInstrumentation = () => {
-      for (const token of SYNTHETIC_FIXTURE_COUNTER_TOKENS) {
-        const output = document.getElementById(`challansakshi-fixture-counter-${token}`) as HTMLOutputElement | null;
+      for (const { token, id } of fixture.counters) {
+        const output = document.getElementById(id) as HTMLOutputElement | null;
         if (output) output.value = String(counters[token]);
       }
       const sequence = root.querySelector<HTMLOutputElement>('[data-challansakshi-fixture-event-sequence="true"]');
@@ -60,7 +59,6 @@ export default function SyntheticExtensionFixtureDestinationPage() {
       counters = { ...resetSyntheticFixtureInstrumentationState().counters };
       dispatchedEventSequence = [];
       renderInstrumentation();
-      root.setAttribute(fixture.ready.attribute, fixture.ready.value);
     };
 
     const onInput = (event: Event) => {
@@ -106,7 +104,7 @@ export default function SyntheticExtensionFixtureDestinationPage() {
     form.addEventListener('keydown', onKeydown, true);
     form.addEventListener(fixture.customEvents[0], onCustom, true);
     form.addEventListener(fixture.customEvents[1], onAutosave, true);
-    form.addEventListener('submit', onSubmit);
+    form.addEventListener('submit', onSubmit, true);
     root.addEventListener('click', onClick);
 
     const observer = new MutationObserver(() => record('form-effect', 'form-mutation'));
@@ -139,8 +137,12 @@ export default function SyntheticExtensionFixtureDestinationPage() {
     };
 
     resetBaseline();
+    root.inert = false;
+    root.setAttribute(fixture.ready.attribute, fixture.ready.value);
 
     return () => {
+      root.inert = true;
+      root.removeAttribute(fixture.ready.attribute);
       observer.disconnect();
       form.removeEventListener('input', onInput, true);
       form.removeEventListener('change', onChange, true);
@@ -148,19 +150,18 @@ export default function SyntheticExtensionFixtureDestinationPage() {
       form.removeEventListener('keydown', onKeydown, true);
       form.removeEventListener(fixture.customEvents[0], onCustom, true);
       form.removeEventListener(fixture.customEvents[1], onAutosave, true);
-      form.removeEventListener('submit', onSubmit);
+      form.removeEventListener('submit', onSubmit, true);
       root.removeEventListener('click', onClick);
       window.fetch = originalFetch;
       XMLHttpRequest.prototype.send = originalXhrSend;
       navigator.sendBeacon = originalBeacon;
       history.pushState = originalPushState;
       history.replaceState = originalReplaceState;
-      root.removeAttribute(fixture.ready.attribute);
     };
   }, [fixture]);
 
   return (
-    <div ref={rootRef} className={`${styles.page} ${styles.fixturePage}`} data-product-mode="demo">
+    <div ref={rootRef} className={`${styles.page} ${styles.fixturePage}`} data-product-mode="demo" inert>
       <main className={styles.fixtureMain}>
         <header className={styles.fixtureHeader}>
           <p className={styles.kicker}>SYNTHETIC EXTENSION FIXTURE · LOOPBACK ONLY</p>
@@ -172,14 +173,14 @@ export default function SyntheticExtensionFixtureDestinationPage() {
           ref={formRef}
           id={fixture.form.id}
           name={fixture.form.name}
-          method="post"
+          method={fixture.form.method}
           action={fixture.form.action}
           {...{ [fixture.form.markerAttribute]: fixture.form.markerValue }}
           className={styles.fixtureForm}
         >
           <section {...{ [fixture.category.containerAttribute]: fixture.category.containerValue }}>
             <label htmlFor={fixture.category.id}>{fixture.category.label}</label>
-            <select id={fixture.category.id} name={fixture.category.name} defaultValue="">
+            <select id={fixture.category.id} name={fixture.category.name} defaultValue={fixture.category.options[0].value}>
               {fixture.category.options.map((option) => (
                 <option key={option.value || 'blank'} value={option.value}>{option.label}</option>
               ))}

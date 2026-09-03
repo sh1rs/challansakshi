@@ -1,4 +1,9 @@
-import type { ActionReadyReviewFacts, ReviewFactSource, VehicleClass } from './public-challan';
+import {
+  SYNTHETIC_EXPORT_SAFE_LIMITATIONS,
+  type SyntheticReviewedFactProjection,
+  type SyntheticReviewFact,
+  type SyntheticReviewFactSource,
+} from './official-handoff';
 
 export const SYNTHETIC_SCHEMA_VERSION = '2.0' as const;
 
@@ -177,58 +182,150 @@ const unavailableValuePrefixes = [
   'unavailable',
 ] as const;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  return actual.length === expected.length
-    && actual.every((key, index) => key === [...expected].sort()[index]);
-}
-
 function isBoundedString(value: unknown, maximumLength: number): value is string {
   return typeof value === 'string' && value.length <= maximumLength;
 }
 
-function isObservation(value: unknown, source: SyntheticSourceDocument): value is SyntheticObservation {
-  if (!isPlainObject(value) || !hasExactKeys(value, observationKeys)) return false;
-  return isBoundedString(value.value, 160)
-    && value.source_document === source
-    && ['high', 'medium', 'low'].includes(String(value.confidence))
-    && ['clear', 'partial', 'unclear', 'not-visible'].includes(String(value.visibility))
-    && isBoundedString(value.evidence_reference, 160)
-    && isBoundedString(value.limitation, 280)
-    && value.user_confirmation_required === true;
+function readExactDataRecord(
+  value: unknown,
+  expectedKeys: readonly string[],
+): Readonly<Record<string, unknown>> | null {
+  try {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length
+      || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+    ) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const entries: Array<readonly [string, unknown]> = [];
+    for (const key of expectedKeys) {
+      const descriptor = descriptors[key];
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+      entries.push([key, descriptor.value]);
+    }
+    return Object.freeze(Object.fromEntries(entries));
+  } catch {
+    return null;
+  }
 }
 
-export function validateSyntheticEvidenceExtraction(value: unknown): value is SyntheticEvidenceExtraction {
-  if (!isPlainObject(value) || !hasExactKeys(value, [
+function readObservation(
+  value: unknown,
+  source: SyntheticSourceDocument,
+): SyntheticObservation | null {
+  const observation = readExactDataRecord(value, observationKeys);
+  if (!observation) return null;
+  if (
+    !isBoundedString(observation.value, 160)
+    || observation.source_document !== source
+    || (observation.confidence !== 'high'
+      && observation.confidence !== 'medium'
+      && observation.confidence !== 'low')
+    || (observation.visibility !== 'clear'
+      && observation.visibility !== 'partial'
+      && observation.visibility !== 'unclear'
+      && observation.visibility !== 'not-visible')
+    || !isBoundedString(observation.evidence_reference, 160)
+    || !isBoundedString(observation.limitation, 280)
+    || observation.user_confirmation_required !== true
+  ) return null;
+  return {
+    value: observation.value,
+    source_document: source,
+    confidence: observation.confidence,
+    visibility: observation.visibility,
+    evidence_reference: observation.evidence_reference,
+    limitation: observation.limitation,
+    user_confirmation_required: true,
+  };
+}
+
+function readBoundedStringArray(value: unknown): string[] | null {
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+    if (value.length > 8) return null;
+    const expectedKeys = [...value.keys()].map(String);
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length + 1
+      || !keys.includes('length')
+      || keys.some((key) => typeof key !== 'string' || (key !== 'length' && !expectedKeys.includes(key)))
+    ) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const items: string[] = [];
+    for (const key of expectedKeys) {
+      const descriptor = descriptors[key];
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)
+        || !isBoundedString(descriptor.value, 280)) return null;
+      items.push(descriptor.value);
+    }
+    return items;
+  } catch {
+    return null;
+  }
+}
+
+function readSyntheticEvidenceExtraction(value: unknown): SyntheticEvidenceExtraction | null {
+  const root = readExactDataRecord(value, [
     'schema_version',
     'challan_document',
     'vehicle_record',
     'enforcement_image',
     'limitations',
-  ])) return false;
-  if (value.schema_version !== SYNTHETIC_SCHEMA_VERSION) return false;
-  if (!isPlainObject(value.challan_document)
-    || !isPlainObject(value.vehicle_record)
-    || !isPlainObject(value.enforcement_image)) return false;
-  if (!hasExactKeys(value.challan_document, [...recordDetailFields, ...challanComparisonFields])) return false;
-  if (!hasExactKeys(value.vehicle_record, vehicleRecordFields)) return false;
-  if (!hasExactKeys(value.enforcement_image, [...comparisonFields, 'offence_assessable'])) return false;
-  if (!Array.isArray(value.limitations)
-    || value.limitations.length > 8
-    || value.limitations.some((item) => !isBoundedString(item, 280))) return false;
+  ]);
+  if (!root || root.schema_version !== SYNTHETIC_SCHEMA_VERSION) return null;
+  const challanCandidate = readExactDataRecord(
+    root.challan_document,
+    [...recordDetailFields, ...challanComparisonFields],
+  );
+  const vehicleCandidate = readExactDataRecord(root.vehicle_record, vehicleRecordFields);
+  const enforcementCandidate = readExactDataRecord(
+    root.enforcement_image,
+    [...comparisonFields, 'offence_assessable'],
+  );
+  const limitations = readBoundedStringArray(root.limitations);
+  if (!challanCandidate || !vehicleCandidate || !enforcementCandidate || !limitations) return null;
 
-  const challanDocument = value.challan_document;
-  const vehicleRecord = value.vehicle_record;
-  const enforcementImage = value.enforcement_image;
-  return [...recordDetailFields, ...challanComparisonFields]
-    .every((field) => isObservation(challanDocument[field], 'challan_document'))
-    && vehicleRecordFields.every((field) => isObservation(vehicleRecord[field], 'vehicle_record'))
-    && [...comparisonFields, 'offence_assessable']
-      .every((field) => isObservation(enforcementImage[field], 'enforcement_image'));
+  const challanEntries = [...recordDetailFields, ...challanComparisonFields].map((field) => {
+    const observation = readObservation(challanCandidate[field], 'challan_document');
+    return observation ? [field, observation] as const : null;
+  });
+  const vehicleEntries = vehicleRecordFields.map((field) => {
+    const observation = readObservation(vehicleCandidate[field], 'vehicle_record');
+    return observation ? [field, observation] as const : null;
+  });
+  const enforcementEntries = [...comparisonFields, 'offence_assessable' as const].map((field) => {
+    const observation = readObservation(enforcementCandidate[field], 'enforcement_image');
+    return observation ? [field, observation] as const : null;
+  });
+  if (
+    challanEntries.some((entry) => entry === null)
+    || vehicleEntries.some((entry) => entry === null)
+    || enforcementEntries.some((entry) => entry === null)
+  ) return null;
+  const completeChallanEntries = challanEntries.filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null,
+  );
+  const completeVehicleEntries = vehicleEntries.filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null,
+  );
+  const completeEnforcementEntries = enforcementEntries.filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null,
+  );
+
+  return {
+    schema_version: SYNTHETIC_SCHEMA_VERSION,
+    challan_document: Object.fromEntries(completeChallanEntries) as SyntheticChallanDocument,
+    vehicle_record: Object.fromEntries(completeVehicleEntries) as SyntheticVehicleRecord,
+    enforcement_image: Object.fromEntries(completeEnforcementEntries) as SyntheticEnforcementImage,
+    limitations,
+  };
+}
+
+export function validateSyntheticEvidenceExtraction(value: unknown): value is SyntheticEvidenceExtraction {
+  return readSyntheticEvidenceExtraction(value) !== null;
 }
 
 function blankObservation(source_document: SyntheticSourceDocument, evidence_reference: string): SyntheticObservation {
@@ -356,7 +453,7 @@ function observationIsConclusive(observation: SyntheticObservation): boolean {
 }
 
 export type SyntheticClassConflictProjectionResult =
-  | Readonly<{ status: 'eligible'; facts: ActionReadyReviewFacts }>
+  | Readonly<{ status: 'eligible'; facts: SyntheticReviewedFactProjection }>
   | Readonly<{
     status: 'abstained';
     reason:
@@ -374,24 +471,69 @@ export type SyntheticClassConflictProjectionInput = Readonly<{
   }>;
 }>;
 
-function isStrictConfirmedObservation(
+type ExactSyntheticObservation = Readonly<{
+  value: string;
+  source: SyntheticSourceDocument;
+  reference: string;
+  limitation: string;
+}>;
+
+const exactClassConflictObservations = Object.freeze({
+  recordRegistration: Object.freeze({
+    value: 'KA 01 AB 3317',
+    source: 'vehicle_record',
+    reference: 'Vehicle record · registration',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-vehicle-record'],
+  }),
+  recordCategory: Object.freeze({
+    value: 'Two-wheeler',
+    source: 'vehicle_record',
+    reference: 'Vehicle record · category',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-vehicle-record'],
+  }),
+  recordColour: Object.freeze({
+    value: 'Blue',
+    source: 'vehicle_record',
+    reference: 'Vehicle record · colour',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-vehicle-record'],
+  }),
+  recordMakeModel: Object.freeze({
+    value: 'Honda Activa 6G',
+    source: 'vehicle_record',
+    reference: 'Vehicle record · make and model',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-vehicle-record'],
+  }),
+  imageCategory: Object.freeze({
+    value: 'Four-wheeler',
+    source: 'enforcement_image',
+    reference: 'Image · full vehicle',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-evidence-image'],
+  }),
+  imageColour: Object.freeze({
+    value: 'White',
+    source: 'enforcement_image',
+    reference: 'Image · body panel',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-evidence-image'],
+  }),
+  imageMakeModel: Object.freeze({
+    value: 'Maruti Swift',
+    source: 'enforcement_image',
+    reference: 'Image · body shape and badging',
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS['bundled-synthetic-evidence-image'],
+  }),
+} as const satisfies Record<string, ExactSyntheticObservation>);
+
+function isExactClassConflictObservation(
   observation: SyntheticObservation,
-  expectedSource: SyntheticSourceDocument,
+  expected: ExactSyntheticObservation,
 ): boolean {
-  return observation.source_document === expectedSource
+  return observation.value === expected.value
+    && observation.source_document === expected.source
     && observation.confidence === 'high'
     && observation.visibility === 'clear'
-    && observation.user_confirmation_required === true
-    && observation.value.trim().length > 0
-    && observation.evidence_reference.trim().length > 0
-    && observation.limitation.trim().length > 0;
-}
-
-function explicitVehicleClass(value: string): Extract<VehicleClass, 'two-wheeler' | 'four-wheeler'> | null {
-  const normalized = collapse(value);
-  if (normalized === 'twowheeler') return 'two-wheeler';
-  if (normalized === 'fourwheeler') return 'four-wheeler';
-  return null;
+    && observation.evidence_reference === expected.reference
+    && observation.limitation === expected.limitation
+    && observation.user_confirmation_required === true;
 }
 
 /**
@@ -410,46 +552,60 @@ export function projectSyntheticClassConflictFacts(
     || input.confirmation.resultRevisionId !== input.resultRevisionId
   ) return { status: 'abstained', reason: 'confirmation-revision-mismatch' };
 
-  const recordClassObservation = input.extraction.vehicle_record.vehicle_category;
-  const imageClassObservation = input.extraction.enforcement_image.vehicle_category;
-  const readableRecordObservation = input.extraction.vehicle_record.registration;
-  const recordClass = explicitVehicleClass(recordClassObservation.value);
-  const imageClass = explicitVehicleClass(imageClassObservation.value);
+  const extraction = readSyntheticEvidenceExtraction(input.extraction);
   if (
-    !isStrictConfirmedObservation(recordClassObservation, 'vehicle_record')
-    || !isStrictConfirmedObservation(imageClassObservation, 'enforcement_image')
-    || !isStrictConfirmedObservation(readableRecordObservation, 'vehicle_record')
-    || unavailableValues.has(collapse(readableRecordObservation.value))
-    || unavailableValuePrefixes.some((prefix) => collapse(readableRecordObservation.value).startsWith(prefix))
-    || !recordClass
-    || !imageClass
-    || recordClass === imageClass
+    !extraction
+    || !isExactClassConflictObservation(
+      extraction.vehicle_record.registration,
+      exactClassConflictObservations.recordRegistration,
+    )
+    || !isExactClassConflictObservation(
+      extraction.vehicle_record.vehicle_category,
+      exactClassConflictObservations.recordCategory,
+    )
+    || !isExactClassConflictObservation(
+      extraction.vehicle_record.colour,
+      exactClassConflictObservations.recordColour,
+    )
+    || !isExactClassConflictObservation(
+      extraction.vehicle_record.make_model,
+      exactClassConflictObservations.recordMakeModel,
+    )
+    || !isExactClassConflictObservation(
+      extraction.enforcement_image.vehicle_category,
+      exactClassConflictObservations.imageCategory,
+    )
+    || !isExactClassConflictObservation(
+      extraction.enforcement_image.colour,
+      exactClassConflictObservations.imageColour,
+    )
+    || !isExactClassConflictObservation(
+      extraction.enforcement_image.make_model,
+      exactClassConflictObservations.imageMakeModel,
+    )
   ) return { status: 'abstained', reason: 'class-facts-not-action-ready' };
 
-  const fact = <T>(value: T, source: ReviewFactSource, limitation: string) => Object.freeze({
+  const fact = <T>(value: T, source: SyntheticReviewFactSource): SyntheticReviewFact<T> => Object.freeze({
     value,
     source,
     confidence: 'high' as const,
-    limitation,
+    limitation: SYNTHETIC_EXPORT_SAFE_LIMITATIONS[source],
     confirmation: 'citizen-confirmed' as const,
     reviewRevisionId: input.resultRevisionId,
   });
-  const facts: ActionReadyReviewFacts = Object.freeze({
+  const facts: SyntheticReviewedFactProjection = Object.freeze({
     reviewRevisionId: input.resultRevisionId,
-    citizenVehicleClass: fact(
-      recordClass,
-      'independent-vehicle-record',
-      recordClassObservation.limitation,
+    vehicleRecordClass: fact(
+      'two-wheeler' as const,
+      'bundled-synthetic-vehicle-record',
     ),
-    observedEvidenceVehicleClass: fact(
-      imageClass,
-      'official-evidence-image',
-      imageClassObservation.limitation,
+    evidenceImageClass: fact(
+      'four-wheeler' as const,
+      'bundled-synthetic-evidence-image',
     ),
-    independentReadableVehicleRecord: fact(
+    readableVehicleRecord: fact<true>(
       true,
-      'independent-vehicle-record',
-      readableRecordObservation.limitation,
+      'bundled-synthetic-vehicle-record',
     ),
     supportedSignals: Object.freeze(['vehicle-class-conflict'] as const),
   });

@@ -626,8 +626,9 @@ export function SyntheticJudgeProofView({
           </div>
           <div className={styles.proofActions}>
             <a className={styles.primaryButton} href="/review">Review a real challan in the browser</a>
-            <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'SHOW_GUARDRAILS' })}>Show guardrails</button>
-            <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'OPEN_EXTENSION_SIMULATION' })}>Open optional synthetic extension simulation</button>
+            {state.stage === 'complete' ? (
+              <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'SHOW_GUARDRAILS' })}>Show guardrails</button>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -645,6 +646,11 @@ export function SyntheticJudgeProofView({
               </article>
             ))}
           </div>
+          {state.stage === 'guardrails' ? (
+            <button className={styles.secondaryButton} type="button" onClick={() => dispatch({ type: 'OPEN_EXTENSION_SIMULATION' })}>
+              Open optional synthetic extension simulation
+            </button>
+          ) : null}
         </section>
       ) : null}
 
@@ -852,37 +858,50 @@ export default function SyntheticTestLabApp() {
       <a className={styles.skipLink} href="#test-lab-main">Skip to Test Lab</a>
       <CitizenHeader language="en" setLanguage={() => undefined} boundary="demo" englishOnly />
       <main id="test-lab-main" className={styles.main}>
-        <section className={styles.hero}>
-          <div>
-            <p className={styles.kicker}>SYNTHETIC TEST LAB · 10 FICTIONAL CASES</p>
-            <h1>Synthetic Evidence Test Lab</h1>
-            <p className={styles.heroLead}>Run 10 fictional cases, then edit any observation to see the deterministic result update.</p>
-            <div className={styles.heroActions}>
-              <button className={styles.primaryButton} type="button" onClick={startProof}>Start the 90-second proof</button>
-              <button className={styles.secondaryButton} type="button" onClick={runSuite}>Run all 10 cases</button>
-              <a className={styles.secondaryButton} href="/demo">Open flagship walkthrough</a>
-            </div>
+        <section className={styles.judgeEntry} data-challansakshi-judge-entry="v1">
+          <div className={styles.judgeIntro}>
+            <p className={styles.kicker}>SYNTHETIC 90-SECOND PROOF</p>
+            <h1>Does this fictional image show the same vehicle as the record?</h1>
+            <p className={styles.heroLead}>See one complete evidence-to-handoff loop, including a correction that clears the earlier result.</p>
           </div>
-          <aside className={styles.heroProof} aria-label="10 fictional cases and outcome distribution">
-            <span><b>{syntheticEvaluationCases.length}</b> fictional cases</span>
-            <span><b>{outcomeCounts.discrepancies}</b> potential discrepancies</span>
-            <span><b>{outcomeCounts.consistent}</b> appear consistent</span>
-            <span><b>{outcomeCounts.inconclusive}</b> inconclusive</span>
-          </aside>
-        </section>
-
-        <section className={styles.boundaryStrip} aria-label="Test Lab boundaries">
-          <p><b>Fictional only.</b><span>No real records or public image analysis.</span></p>
-          <p><b>Rules decide findings.</b><span>AI never chooses the result or legal outcome.</span></p>
-          <p><b>Edits clear results.</b><span>Changed facts require fresh human confirmation.</span></p>
+          <div className={styles.judgePair} aria-label="Compact fictional record and image pair">
+            <article>
+              <span>FICTIONAL VEHICLE RECORD</span>
+              <strong>Blue Honda Activa 6G · Two-wheeler</strong>
+            </article>
+            <b aria-hidden="true">≠</b>
+            <article>
+              <span>FICTIONAL ENFORCEMENT IMAGE</span>
+              <strong>White Maruti Swift · Four-wheeler</strong>
+            </article>
+          </div>
+          <div className={styles.judgeBoundary} aria-label="Proof responsibility boundary">
+            <p><b>AI extracts</b><span>Source-linked observations</span></p>
+            <p><b>Rules compare</b><span>Bounded deterministic outcomes</span></p>
+            <p><b>Citizen controls</b><span>Confirmation and every handoff</span></p>
+          </div>
+          <button className={styles.primaryButton} type="button" onClick={startProof}>Start the 90-second proof</button>
+          <p className={styles.judgeSafety}><b>Synthetic demonstration data.</b> No real record, upload, government connection, filing, payment, or decision.</p>
         </section>
 
         {proofRequest > 0 ? <SyntheticJudgeProofLane key={proofRequest} /> : null}
 
         <section className={styles.suiteSection} aria-labelledby="suite-heading">
           <div className={styles.suiteHeading}>
-            <div><p className={styles.kicker}>RUNTIME EVALUATION</p><h2 id="suite-heading">One engine, not ten canned conclusions</h2></div>
+            <div><p className={styles.kicker}>RUNTIME EVALUATION</p><h2 id="suite-heading">Synthetic Evidence Test Lab</h2><p>One engine, not ten canned conclusions.</p></div>
             {suiteReport ? <strong className={suiteReport.failed === 0 ? styles.suitePass : styles.suiteFail}>{suiteReport.passed} / {suiteReport.total} expected outcomes reproduced</strong> : <span>Press Run all to calculate every actual outcome.</span>}
+          </div>
+          <div className={styles.suiteOverview}>
+            <div className={styles.heroActions}>
+              <button className={styles.secondaryButton} type="button" onClick={runSuite}>Run all 10 cases</button>
+              <a className={styles.secondaryButton} href="/demo">Open flagship walkthrough</a>
+            </div>
+            <aside className={styles.heroProof} aria-label="10 fictional cases and outcome distribution">
+              <span><b>{syntheticEvaluationCases.length}</b> fictional cases</span>
+              <span><b>{outcomeCounts.discrepancies}</b> potential discrepancies</span>
+              <span><b>{outcomeCounts.consistent}</b> appear consistent</span>
+              <span><b>{outcomeCounts.inconclusive}</b> inconclusive</span>
+            </aside>
           </div>
           <p className={styles.liveRegion} aria-live="polite">{suiteReport ? `${suiteReport.total} cases complete: ${suiteReport.passed} passed, ${suiteReport.failed} failed.` : ''}</p>
           <div className={styles.filters} role="group" aria-label="Filter Test Lab cases">

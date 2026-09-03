@@ -40,9 +40,14 @@ describe('synthetic demo mobile accessibility', () => {
     const html = renderToStaticMarkup(createElement(ChallanSakshiApp));
 
     expect(html).toContain('<h1>Does the photo show your vehicle?</h1>');
-    expect(html).toContain('>Start fictional demo<');
+    expect(html).toContain('<a class="button button-primary" href="/demo/test-lab">Start the 90-second proof</a>');
+    expect(html).toContain('>Explore the longer fictional walkthrough<');
     expect(html).toContain('>Review a real challan<');
-    expect(html).toContain('>Open Test Lab<');
+    expect(html).not.toContain('>Start fictional demo<');
+    expect(html).not.toContain('>Open Test Lab<');
+    const heroActions = html.match(/<div class="hero-actions">([\s\S]*?)<\/div>/)?.[1] ?? '';
+    expect(heroActions.match(/<(?:a|button)\b/g)).toHaveLength(3);
+    expect(heroActions.match(/button-primary/g)).toHaveLength(1);
     expect(html).toContain('Fictional data only');
     expect(html).toContain('no uploads or government connection');
     expect(html).not.toContain('id="resolution-coverage"');

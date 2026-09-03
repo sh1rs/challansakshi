@@ -35,6 +35,9 @@ import {
   type LegacyIssueMapping,
   type OfficialHandoffPack,
   type RealHandoffBuildInput,
+  type SyntheticReviewedFactProjection,
+  type SyntheticReviewFact,
+  type SyntheticReviewFactSource,
   type SyntheticHandoffBuildInput,
   type SyntheticHandoffSimulation,
 } from '../lib/official-handoff';
@@ -69,6 +72,28 @@ const classConflictFacts = (
   citizenVehicleClass: fact(citizenClass, 'independent-vehicle-record'),
   observedEvidenceVehicleClass: fact(evidenceClass, 'official-evidence-image'),
   independentReadableVehicleRecord: readableRecord(),
+  supportedSignals: ['vehicle-class-conflict'],
+});
+
+const syntheticFact = <T>(
+  value: T,
+  source: SyntheticReviewFactSource,
+): SyntheticReviewFact<T> => ({
+  value,
+  source,
+  confidence: 'high',
+  limitation: source === 'bundled-synthetic-vehicle-record'
+    ? 'Bundled fictional vehicle-record observation; not independent or official verification.'
+    : 'Bundled fictional image observation; no live model or government request ran in this proof.',
+  confirmation: 'citizen-confirmed',
+  reviewRevisionId: RESULT_REVISION,
+});
+
+const syntheticClassConflictFacts = (): SyntheticReviewedFactProjection => ({
+  reviewRevisionId: RESULT_REVISION,
+  vehicleRecordClass: syntheticFact('two-wheeler', 'bundled-synthetic-vehicle-record'),
+  evidenceImageClass: syntheticFact('four-wheeler', 'bundled-synthetic-evidence-image'),
+  readableVehicleRecord: syntheticFact(true, 'bundled-synthetic-vehicle-record'),
   supportedSignals: ['vehicle-class-conflict'],
 });
 
@@ -110,7 +135,7 @@ const syntheticInput = (overrides: Partial<SyntheticHandoffBuildInput> = {}): Sy
   mode: 'synthetic',
   sourceKind: 'bundled-synthetic-record',
   routeKey: 'synthetic-fixture',
-  facts: classConflictFacts(),
+  facts: syntheticClassConflictFacts(),
   resultClass: 'possible-discrepancy',
   resultRevisionId: RESULT_REVISION,
   packRevisionId: PACK_REVISION,
@@ -645,7 +670,31 @@ describe('closed real and synthetic handoff builders', () => {
     });
     expect(result.simulation).not.toHaveProperty('packDigest');
     expect(result.simulation).not.toHaveProperty('formCompatibility');
-    expect(JSON.stringify(result.simulation)).not.toMatch(/canonicalUrl|officialUrl|lastVerifiedAt/);
+    expect(result.simulation.facts).toMatchObject({
+      vehicleRecordClass: { source: 'bundled-synthetic-vehicle-record', value: 'two-wheeler' },
+      evidenceImageClass: { source: 'bundled-synthetic-evidence-image', value: 'four-wheeler' },
+      readableVehicleRecord: { source: 'bundled-synthetic-vehicle-record', value: true },
+    });
+    expect(result.simulation.factualBullets.map((bullet) => bullet.source)).toEqual([
+      'bundled-synthetic-vehicle-record',
+      'bundled-synthetic-evidence-image',
+    ]);
+    expect(result.simulation.legacyIssueSimulation).toMatchObject({
+      issueCode: 'four-wheeler-on-two-wheeler',
+    });
+    expect(JSON.stringify(result.simulation)).not.toMatch(
+      /canonicalUrl|officialUrl|lastVerifiedAt|official-evidence-image|independent-vehicle-record|official-record|citizen-attestation/,
+    );
+  });
+
+  it('runtime-rejects every real-source fact shape at the synthetic builder boundary', () => {
+    expect(buildSyntheticHandoffSimulation({
+      ...syntheticInput(),
+      facts: classConflictFacts(),
+    } as unknown as SyntheticHandoffBuildInput)).toEqual({
+      status: 'abstained',
+      reason: 'invalid-reviewed-facts',
+    });
   });
 
   it('runtime-rejects cross-mode, cross-source, and cross-route wrapper inputs', () => {
@@ -661,6 +710,7 @@ describe('closed real and synthetic handoff builders', () => {
 
   it('keeps the real and synthetic input and output wrappers structurally incompatible', () => {
     expectTypeOf<RealHandoffBuildInput>().not.toMatchTypeOf<SyntheticHandoffBuildInput>();
+    expectTypeOf<ActionReadyReviewFacts>().not.toMatchTypeOf<SyntheticReviewedFactProjection>();
     expectTypeOf<OfficialHandoffPack>().not.toMatchTypeOf<SyntheticHandoffSimulation>();
     expectTypeOf<SyntheticHandoffSimulation>().not.toMatchTypeOf<OfficialHandoffPack>();
   });

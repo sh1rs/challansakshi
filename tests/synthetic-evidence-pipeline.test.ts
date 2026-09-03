@@ -366,6 +366,14 @@ describe('deterministic test laboratory corpus', () => {
       expectedOverall: 'potential-evidence-discrepancy',
     });
     expect(flagship?.extraction.vehicle_record).toMatchObject({
+      registration: {
+        value: 'KA 01 AB 3317',
+        source_document: 'vehicle_record',
+        confidence: 'high',
+        visibility: 'clear',
+        evidence_reference: 'Vehicle record · registration',
+        limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+      },
       vehicle_category: {
         value: 'Two-wheeler',
         source_document: 'vehicle_record',
@@ -449,7 +457,7 @@ describe('deterministic test laboratory corpus', () => {
 
   it('projects only a confirmed same-revision high-and-clear explicit class conflict', () => {
     const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: {
-      extraction: SyntheticEvidenceExtraction;
+      extraction: unknown;
       resultRevisionId: string;
       confirmation: { status: 'confirmed'; resultRevisionId: string };
     }) => { status: string; facts?: { supportedSignals: readonly string[] } });
@@ -469,23 +477,23 @@ describe('deterministic test laboratory corpus', () => {
       status: 'eligible',
       facts: {
         reviewRevisionId: resultRevisionId,
-        citizenVehicleClass: {
+        vehicleRecordClass: {
           value: 'two-wheeler',
-          source: 'independent-vehicle-record',
+          source: 'bundled-synthetic-vehicle-record',
           confidence: 'high',
           confirmation: 'citizen-confirmed',
           reviewRevisionId: resultRevisionId,
         },
-        observedEvidenceVehicleClass: {
+        evidenceImageClass: {
           value: 'four-wheeler',
-          source: 'official-evidence-image',
+          source: 'bundled-synthetic-evidence-image',
           confidence: 'high',
           confirmation: 'citizen-confirmed',
           reviewRevisionId: resultRevisionId,
         },
-        independentReadableVehicleRecord: {
+        readableVehicleRecord: {
           value: true,
-          source: 'independent-vehicle-record',
+          source: 'bundled-synthetic-vehicle-record',
           confidence: 'high',
           confirmation: 'citizen-confirmed',
           reviewRevisionId: resultRevisionId,
@@ -493,6 +501,11 @@ describe('deterministic test laboratory corpus', () => {
         supportedSignals: ['vehicle-class-conflict'],
       },
     });
+    expect(JSON.stringify(project({
+      extraction: flagship.extraction,
+      resultRevisionId,
+      confirmation: { status: 'confirmed', resultRevisionId },
+    }))).not.toMatch(/official-evidence-image|independent-vehicle-record|official-record|citizen-attestation/);
 
     const medium = structuredClone(flagship.extraction);
     medium.enforcement_image.vehicle_category.confidence = 'medium';
@@ -511,7 +524,7 @@ describe('deterministic test laboratory corpus', () => {
 
   it('abstains when any class-conflict source, reference, limit, readability, or confirmation gate is weakened', () => {
     const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: {
-      extraction: SyntheticEvidenceExtraction;
+      extraction: unknown;
       resultRevisionId: string;
       confirmation: { status: 'confirmed'; resultRevisionId: string };
     }) => { status: string; reason?: string });
@@ -521,30 +534,103 @@ describe('deterministic test laboratory corpus', () => {
     expect(flagship).toBeDefined();
     if (!flagship) return;
     const resultRevisionId = '11111111111111111111111111111111';
-    const mutations: Array<(draft: SyntheticEvidenceExtraction) => void> = [
-      (draft) => { draft.vehicle_record.vehicle_category.visibility = 'partial'; },
-      (draft) => { draft.vehicle_record.vehicle_category.evidence_reference = ''; },
-      (draft) => { draft.vehicle_record.vehicle_category.limitation = ''; },
-      (draft) => { draft.vehicle_record.vehicle_category.source_document = 'enforcement_image'; },
-      (draft) => { draft.vehicle_record.vehicle_category.user_confirmation_required = false as true; },
-      (draft) => { draft.enforcement_image.vehicle_category.confidence = 'medium'; },
-      (draft) => { draft.enforcement_image.vehicle_category.evidence_reference = ''; },
-      (draft) => { draft.enforcement_image.vehicle_category.limitation = ''; },
-      (draft) => { draft.vehicle_record.registration.value = 'Unreadable'; },
-      (draft) => { draft.vehicle_record.registration.visibility = 'unclear'; },
-      (draft) => { draft.vehicle_record.registration.confidence = 'medium'; },
-      (draft) => { draft.vehicle_record.registration.evidence_reference = ''; },
-      (draft) => { draft.vehicle_record.registration.limitation = ''; },
+    const observations = [
+      (draft: SyntheticEvidenceExtraction) => draft.vehicle_record.registration,
+      (draft: SyntheticEvidenceExtraction) => draft.vehicle_record.vehicle_category,
+      (draft: SyntheticEvidenceExtraction) => draft.vehicle_record.colour,
+      (draft: SyntheticEvidenceExtraction) => draft.vehicle_record.make_model,
+      (draft: SyntheticEvidenceExtraction) => draft.enforcement_image.vehicle_category,
+      (draft: SyntheticEvidenceExtraction) => draft.enforcement_image.colour,
+      (draft: SyntheticEvidenceExtraction) => draft.enforcement_image.make_model,
+    ];
+    const mutations: Array<(observation: SyntheticObservation) => void> = [
+      (observation) => { observation.value = 'Fabricated replacement'; },
+      (observation) => { observation.source_document = observation.source_document === 'vehicle_record' ? 'enforcement_image' : 'vehicle_record'; },
+      (observation) => { observation.confidence = 'medium'; },
+      (observation) => { observation.visibility = 'partial'; },
+      (observation) => { observation.evidence_reference = 'Fabricated reference'; },
+      (observation) => { observation.limitation = 'Fabricated limitation'; },
+      (observation) => { observation.user_confirmation_required = false as true; },
     ];
 
-    for (const mutate of mutations) {
-      const draft = structuredClone(flagship.extraction);
-      mutate(draft);
-      expect(project({
-        extraction: draft,
-        resultRevisionId,
-        confirmation: { status: 'confirmed', resultRevisionId },
-      })).toEqual({ status: 'abstained', reason: 'class-facts-not-action-ready' });
+    for (const observationFor of observations) {
+      for (const mutate of mutations) {
+        const draft = structuredClone(flagship.extraction);
+        mutate(observationFor(draft));
+        expect(project({
+          extraction: draft,
+          resultRevisionId,
+          confirmation: { status: 'confirmed', resultRevisionId },
+        })).toEqual({ status: 'abstained', reason: 'class-facts-not-action-ready' });
+      }
     }
+  });
+
+  it('abstains without throwing or invoking accessors for malformed non-plain extra or incomplete extractions', () => {
+    const project = Reflect.get(SyntheticPipeline, 'projectSyntheticClassConflictFacts') as undefined | ((input: {
+      extraction: unknown;
+      resultRevisionId: string;
+      confirmation: { status: 'confirmed'; resultRevisionId: string };
+    }) => { status: string; reason?: string });
+    expect(project).toBeTypeOf('function');
+    if (!project) return;
+    const flagship = syntheticEvaluationCases.find((item) => item.id === 'case-04-category-conflict');
+    expect(flagship).toBeDefined();
+    if (!flagship) return;
+    const resultRevisionId = '11111111111111111111111111111111';
+
+    const missingNested = structuredClone(flagship.extraction) as unknown as {
+      vehicle_record: Record<string, unknown>;
+    };
+    delete missingNested.vehicle_record.colour;
+    const nonString = structuredClone(flagship.extraction);
+    nonString.vehicle_record.colour.value = 42 as unknown as string;
+    const extraRoot = { ...structuredClone(flagship.extraction), fabricated: 'extra' };
+    const inherited = Object.assign(
+      Object.create({ fabricated: 'inherited' }) as SyntheticEvidenceExtraction,
+      structuredClone(flagship.extraction),
+    );
+    let getterCalls = 0;
+    const accessorRoot = Object.defineProperty(
+      { ...structuredClone(flagship.extraction) },
+      'vehicle_record',
+      {
+        enumerable: true,
+        get: () => {
+          getterCalls += 1;
+          throw new Error('must not execute');
+        },
+      },
+    );
+    const accessorObservation = structuredClone(flagship.extraction);
+    Object.defineProperty(accessorObservation.vehicle_record.colour, 'value', {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        throw new Error('must not execute');
+      },
+    });
+
+    for (const extractionCandidate of [
+      null,
+      Object.create(null),
+      missingNested,
+      nonString,
+      extraRoot,
+      inherited,
+      accessorRoot,
+      accessorObservation,
+    ]) {
+      let result: { status: string; reason?: string } | undefined;
+      expect(() => {
+        result = project({
+          extraction: extractionCandidate,
+          resultRevisionId,
+          confirmation: { status: 'confirmed', resultRevisionId },
+        });
+      }).not.toThrow();
+      expect(result).toEqual({ status: 'abstained', reason: 'class-facts-not-action-ready' });
+    }
+    expect(getterCalls).toBe(0);
   });
 });

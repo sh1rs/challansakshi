@@ -234,6 +234,10 @@ export function reduceSyntheticJudgeProofState(
   }
 
   if (action.type === 'CONFIRM_AND_COMPARE') {
+    if (
+      state.stage !== 'review-pair'
+      && !(state.stage === 'reconfirm' && state.correctionApplied)
+    ) return state;
     if (!/^[0-9a-f]{32}$/.test(action.resultRevisionId)) return state;
     const result = compareSyntheticEvidence(state.draft);
     const path = decideSyntheticResolutionPath(result);
@@ -264,7 +268,8 @@ export function reduceSyntheticJudgeProofState(
 
   if (action.type === 'CONFIRM_SYNTHETIC_PACK') {
     if (
-      !state.result
+      state.stage !== 'finding'
+      || !state.result
       || state.result.overall !== 'potential-evidence-discrepancy'
       || !state.confirmedResultRevisionId
     ) return state;
@@ -316,7 +321,7 @@ export function reduceSyntheticJudgeProofState(
   }
 
   if (action.type === 'SIMULATE_OFFICIAL_ROUTE_OPEN') {
-    if (!state.simulation) return state;
+    if (state.stage !== 'handoff' || !state.simulation) return state;
     return {
       ...state,
       stage: 'return',
@@ -335,7 +340,7 @@ export function reduceSyntheticJudgeProofState(
   }
 
   if (action.type === 'RECORD_SYNTHETIC_RETURN') {
-    if (!state.routeSimulation) return state;
+    if (state.stage !== 'return' || !state.routeSimulation) return state;
     return {
       ...state,
       stage: 'correction',
@@ -366,7 +371,7 @@ export function reduceSyntheticJudgeProofState(
   }
 
   if (action.type === 'SHOW_GUARDRAILS') {
-    if (state.stage !== 'complete' && state.stage !== 'guardrails' && state.stage !== 'extension') return state;
+    if (state.stage !== 'complete') return state;
     return {
       ...state,
       stage: 'guardrails',
@@ -384,7 +389,7 @@ export function reduceSyntheticJudgeProofState(
   }
 
   if (action.type === 'OPEN_EXTENSION_SIMULATION') {
-    if (state.stage !== 'complete' && state.stage !== 'guardrails') return state;
+    if (state.stage !== 'guardrails') return state;
     return {
       ...state,
       stage: 'extension',

@@ -176,6 +176,7 @@ export type SyntheticFixtureInstrumentationState = Readonly<{
   counters: Readonly<Record<SyntheticFixtureCounterToken, number>>;
   dispatchedEventSequence: readonly string[];
   ready: boolean;
+  inert: boolean;
 }>;
 
 function zeroCounters(): Readonly<Record<SyntheticFixtureCounterToken, number>> {
@@ -189,6 +190,7 @@ export function createSyntheticFixtureInstrumentationState(): SyntheticFixtureIn
     counters: zeroCounters(),
     dispatchedEventSequence: Object.freeze([]),
     ready: false,
+    inert: true,
   });
 }
 
@@ -197,6 +199,7 @@ export function resetSyntheticFixtureInstrumentationState(): SyntheticFixtureIns
     counters: zeroCounters(),
     dispatchedEventSequence: Object.freeze([]),
     ready: true,
+    inert: false,
   });
 }
 

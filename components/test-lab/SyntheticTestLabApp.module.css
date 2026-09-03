@@ -63,6 +63,30 @@
 .heroLead { max-width: 750px; margin: 22px 0 0; color: var(--muted); font-size: 18px; line-height: 1.7; }
 .heroActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 
+.judgeEntry {
+  min-height: calc(100svh - 148px);
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 22px;
+  padding: 34px clamp(0px, 2vw, 24px) 48px;
+}
+.judgeIntro h1 { max-width: 920px; margin: 14px 0 0; font: 700 clamp(38px, 5.6vw, 68px)/1.02 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
+.judgePair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
+.judgePair article { min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.judgePair span { display: block; color: var(--teal-dark); font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.judgePair strong { display: block; margin-top: 7px; overflow-wrap: anywhere; font: 700 clamp(18px, 2.4vw, 26px)/1.2 Georgia, serif; }
+.judgePair > b { color: #934337; font-size: 26px; }
+.judgeBoundary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--line); background: #edf4f0; }
+.judgeBoundary p { min-width: 0; margin: 0; padding: 13px 18px; border-right: 1px solid var(--line); }
+.judgeBoundary p:last-child { border-right: 0; }
+.judgeBoundary b,
+.judgeBoundary span { display: block; overflow-wrap: anywhere; }
+.judgeBoundary b { font: 700 16px Georgia, serif; }
+.judgeBoundary span { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.judgeEntry > .primaryButton { width: fit-content; min-width: min(100%, 280px); }
+.judgeSafety { max-width: 760px; margin: -8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
 .primaryButton,
 .secondaryButton,
 .dangerButton,
@@ -104,7 +128,7 @@
 
 .proofLane { margin-top: 40px; overflow: hidden; border: 1px solid #a8bdb4; border-radius: 18px; background: #fff; box-shadow: 0 22px 55px rgb(25 48 46 / 9%); }
 .proofLane [tabindex='-1'] { scroll-margin-top: 18px; }
-.proofLane [tabindex='-1']:focus-visible { outline: 3px solid var(--amber); outline-offset: 5px; border-radius: 4px; }
+.proofLane [tabindex='-1']:focus { outline: 3px solid var(--amber); outline-offset: 5px; border-radius: 4px; }
 .proofBanner { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 22px; background: var(--navy); color: #fff; }
 .proofBanner strong { font: 700 16px Georgia, serif; }
 .proofBanner span { color: #d9e8e8; font-size: 12px; text-align: right; }
@@ -161,6 +185,8 @@
 .analysisProvenance { margin: 14px 0 0; padding: 11px 13px; border: 1px solid #d7b976; border-radius: 8px; background: #fff8e9; color: #654c22; font-size: 12px; }
 
 .suiteSection { padding-top: 78px; }
+.suiteOverview { display: grid; grid-template-columns: minmax(0, .75fr) minmax(380px, 1.25fr); align-items: center; gap: 28px; margin-top: 20px; }
+.suiteOverview .heroActions { margin-top: 0; }
 .suiteHeading,
 .customHeading,
 .workbenchHeader,
@@ -366,6 +392,7 @@
 @media (max-width: 980px) {
   .hero { grid-template-columns: 1fr; }
   .heroProof { max-width: 620px; }
+  .suiteOverview { grid-template-columns: 1fr; }
   .workbenchGrid { grid-template-columns: 1fr; }
   .caseList { position: static; display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 3px 4px 12px; scroll-snap-type: x proximity; }
   .caseButton { flex: 0 0 min(360px, 82vw); scroll-snap-align: start; }
@@ -375,6 +402,9 @@
   .main { width: min(100% - 28px, 1320px); padding-top: 35px; }
   .hero { min-height: 0; padding: 22px 0 44px; }
   .hero h1 { font-size: 46px; }
+  .judgeBoundary { grid-template-columns: 1fr; }
+  .judgeBoundary p { border-right: 0; border-bottom: 1px solid var(--line); }
+  .judgeBoundary p:last-child { border-bottom: 0; }
   .boundaryStrip { grid-template-columns: 1fr; }
   .boundaryStrip p { border-right: 0; border-bottom: 1px solid var(--line); }
   .suiteHeading,
@@ -403,6 +433,9 @@
 }
 
 @media (max-width: 560px) {
+  .judgePair { grid-template-columns: 1fr; }
+  .judgePair > b { transform: rotate(90deg); justify-self: center; }
+  .judgeEntry .primaryButton { min-height: 48px; width: 100%; font-size: 16px; }
   .heroLead { font-size: 16px; }
   .heroActions { flex-direction: column; }
   .heroActions > * { width: 100%; }
@@ -509,6 +542,14 @@
   .proofSources span,
   .proofSources small,
   .proofOffenceLimit span { font-size: 16px; }
+}
+
+@media (max-width: 390px) {
+  .judgeEntry { padding-inline: 0; }
+}
+
+@media (max-width: 320px) {
+  .judgeEntry { min-height: calc(100svh - 148px); min-width: 0; align-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

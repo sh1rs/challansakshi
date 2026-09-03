@@ -5,6 +5,7 @@ import {
   buildSyntheticHandoffSimulation,
   type OfficialHandoffPack,
   type RealHandoffBuildInput,
+  type SyntheticReviewedFactProjection,
   type SyntheticHandoffBuildInput,
 } from '../lib/official-handoff';
 import {
@@ -40,6 +41,35 @@ const facts: ActionReadyReviewFacts = {
   citizenVehicleClass: fact('four-wheeler', 'independent-vehicle-record'),
   observedEvidenceVehicleClass: fact('two-wheeler', 'official-evidence-image'),
   independentReadableVehicleRecord: fact(true, 'independent-vehicle-record'),
+  supportedSignals: ['vehicle-class-conflict'],
+};
+
+const syntheticFacts: SyntheticReviewedFactProjection = {
+  reviewRevisionId: RESULT_REVISION,
+  vehicleRecordClass: {
+    value: 'two-wheeler',
+    source: 'bundled-synthetic-vehicle-record',
+    confidence: 'high',
+    limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+    confirmation: 'citizen-confirmed',
+    reviewRevisionId: RESULT_REVISION,
+  },
+  evidenceImageClass: {
+    value: 'four-wheeler',
+    source: 'bundled-synthetic-evidence-image',
+    confidence: 'high',
+    limitation: 'Bundled fictional image observation; no live model or government request ran in this proof.',
+    confirmation: 'citizen-confirmed',
+    reviewRevisionId: RESULT_REVISION,
+  },
+  readableVehicleRecord: {
+    value: true,
+    source: 'bundled-synthetic-vehicle-record',
+    confidence: 'high',
+    limitation: 'Bundled fictional vehicle-record observation; not independent or official verification.',
+    confirmation: 'citizen-confirmed',
+    reviewRevisionId: RESULT_REVISION,
+  },
   supportedSignals: ['vehicle-class-conflict'],
 };
 
@@ -142,7 +172,7 @@ describe('authentic official-pack binding and link observation', () => {
     const wrongDigest = { ...currentPack, packDigest: '0'.repeat(64) } as OfficialHandoffPack;
     const syntheticInput: SyntheticHandoffBuildInput = {
       mode: 'synthetic', sourceKind: 'bundled-synthetic-record', routeKey: 'synthetic-fixture',
-      facts, resultClass: 'possible-discrepancy', resultRevisionId: RESULT_REVISION,
+      facts: syntheticFacts, resultClass: 'possible-discrepancy', resultRevisionId: RESULT_REVISION,
       packRevisionId: PACK_REVISION, reviewedDescription: 'Synthetic description.',
       confirmation: { status: 'confirmed', packRevisionId: PACK_REVISION, roleConfirmation: selfConfirmation },
       generatedAt: NOW,
