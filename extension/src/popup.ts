@@ -106,6 +106,10 @@ const COPY = Object.freeze({
     en: 'Stored safety data needs attention',
     hi: 'संग्रहित सुरक्षा डेटा पर ध्यान देना ज़रूरी है',
   }),
+  quarantinedBody: Object.freeze({
+    en: 'Stored safety data could not be trusted and was set aside unchanged. Nothing was repaired or guessed.',
+    hi: 'संग्रहित सुरक्षा डेटा भरोसेमंद नहीं पाया गया और उसे बिना बदले अलग रख दिया गया। कुछ भी सुधारा या अनुमानित नहीं किया गया।',
+  }),
   unsupportedHeading: Object.freeze({
     en: 'This page is not supported',
     hi: 'यह पेज समर्थित नहीं है',
@@ -279,9 +283,14 @@ type ViewSpec = Readonly<{
   actions?: readonly ActionSpec[];
 }>;
 
+let resetAllowed = false;
+
 function renderView(view: ViewSpec) {
   clearTimers();
   valueNodes = [];
+  stagedTuple = null;
+  warningRef = null;
+  resetAllowed = false;
   const nextChildren: Node[] = [];
   const stateHeading = element('h2');
   stateHeading.id = 'state-heading';
@@ -528,7 +537,7 @@ function activateAcknowledge() {
 }
 
 function activateReset() {
-  if (busy) return;
+  if (busy || !resetAllowed) return;
   void runCommand('reset-for-device-owner', false, () => (
     buildResetForDeviceOwnerRequest({
       schema: DEVICE_OWNER_RESET_ATTESTATION_SCHEMA,
@@ -581,23 +590,24 @@ function renderRecovery(command: WorkerCommand, state: 'unresolved-live' | 'unre
     : state === 'unresolved-orphaned'
       ? COPY.orphanedHeading
       : COPY.quarantinedHeading;
+  const bodyCopy = state === 'quarantined' ? COPY.quarantinedBody : COPY.unresolvedLiveBody;
   const offerReset = state === 'unresolved-orphaned' || state === 'quarantined';
   renderView({
     heading,
     language: 'both',
     postAttempt: postAttemptFor(command, state),
     bodyBuilder: (body) => {
-      body.append(bilingualLine(COPY.unresolvedLiveBody, 'state-body'));
+      body.append(bilingualLine(bodyCopy, 'state-body'));
       if (offerReset) body.append(bilingualLine(COPY.resetDisclosure, 'reset-disclosure'));
     },
     actions: offerReset
       ? [{ label: COPY.actionReset, kind: 'danger', language: 'both', onActivate: activateReset }]
       : [],
   });
+  resetAllowed = offerReset;
 }
 
 function renderWarning(command: WorkerCommand, state: 'partial' | 'needs-review', warning: WarningWireV1) {
-  warningRef = warning;
   const heading = state === 'partial' ? COPY.partialHeading : COPY.needsReviewHeading;
   const acknowledgementOpen = Date.now() < warning.warningExpiresAt;
   renderView({
@@ -619,6 +629,7 @@ function renderWarning(command: WorkerCommand, state: 'partial' | 'needs-review'
       onActivate: activateAcknowledge,
     }],
   });
+  warningRef = warning;
   if (acknowledgementOpen) {
     scheduleAt(warning.warningExpiresAt, () => {
       if (warningRef !== warning) return;
@@ -630,7 +641,6 @@ function renderWarning(command: WorkerCommand, state: 'partial' | 'needs-review'
 }
 
 function renderStaged(command: WorkerCommand, tuple: StagedTuple) {
-  stagedTuple = tuple;
   renderView({
     heading: COPY.stagedHeading,
     language: 'both',
@@ -643,13 +653,13 @@ function renderStaged(command: WorkerCommand, tuple: StagedTuple) {
     },
     actions: [{ label: COPY.actionClear, kind: 'secondary', language: 'both', onActivate: activateClear }],
   });
+  stagedTuple = tuple;
   scheduleAt(tuple.effectiveExpiresAtMs, renderLocalExpiry, (timer) => {
     expiryTimer = timer;
   });
 }
 
 function renderSourcePreview(dto: SourcePreviewDtoV1, binding: SourcePreviewBindingWireV1) {
-  previewSlot = { kind: 'source', dto, binding };
   const language = dto.language;
   renderView({
     heading: { en: 'Reviewed fields on this page', hi: 'इस पेज पर जाँचे गए फ़ील्ड' },
@@ -667,16 +677,18 @@ function renderSourcePreview(dto: SourcePreviewDtoV1, binding: SourcePreviewBind
     },
     actions: [{ label: COPY.actionLoad, kind: 'primary', language, onActivate: activateLoad }],
   });
+  previewSlot = { kind: 'source', dto, binding };
   const dtoExpiry = Date.parse(dto.expiresAt);
-  const earliest = Math.min(binding.previewNotAfterMs, Number.isNaN(dtoExpiry) ? binding.previewNotAfterMs : dtoExpiry);
-  scheduleAt(earliest, renderLocalExpiry, (timer) => {
+  if (Number.isNaN(dtoExpiry)) {
+    renderTransportError();
+    return;
+  }
+  scheduleAt(Math.min(binding.previewNotAfterMs, dtoExpiry), renderLocalExpiry, (timer) => {
     expiryTimer = timer;
   });
 }
 
 function renderDestinationPreview(dto: DestinationPreviewDtoV1, tuple: StagedTuple) {
-  previewSlot = { kind: 'destination', dto, tuple };
-  stagedTuple = tuple;
   const language = dto.language;
   renderView({
     heading: { en: 'Ready to fill the reviewed fields', hi: 'जाँचे गए फ़ील्ड भरने के लिए तैयार' },
@@ -700,9 +712,14 @@ function renderDestinationPreview(dto: DestinationPreviewDtoV1, tuple: StagedTup
       { label: COPY.actionClear, kind: 'secondary', language, onActivate: activateClear },
     ],
   });
+  previewSlot = { kind: 'destination', dto, tuple };
+  stagedTuple = tuple;
   const adapterExpiry = Date.parse(dto.adapterExpiresAt);
-  const earliest = Math.min(tuple.effectiveExpiresAtMs, Number.isNaN(adapterExpiry) ? tuple.effectiveExpiresAtMs : adapterExpiry);
-  scheduleAt(earliest, renderLocalExpiry, (timer) => {
+  if (Number.isNaN(adapterExpiry)) {
+    renderTransportError();
+    return;
+  }
+  scheduleAt(Math.min(tuple.effectiveExpiresAtMs, adapterExpiry), renderLocalExpiry, (timer) => {
     expiryTimer = timer;
   });
 }

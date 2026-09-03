@@ -1135,3 +1135,97 @@ describe('compile-time environment label wiring', () => {
     expect(viteConfig).toContain("existsSync(popupEntry) ? popupEntry : virtualPopupEntry");
   });
 });
+
+describe('hardening from independent review', () => {
+  it('locks the frozen Hindi boundary, action, and fallback copy against regression', async () => {
+    let previewDelivered = false;
+    const fillHarness = makePopupHarness({
+      reply: (request: unknown) => {
+        if (!previewDelivered) {
+          previewDelivered = true;
+          void request;
+          return destinationPreviewResponse({ language: 'hi' });
+        }
+        return fixedResponse('fill-empty-reviewed-fields', 'success');
+      },
+    });
+    const dom = await loadPopup(fillHarness);
+    await consent(dom, fillHarness);
+    expect(dom.window.document.querySelector('.action-primary')?.textContent).toBe('जाँचे गए खाली फ़ील्ड भरें');
+    expect(buttonByText(dom, 'तैयार किए गए फ़ील्ड साफ़ करें').className).toContain('action-secondary');
+    buttonByText(dom, 'जाँचे गए खाली फ़ील्ड भरें').click();
+    await settle();
+    expect(bodyText(dom)).toContain('एक्सटेंशन ने Submit पर क्लिक नहीं किया और न ही Submit को कॉल किया');
+    expect(bodyText(dom)).toContain('इनको नहीं छुआ जाएगा: चालान नंबर, CAPTCHA, OTP, Aadhaar, भुगतान, अटैचमेंट, घोषणा, Submit');
+
+    const unsupported = makePopupHarness({ reply: fixedResponse('preview-current-page', 'unsupported') });
+    const unsupportedDom = await loadPopup(unsupported);
+    await consent(unsupportedDom, unsupported);
+    expect(bodyText(unsupportedDom)).toContain('ChallanSakshi पर पहले से दिखाए गए सहायक-कॉपी चरणों का उपयोग करें। यह पॉपअप कोई वेबसाइट नहीं खोलता और क्लिपबोर्ड पर कॉपी नहीं करता।');
+
+    const warningHarness = makePopupHarness({
+      reply: { schema: WORKER_RESPONSE_SCHEMA, command: 'preview-current-page', state: 'needs-review', warning: warningWire() },
+    });
+    const warningDom = await loadPopup(warningHarness);
+    await consent(warningDom, warningHarness);
+    expect(bodyText(warningDom)).toContain('प्रभावित व्यक्ति ने फ़ॉर्म की जाँच कर ली · चेतावनी साफ़ करें');
+
+    const quarantineHarness = makePopupHarness({ reply: fixedResponse('preview-current-page', 'quarantined') });
+    const quarantineDom = await loadPopup(quarantineHarness);
+    await consent(quarantineDom, quarantineHarness);
+    expect(bodyText(quarantineDom)).toContain('मैं इस डिवाइस का स्वामी हूँ और मैंने सभी संबंधित आधिकारिक टैब और सभी ब्राउज़र प्रक्रियाएँ बंद कर दी हैं · डिवाइस स्थिति रीसेट करें');
+  });
+
+  it('gives the quarantined view its own honest body line distinct from unresolved copy', async () => {
+    const quarantineHarness = makePopupHarness({ reply: fixedResponse('preview-current-page', 'quarantined') });
+    const quarantineDom = await loadPopup(quarantineHarness);
+    await consent(quarantineDom, quarantineHarness);
+    expect(bodyText(quarantineDom)).toContain('Stored safety data could not be trusted and was set aside unchanged. Nothing was repaired or guessed.');
+    expect(bodyText(quarantineDom)).toContain('संग्रहित सुरक्षा डेटा भरोसेमंद नहीं पाया गया और उसे बिना बदले अलग रख दिया गया। कुछ भी सुधारा या अनुमानित नहीं किया गया।');
+    expect(bodyText(quarantineDom)).not.toContain('An attempt is still unresolved');
+
+    const orphanHarness = makePopupHarness({ reply: fixedResponse('preview-current-page', 'unresolved-orphaned') });
+    const orphanDom = await loadPopup(orphanHarness);
+    await consent(orphanDom, orphanHarness);
+    expect(bodyText(orphanDom)).toContain('An attempt is still unresolved');
+    expect(bodyText(orphanDom)).not.toContain('Stored safety data could not be trusted');
+  });
+
+  it('disarms detached Clear and reset controls after a terminal render', async () => {
+    const clearHarness = makePopupHarness({
+      reply: (request: unknown) => {
+        const command = (request as { command: string }).command;
+        if (command === 'preview-current-page') return stagedResponse('preview-current-page');
+        return fixedResponse('clear-staged-fields', 'empty');
+      },
+    });
+    const clearDom = await loadPopup(clearHarness);
+    await consent(clearDom, clearHarness);
+    const clearButton = buttonByText(clearDom, 'Clear prepared fields');
+    clearButton.click();
+    await settle();
+    expect(heading(clearDom).textContent).toContain('Nothing is prepared');
+    clearHarness.calls.length = 0;
+    clearButton.click();
+    await settle();
+    expect(clearHarness.calls, 'detached Clear must be inert').toEqual([]);
+
+    const resetHarness = makePopupHarness({
+      reply: (request: unknown) => {
+        const command = (request as { command: string }).command;
+        if (command === 'preview-current-page') return fixedResponse('preview-current-page', 'quarantined');
+        return fixedResponse('reset-for-device-owner', 'empty');
+      },
+    });
+    const resetDom = await loadPopup(resetHarness);
+    await consent(resetDom, resetHarness);
+    const resetButton = buttonByText(resetDom, 'reset device state');
+    resetButton.click();
+    await settle();
+    expect(heading(resetDom).textContent).toContain('Nothing is prepared');
+    resetHarness.calls.length = 0;
+    resetButton.click();
+    await settle();
+    expect(resetHarness.calls, 'detached reset must be inert').toEqual([]);
+  });
+});
