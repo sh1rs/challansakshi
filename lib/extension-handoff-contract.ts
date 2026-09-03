@@ -157,31 +157,37 @@ const SYNTHETIC_EXTENSION_ROUTES = Object.freeze([
   }),
 ] as const);
 
+const REAL_EXTENSION_ENVELOPE_VARIANT = Object.freeze({
+  envelopeMode: 'real',
+  routes: REAL_EXTENSION_ROUTES,
+});
+const SYNTHETIC_EXTENSION_ENVELOPE_VARIANT = Object.freeze({
+  envelopeMode: 'synthetic',
+  routes: SYNTHETIC_EXTENSION_ROUTES,
+});
+
 const EXTENSION_ENVELOPE_PROFILE_AUTHORITIES = Object.freeze({
   'synthetic-development': Object.freeze({
     profile: 'synthetic-development',
     envelopeMode: 'synthetic',
-    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
-    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
-    routes: SYNTHETIC_EXTENSION_ROUTES,
   }),
   'production-disabled': Object.freeze({
     profile: 'production-disabled',
     envelopeMode: 'real',
-    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
-    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
-    routes: REAL_EXTENSION_ROUTES,
   }),
   'production-candidate': Object.freeze({
     profile: 'production-candidate',
     envelopeMode: 'real',
-    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
-    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
-    routes: REAL_EXTENSION_ROUTES,
   }),
 } as const satisfies Record<ExtensionHandoffProfile, ExtensionEnvelopeValidationAuthority['profiles'][number]>);
 
 const ALL_EXTENSION_ENVELOPE_AUTHORITIES: ExtensionEnvelopeValidationAuthority = Object.freeze({
+  routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+  adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
+  envelopeVariants: Object.freeze([
+    SYNTHETIC_EXTENSION_ENVELOPE_VARIANT,
+    REAL_EXTENSION_ENVELOPE_VARIANT,
+  ]),
   profiles: Object.freeze([
     EXTENSION_ENVELOPE_PROFILE_AUTHORITIES['synthetic-development'],
     EXTENSION_ENVELOPE_PROFILE_AUTHORITIES['production-disabled'],
@@ -197,7 +203,13 @@ export function getExtensionEnvelopeValidationAuthority(
     && profile !== 'production-disabled'
     && profile !== 'production-candidate'
   ) return null;
+  const envelopeVariant = profile === 'synthetic-development'
+    ? SYNTHETIC_EXTENSION_ENVELOPE_VARIANT
+    : REAL_EXTENSION_ENVELOPE_VARIANT;
   return Object.freeze({
+    routeRegistryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+    adapterContractVersion: EXTENSION_ADAPTER_CONTRACT_VERSION,
+    envelopeVariants: Object.freeze([envelopeVariant]),
     profiles: Object.freeze([EXTENSION_ENVELOPE_PROFILE_AUTHORITIES[profile]]),
   });
 }

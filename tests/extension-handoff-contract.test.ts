@@ -478,6 +478,49 @@ describe('Unicode and bounded description safeguards', () => {
 });
 
 describe('time, route, version, and profile closure', () => {
+  const validationApis = [
+    ['record validator', (envelope: unknown, context: unknown) => (
+      validateExtensionHandoffEnvelope(envelope, context as ExtensionHandoffValidationContext)
+    )],
+    ['canonical JSON parser', (envelope: unknown, context: unknown) => (
+      parseCanonicalExtensionHandoffEnvelopeJson(
+        JSON.stringify(envelope), context as ExtensionHandoffValidationContext,
+      )
+    )],
+  ] as const;
+
+  it.each(validationApis)('%s preserves registry-version rejection before invalid context', (
+    _name, validate,
+  ) => {
+    const envelope = {
+      ...builtRealEnvelope(),
+      routeRegistryVersion: 'challansakshi.official-routes/invalid',
+    };
+    const invalidContext = {
+      profile: 'invented-profile',
+      nowMs: 'not-a-number',
+      importedAtMs: ISSUED_AT_MS,
+    };
+
+    expect(validate(envelope, invalidContext)).toEqual({
+      status: 'rejected', reason: 'route-registry-version-mismatch',
+    });
+  });
+
+  it.each(validationApis)('%s preserves global route/issue rejection before profile mismatch', (
+    _name, validate,
+  ) => {
+    const envelope = {
+      ...builtRealEnvelope(),
+      routeKey: 'legacy',
+      issueCode: null,
+    };
+
+    expect(validate(envelope, validationContext('synthetic-development'))).toEqual({
+      status: 'rejected', reason: 'route-issue-mismatch',
+    });
+  });
+
   it('accepts canonical UTC timestamps with exactly 60 seconds of future tolerance', () => {
     const envelope = builtRealEnvelope();
     expect(validateExtensionHandoffEnvelope(

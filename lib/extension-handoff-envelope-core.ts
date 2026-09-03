@@ -43,12 +43,17 @@ export type ExtensionEnvelopeRouteAuthority = Readonly<{
 export type ExtensionEnvelopeProfileAuthority = Readonly<{
   profile: string;
   envelopeMode: string;
-  routeRegistryVersion: string;
-  adapterContractVersion: string;
+}>;
+
+export type ExtensionEnvelopeVariantAuthority = Readonly<{
+  envelopeMode: string;
   routes: readonly ExtensionEnvelopeRouteAuthority[];
 }>;
 
 export type ExtensionEnvelopeValidationAuthority = Readonly<{
+  routeRegistryVersion: string;
+  adapterContractVersion: string;
+  envelopeVariants: readonly ExtensionEnvelopeVariantAuthority[];
   profiles: readonly ExtensionEnvelopeProfileAuthority[];
 }>;
 
@@ -278,6 +283,29 @@ export function validateExtensionHandoffEnvelopeAgainstAuthority(
     || typeof candidate.packRevisionId !== 'string' || !OPAQUE_ID_PATTERN.test(candidate.packRevisionId)
   ) return { status: 'rejected', reason: 'invalid-id' };
 
+  if (candidate.routeRegistryVersion !== authority.routeRegistryVersion) {
+    return { status: 'rejected', reason: 'route-registry-version-mismatch' };
+  }
+  if (candidate.adapterContractVersion !== authority.adapterContractVersion) {
+    return { status: 'rejected', reason: 'adapter-contract-version-mismatch' };
+  }
+  if (
+    (candidate.language !== 'en' && candidate.language !== 'hi')
+    || typeof candidate.simpleMode !== 'boolean'
+  ) return { status: 'rejected', reason: 'invalid-presentation' };
+  if (candidate.confirmed !== true || candidate.deviceMode !== 'private') {
+    return { status: 'rejected', reason: 'confirmation-or-device-mismatch' };
+  }
+
+  const routeIssueMatches = authority.envelopeVariants.some((variant) => (
+    variant.envelopeMode === candidate.mode
+    && variant.routes.some((route) => (
+      route.routeKey === candidate.routeKey
+      && route.issueCodes.some((issueCode) => issueCode === candidate.issueCode)
+    ))
+  ));
+  if (!routeIssueMatches) return { status: 'rejected', reason: 'route-issue-mismatch' };
+
   const contextRead = readPlainDataRecord(context, VALIDATION_CONTEXT_KEYS);
   if (!contextRead.ok) return { status: 'rejected', reason: 'invalid-validation-context' };
   const checkedContext = contextRead.values;
@@ -295,25 +323,6 @@ export function validateExtensionHandoffEnvelopeAgainstAuthority(
   if (candidate.mode !== profileAuthority.envelopeMode) {
     return { status: 'rejected', reason: 'profile-mismatch' };
   }
-  if (candidate.routeRegistryVersion !== profileAuthority.routeRegistryVersion) {
-    return { status: 'rejected', reason: 'route-registry-version-mismatch' };
-  }
-  if (candidate.adapterContractVersion !== profileAuthority.adapterContractVersion) {
-    return { status: 'rejected', reason: 'adapter-contract-version-mismatch' };
-  }
-  if (
-    (candidate.language !== 'en' && candidate.language !== 'hi')
-    || typeof candidate.simpleMode !== 'boolean'
-  ) return { status: 'rejected', reason: 'invalid-presentation' };
-  if (candidate.confirmed !== true || candidate.deviceMode !== 'private') {
-    return { status: 'rejected', reason: 'confirmation-or-device-mismatch' };
-  }
-
-  const routeIssueMatches = profileAuthority.routes.some((route) => (
-    route.routeKey === candidate.routeKey
-    && route.issueCodes.some((issueCode) => issueCode === candidate.issueCode)
-  ));
-  if (!routeIssueMatches) return { status: 'rejected', reason: 'route-issue-mismatch' };
 
   const issuedAtMs = canonicalTimestampMilliseconds(candidate.issuedAt);
   const expiresAtMs = canonicalTimestampMilliseconds(candidate.expiresAt);
