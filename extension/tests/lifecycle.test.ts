@@ -443,6 +443,67 @@ const EXPECTED_MODULE_WRITE_SITES = Object.freeze([
   'ensureSessionTrustedAccess:sessionTrustedAccess',
 ] as const);
 
+const EXPECTED_INNER_CALLEES: readonly string[] = Object.freeze([
+  'Date.now',
+  'Date.parse',
+  'Object.freeze',
+  'actionTabMatches',
+  'armUnresolvedLive',
+  'buildDestinationFillPlan',
+  'buildFixedWorkerResponse',
+  'buildRejectedWorkerResponse',
+  'cancelBeforeDispatch',
+  'chrome.scripting.executeScript',
+  'expireStaged',
+  'fixedBlocker',
+  'invalidateStaged',
+  'isPositiveTime',
+  'liveFromSession',
+  'makePreviewPlan',
+  'newOpaque',
+  'nextOperationDeadline',
+  'readyLedger',
+  'reconcileLifecycle',
+  'routeFailure',
+  'runSourceReprobe',
+  'sourceBinding',
+  'stagedPreviewTiming',
+  'validateDestinationRepreflightInjectionResult',
+  'writeSessionState',
+]);
+const EXPECTED_INNER_NEW_CALLEES: readonly string[] = Object.freeze([]);
+const EXPECTED_FILL_CALLEES: readonly string[] = Object.freeze([
+  'Date.now',
+  'Object.freeze',
+  'Promise.reject',
+  'actionTabMatches',
+  'buildFixedWorkerResponse',
+  'buildRejectedWorkerResponse',
+  'cancelBeforeDispatch',
+  'chrome.scripting.executeScript',
+  'completeFill',
+  'deliver',
+  'dispatch.then',
+  'dispatch.then().then',
+  'enqueueLifecycle',
+  'prepareFillDispatch',
+  'runSourceReprobe',
+]);
+const EXPECTED_FILL_NEW_CALLEES: readonly string[] = Object.freeze(['Error']);
+
+function canonicalCalleeChain(expression: ts.Expression): string | null {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression) && !expression.questionDotToken) {
+    const base = canonicalCalleeChain(expression.expression);
+    return base === null ? null : `${base}.${expression.name.text}`;
+  }
+  if (ts.isCallExpression(expression)) {
+    const base = canonicalCalleeChain(expression.expression);
+    return base === null ? null : `${base}()`;
+  }
+  return null;
+}
+
 const EXPECTED_MODULE_SIGNATURES = Object.freeze([
   'import ../../lib/extension-handoff-envelope-core { EXTENSION_ENVELOPE_KEYS, '
     + 'digestCanonicalExtensionHandoffEnvelopeCore, validateExtensionHandoffEnvelopeAgainstAuthority, '
@@ -2415,6 +2476,20 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
     const callsNamed = (name: string) => innerCalls.filter((call) => (
       ts.isIdentifier(call.expression) && call.expression.text === name
     ));
+    const innerNewExpressions: ts.NewExpression[] = [];
+    const collectInnerNews = (node: ts.Node) => {
+      if (ts.isNewExpression(node)) innerNewExpressions.push(node);
+      ts.forEachChild(node, collectInnerNews);
+    };
+    collectInnerNews(inner);
+    const innerCalleeShapesValid = innerCalls.every((call) => {
+      const chain = canonicalCalleeChain(call.expression);
+      return chain !== null && EXPECTED_INNER_CALLEES.includes(chain);
+    }) && innerNewExpressions.every((expression) => {
+      const chain = canonicalCalleeChain(expression.expression);
+      return chain !== null && EXPECTED_INNER_NEW_CALLEES.includes(chain);
+    });
+    if (!innerCalleeShapesValid) report('inner call callees must match the canonical set');
     const certifiedCalls = new Set<ts.CallExpression>();
     const certifiedAggregates = new Set<ts.ObjectLiteralExpression | ts.ArrayLiteralExpression>();
     const certifiedAssignments = new Set<ts.BinaryExpression>();
@@ -3272,6 +3347,20 @@ function analyzePayloadFreeFillPreparation(source: string): readonly string[] {
       const fillCallsNamed = (name: string) => fillCalls.filter((call) => (
         ts.isIdentifier(call.expression) && call.expression.text === name
       ));
+      const fillNewExpressions: ts.NewExpression[] = [];
+      const collectFillNews = (node: ts.Node) => {
+        if (ts.isNewExpression(node)) fillNewExpressions.push(node);
+        ts.forEachChild(node, collectFillNews);
+      };
+      collectFillNews(fillFunction);
+      const fillCalleeShapesValid = fillCalls.every((call) => {
+        const chain = canonicalCalleeChain(call.expression);
+        return chain !== null && EXPECTED_FILL_CALLEES.includes(chain);
+      }) && fillNewExpressions.every((expression) => {
+        const chain = canonicalCalleeChain(expression.expression);
+        return chain !== null && EXPECTED_FILL_NEW_CALLEES.includes(chain);
+      });
+      if (!fillCalleeShapesValid) report('fill call callees must match the canonical set');
       const fillCertifiedCalls = new Set<ts.CallExpression>();
       const fillCertifiedAggregates = new Set<ts.Node>();
       const fillCertifiedAssignments = new Set<ts.BinaryExpression>();
@@ -5171,6 +5260,124 @@ describe('serialized handoff lifecycle', () => {
       analyzeMutation(optionalCanonicalCallMutation, 'optional-chained canonical call', true),
       'optional-chained canonical call',
     ).toContain('inner durability suffix does not match closed grammar');
+
+    const parenthesizedInnerCallMutation = insertBeforeArming(
+      [
+        '  void (writeSessionState)({',
+        "    schema: SESSION_STATE_SCHEMA,",
+        "    state: 'consuming',",
+        "    generation: 'ffffffffffffffffffffffffffffffff',",
+        "    armNonce: 'ffffffffffffffffffffffffffffffff',",
+        "    packId: 'ffffffffffffffffffffffffffffffff',",
+        "    attemptId: 'ffffffffffffffffffffffffffffffff',",
+        "    replayUntil: 1,",
+        "    attemptNotAfterMs: 1,",
+        "    destinationTabId: 1,",
+        "    destinationDocumentId: 'destination-document-A',",
+        '  });',
+      ].join('\n'),
+      'parenthesized canonical inner call',
+    );
+    expect.soft(
+      analyzeMutation(parenthesizedInnerCallMutation, 'parenthesized canonical inner call', true),
+      'parenthesized canonical inner call',
+    ).toContain('inner call callees must match the canonical set');
+
+    const assertedInnerCalleeMutation = insertBeforeArming(
+      [
+        '  void (writeSessionState as typeof writeSessionState)({',
+        "    schema: SESSION_STATE_SCHEMA,",
+        "    state: 'consuming',",
+        "    generation: 'ffffffffffffffffffffffffffffffff',",
+        "    armNonce: 'ffffffffffffffffffffffffffffffff',",
+        "    packId: 'ffffffffffffffffffffffffffffffff',",
+        "    attemptId: 'ffffffffffffffffffffffffffffffff',",
+        "    replayUntil: 1,",
+        "    attemptNotAfterMs: 1,",
+        "    destinationTabId: 1,",
+        "    destinationDocumentId: 'destination-document-A',",
+        '  });',
+      ].join('\n'),
+      'asserted canonical inner callee',
+    );
+    expect.soft(
+      analyzeMutation(assertedInnerCalleeMutation, 'asserted canonical inner callee', true),
+      'asserted canonical inner callee',
+    ).toContain('inner call callees must match the canonical set');
+
+    const unknownInnerCalleeMutation = insertBeforeArming(
+      "  void eval('null');",
+      'unknown inner callee invocation',
+    );
+    expect.soft(
+      analyzeMutation(unknownInnerCalleeMutation, 'unknown inner callee invocation', true),
+      'unknown inner callee invocation',
+    ).toContain('inner call callees must match the canonical set');
+
+    const parenthesizedFillCallMutation = replaceExactlyOnce(
+      source,
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+      ].join('\n'),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+        '  void (writeSessionState)({',
+        "    schema: SESSION_STATE_SCHEMA,",
+        "    state: 'consuming',",
+        "    generation: 'ffffffffffffffffffffffffffffffff',",
+        "    armNonce: 'ffffffffffffffffffffffffffffffff',",
+        "    packId: 'ffffffffffffffffffffffffffffffff',",
+        "    attemptId: 'ffffffffffffffffffffffffffffffff',",
+        "    replayUntil: 1,",
+        "    attemptNotAfterMs: 1,",
+        "    destinationTabId: 1,",
+        "    destinationDocumentId: 'destination-document-A',",
+        '  });',
+      ].join('\n'),
+      'parenthesized canonical fill call',
+    );
+    expect.soft(
+      analyzeMutation(parenthesizedFillCallMutation, 'parenthesized canonical fill call', true),
+      'parenthesized canonical fill call',
+    ).toContain('fill call callees must match the canonical set');
+
+    const constructedFillCalleeMutation = replaceExactlyOnce(
+      source,
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+      ].join('\n'),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+        "  void new Function('return null;');",
+      ].join('\n'),
+      'constructed fill callee',
+    );
+    expect.soft(
+      analyzeMutation(constructedFillCalleeMutation, 'constructed fill callee', true),
+      'constructed fill callee',
+    ).toContain('fill call callees must match the canonical set');
+
+    const parenthesizedChromeFillCalleeMutation = replaceExactlyOnce(
+      source,
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+      ].join('\n'),
+      [
+        '  let sourceAuthorization: SourcePreviewBindingV1 | null = prepared.sourceAuthorization;',
+        '  prepared = null;',
+        '  void (chrome.scripting.executeScript)({ target: { tabId: 1 }, func: () => null });',
+      ].join('\n'),
+      'parenthesized chrome fill callee',
+    );
+    expect.soft(
+      analyzeMutation(parenthesizedChromeFillCalleeMutation, 'parenthesized chrome fill callee', true),
+      'parenthesized chrome fill callee',
+    ).toContain('fill call callees must match the canonical set');
 
     const postUsePreviewPlanWriteMutation = insertBeforeArming(
       '  (previewPlan as unknown as { adapter: unknown }).adapter = 0;',
