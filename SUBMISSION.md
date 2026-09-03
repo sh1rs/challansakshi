@@ -14,9 +14,9 @@ After a fictional rejection, the same frozen revision is compared with the suppl
 
 The compact preflight never opens suspicious destinations and stops on synthetic APK, credential, remote-access, or personal-payment requests. Text-first mode leaves the 1.6 MB evidence image unloaded until requested; the independent Simpler view adds a plain-language summary and roomier layout. The app works from typed fixtures, with optional structured OpenAI vision and fallback. No real upload, filing, payment, authentication, or government connection exists, and no result declares innocence, fraud, legal ownership, or invalidity.
 
-## Beyond the hero demo: public-interest early access
+## Beyond the hero demo: public-beta release candidate
 
-The same evidence discipline now powers two isolated, immediately usable manual tools:
+The same evidence discipline now powers two isolated, end-to-end manual tools in the release-candidate build. They work without a government connection; public deployment remains gated by the operating, privacy, security, accessibility, and external-review checks documented in the repository:
 
 - **Real e-Challan self-review (`/review`)** — citizens inspect the official record themselves, record only structured masked observations, and receive a conservative local worksheet. It refuses message-only sources, uninspected images, colour-only mismatch claims, and inferred deadlines.
 - **TollSakshi (`/fastag`)** — citizens reconcile a recorded FASTag debit against the official tag mapping, event time, plaza, two-debit pattern, alternate payment, tariff/pass, and credit observations. Its Transaction-to-Journey Map, TP1–TP14 Passport, bank-versus-NHAI-FASTag routing, current-rule issuer review, and aligned-record refusal turn the architecture into a second deep mobility vertical.
@@ -57,7 +57,7 @@ The journey is:
 
 ## What actually works
 
-- Isolated public manual e-Challan review and TollSakshi routes with Privacy/Data Controls and Safety/Official Routes pages.
+- Isolated end-to-end manual e-Challan review and TollSakshi routes with Privacy/Data Controls and Safety/Official Routes pages.
 - Memory-only real-mode state, masked identifiers, explicit device choice, shared-device in-app copy/download lock plus an approximately 10-minute inactivity exit attempt, Quick exit, and a test-enforced no-storage/no-network/no-upload/no-form boundary.
 - Domain- and UI-level artifact gates: aligned, already-credited, incomplete, Virtual Court, unknown-jurisdiction, or stale-attestation outcomes cannot expose a dispute request.
 - English-only real-case workflows until their rule explanations and downloadable artifacts complete Hindi safety review; the synthetic journey remains bilingual.
