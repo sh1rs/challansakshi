@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import ChallanSakshiApp from '../components/ChallanSakshiApp';
+import { CitizenFooter } from '../components/shared/CitizenChrome';
 import CitizenHome from '../components/public-beta/CitizenHome';
 import CitizenReviewApp from '../components/public-beta/CitizenReviewApp';
 import { PrivacyPage } from '../components/public-beta/PublicInfoPage';
@@ -98,6 +99,26 @@ describe('shared citizen product chrome', () => {
     expect(html).toContain('Not a government, bank, court, or toll service');
     expect(landmarkFrom(html, 'footer')).toContain('Independent non-public prototype');
     expect(html).not.toMatch(/early access|public beta/i);
+  });
+
+  it.each(realSurfaces)('%s carries the single credential and upload boundary in its footer', (_name, createSurface) => {
+    const footer = landmarkFrom(renderToStaticMarkup(createSurface()), 'footer');
+
+    expect(footer).toContain('Never enter a government password, CAPTCHA, OTP, Aadhaar, or payment credentials here.');
+    expect(footer).toContain('Your files and answers stay in this browser and are not uploaded.');
+    expect(footer).toContain('this is not legal advice and no outcome is guaranteed');
+  });
+
+  it('states the same boundary in Hindi without falling back to English', () => {
+    const footer = landmarkFrom(
+      renderToStaticMarkup(createElement(CitizenFooter, { language: 'hi' })),
+      'footer',
+    );
+
+    expect(footer).toContain('सरकारी पासवर्ड, CAPTCHA, OTP, Aadhaar या भुगतान क्रेडेंशियल यहाँ कभी दर्ज न करें।');
+    expect(footer).toContain('आपकी फ़ाइलें और उत्तर इसी ब्राउज़र में रहते हैं और अपलोड नहीं होते।');
+    expect(footer).toContain('यह कानूनी सलाह नहीं है और नतीजे की गारंटी नहीं है।');
+    expect(footer).not.toContain('Never enter a government password');
   });
 
   it('keeps the synthetic status explicit while using the citizen shell', () => {

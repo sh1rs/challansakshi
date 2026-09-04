@@ -90,4 +90,36 @@ describe('TollSakshi official route links', () => {
     expect(preview).toBeGreaterThan(download);
     expect(packet.slice(preview)).toContain('<pre>{worksheet}</pre>');
   });
+
+  it('opens the start step without hero chrome, boundary asides, or consent gates', () => {
+    expect(tollSource).not.toContain('styles.hero');
+    expect(tollSource).not.toContain('TollSafetyBoundary');
+    expect(tollSource).not.toContain('consent.manual');
+    expect(tollSource).not.toContain('consent.minimum');
+    expect(tollSource).toContain("useState<Device>('private')");
+    expect(tollSource).toContain("setDevice(event.target.checked ? 'shared' : 'private')");
+    expect(tollSource).toContain('This is a shared or public device');
+    expect(tollSource).toMatch(/device === 'shared' && <p className=\{styles\.restricted\}>/);
+    expect(tollSource).toContain('copy and download stay disabled');
+    expect(tollSource).toContain('A UPI PIN sends money; it is never needed to receive a refund.');
+    expect(tollSource.indexOf('A UPI PIN sends money')).toBeLessThan(tollSource.indexOf('styles.sourceGrid'));
+    expect(tollSource).toContain('{mode === \'synthetic\' && <p className={styles.restricted} role="status"><strong>SYNTHETIC FIXTURE — NOT A REAL TRANSACTION.</strong>');
+  });
+
+  it('keeps the anti-scam line beside the official route links and the IHMCL FAQ labelling', () => {
+    const packet = tollSource.slice(tollSource.indexOf("{step === 'packet' &&"));
+    const antiScam = packet.indexOf('Do not use a phone number or link copied from the debit message.');
+    const routeLinks = packet.indexOf('<div className={styles.sourceGrid}>');
+
+    expect(antiScam).toBeGreaterThanOrEqual(0);
+    expect(routeLinks).toBeGreaterThan(antiScam);
+    expect(packet).toContain('IHMCL’s FASTag FAQ currently says to report an incorrect deduction within 40 days of the transaction date');
+    expect(packet).toContain('chargeback process normally takes up to 20–30 working days');
+  });
+
+  it('moves focus to the changed step heading without an animated jump and lands on the erroring record group', () => {
+    expect(tollSource).toContain('heading.focus({ preventScroll: true });');
+    expect(tollSource).toContain("(heading.closest('section') ?? heading).scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });");
+    expect(tollSource).toContain("recordGroupRefs.current[group]?.querySelector('summary')?.focus();");
+  });
 });

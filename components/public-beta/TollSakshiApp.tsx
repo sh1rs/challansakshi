@@ -42,22 +42,6 @@ function SelectField({ id, label, value, onChange, options, help }: { id: string
   return <div className={styles.field}><label htmlFor={id}>{label}</label><select id={id} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select>{help && <small>{help}</small>}</div>;
 }
 
-function TollSafetyBoundary({ language }: { language: Language }) {
-  return (
-    <aside className={styles.boundary} aria-label={t(language, 'Important product boundary', 'महत्वपूर्ण उत्पाद सीमा')}>
-      <span aria-hidden="true">i</span>
-      <div>
-        <strong>{t(language, 'No uploads. Your entries stay in this tab.', 'कोई अपलोड नहीं। आपकी प्रविष्टियाँ इसी टैब में रहती हैं।')}</strong>
-        <details className={styles.privacyDetails}>
-          <summary>{t(language, 'Privacy details', 'गोपनीयता विवरण')}</summary>
-          <p>{t(language, 'Your entries remain in this app tab. They are not sent to an AI model, bank, toll operator, or authority. The hosting provider still receives ordinary page-request metadata.', 'आपकी प्रविष्टियाँ इसी ऐप टैब में रहती हैं। वे AI मॉडल, बैंक, टोल ऑपरेटर या प्राधिकरण को नहीं भेजी जातीं। होस्टिंग प्रदाता को फिर भी सामान्य पेज-अनुरोध मेटाडेटा मिलता है।')}</p>
-        </details>
-        <p>{t(language, 'Never enter a password, OTP, Aadhaar, PIN, CVV, or full account/tag/reference number here. A UPI PIN sends money; it is never needed to receive a refund.', 'यहाँ पासवर्ड, OTP, Aadhaar, PIN, CVV या पूरा खाता/टैग/रेफरेंस नंबर कभी दर्ज न करें। UPI PIN पैसे भेजता है; रिफंड पाने के लिए इसकी कभी आवश्यकता नहीं होती।')}</p>
-      </div>
-    </aside>
-  );
-}
-
 function concernLabel(concern: TollConcern, language: Language): string {
   const labels: Record<TollConcern, [string, string]> = {
     unrecognised: ['I do not recognise this crossing', 'मैं इस क्रॉसिंग को नहीं पहचानता/पहचानती'],
@@ -85,8 +69,7 @@ export default function TollSakshiApp() {
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<Step>('start');
   const [mode, setMode] = useState<Mode>('real');
-  const [device, setDevice] = useState<Device | null>(null);
-  const [consent, setConsent] = useState({ manual: false, minimum: false });
+  const [device, setDevice] = useState<Device>('private');
   const [answers, setAnswers] = useState<TollReviewAnswers>(defaultAnswers);
   const [refs, setRefs] = useState(emptyRefs);
   const [direction, setDirection] = useState('unknown');
@@ -134,7 +117,8 @@ export default function TollSakshiApp() {
   const assessment = useMemo(() => assessTollReview(reviewedAnswers), [reviewedAnswers]);
   const passport = useMemo(() => buildTollPassport(reviewedAnswers, refs), [reviewedAnswers, refs]);
   const worksheet = useMemo(() => buildTollWorksheet({ ...refs, answers: reviewedAnswers, assessment, synthetic: mode === 'synthetic' }), [refs, reviewedAnswers, assessment, mode]);
-  const startReady = Boolean(device && (mode === 'synthetic' || (consent.manual && consent.minimum)));
+  // A review mode is always selected (real by default) and the shared-device checkbox is optional, so the start step never blocks.
+  const startReady = true;
   const sourceReady = mode === 'synthetic'
     ? reviewedAnswers.sourceVerified
     : Boolean(sourceConfirmed && refs.issuerLabel && refs.issuerLabel !== 'Not sure');
@@ -167,7 +151,7 @@ export default function TollSakshiApp() {
           : '';
 
   const reset = () => {
-    setStep('start'); setMode('real'); setDevice(null); setConsent({ manual: false, minimum: false }); setAnswers(defaultAnswers);
+    setStep('start'); setMode('real'); setDevice('private'); setAnswers(defaultAnswers);
     setRefs(emptyRefs); setDirection('unknown'); setFixtureId('different-vehicle'); setError(''); setArtifactStatus('');
     setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
     setSourceVerificationSignature(''); setReconciliationSignature('');
@@ -205,7 +189,10 @@ export default function TollSakshiApp() {
   useEffect(() => {
     if (previousStepRef.current === step) return;
     previousStepRef.current = step;
-    guideHeadingRef.current?.focus();
+    const heading = guideHeadingRef.current;
+    if (!heading) return;
+    heading.focus({ preventScroll: true });
+    (heading.closest('section') ?? heading).scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
   }, [step]);
 
   const quickExit = () => { reset(); window.location.replace('/'); };
@@ -215,30 +202,27 @@ export default function TollSakshiApp() {
   };
 
   const selectRealMode = () => {
-    setMode('real'); setConsent({ manual: false, minimum: false }); setAnswers(defaultAnswers); setRefs(emptyRefs);
+    setMode('real'); setAnswers(defaultAnswers); setRefs(emptyRefs);
     setDirection('unknown'); setFixtureId('different-vehicle'); setError(''); setArtifactStatus('');
     setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
     setSourceVerificationSignature(''); setReconciliationSignature('');
   };
 
   const selectSyntheticMode = () => {
-    setMode('synthetic'); setConsent({ manual: false, minimum: false }); setArtifactStatus('');
+    setMode('synthetic'); setArtifactStatus('');
     setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
     setSourceVerificationSignature(''); setReconciliationSignature('');
     chooseFixture(tollFixtures[0]);
   };
 
   const continueStart = () => {
-    if (!device || (mode === 'real' && (!consent.manual || !consent.minimum))) {
-      setError(t(language, 'Choose the device type and, for real records, confirm both safety statements before continuing.', 'डिवाइस प्रकार चुनें और असली रिकॉर्ड के लिए दोनों सुरक्षा कथनों की पुष्टि करें।'));
-      return;
-    }
     if (mode === 'synthetic') chooseFixture(tollFixtures.find((fixture) => fixture.id === fixtureId) ?? tollFixtures[0]);
     setError(''); setStep('records');
   };
 
   const showRecordError = (group: RecordGroup, message: string) => {
     recordGroupRefs.current[group]?.setAttribute('open', '');
+    recordGroupRefs.current[group]?.querySelector('summary')?.focus();
     setError(message);
   };
 
@@ -335,35 +319,17 @@ export default function TollSakshiApp() {
           headingRef={guideHeadingRef}
           headingId="toll-guided-step-title"
         />
-        {step === 'start' && <section className={`${styles.hero} ${styles.heroCompact}`}>
-          <div><p className={styles.eyebrow}>{t(language, 'FASTag transaction reconciliation', 'FASTag लेन-देन मिलान')}</p><h1>{t(language, 'Does this debit match a ', 'क्या यह डेबिट दर्ज ')}<em>{t(language, 'documented crossing?', 'क्रॉसिंग से मेल खाता है?')}</em></h1><p className={styles.lede}>{t(language, 'TollSakshi separates passage time from posting time, maps the debit to vehicle and plaza records, and prepares a conservative issuer checklist.', 'TollSakshi पास होने के समय को पोस्टिंग समय से अलग रखता है, डेबिट को वाहन और प्लाज़ा रिकॉर्ड से मिलाता है, और सावधान जारीकर्ता सूची बनाता है।')}</p></div>
-          <div className={styles.heroCard}><span>{t(language, 'NEW MOBILITY SERVICE', 'नई मोबिलिटी सेवा')}</span><strong>{t(language, 'One evidence core, a new real-world pain point', 'एक सबूत प्रणाली, नई असली समस्या')}</strong><ul><li>{t(language, 'Unrecognised toll crossing', 'अपरिचित टोल क्रॉसिंग')}</li><li>{t(language, 'Possible duplicate debit or missing credit', 'संभावित दोहरा डेबिट या गायब क्रेडिट')}</li><li>{t(language, 'Alternate payment, fare, class, or pass conflict', 'अन्य भुगतान, किराया, श्रेणी या पास अंतर')}</li></ul></div>
-        </section>}
-        <TollSafetyBoundary language={language} />
-        {mode === 'synthetic' && <p className={styles.restricted} role="status"><strong>SYNTHETIC FIXTURE — NOT A REAL TRANSACTION.</strong> {t(language, 'Every value on this page is fictional. Do not submit the generated note to an issuer.', 'इस पेज की हर जानकारी काल्पनिक है। तैयार नोट जारीकर्ता को जमा न करें।')}</p>}
+        {mode === 'synthetic' && <p className={styles.restricted} role="status"><strong>SYNTHETIC FIXTURE — NOT A REAL TRANSACTION.</strong> {t(language, 'Fictional values only. Do not send the generated note to an issuer.', 'सभी मान काल्पनिक हैं। तैयार नोट जारीकर्ता को न भेजें।')}</p>}
 
         {step === 'start' && <section className={styles.panel} aria-labelledby="toll-start-title">
-          <div className={styles.sectionTitle}><div><h2 id="toll-start-title">{t(language, 'Manual self-review or synthetic walkthrough', 'मैन्युअल स्वयं-समीक्षा या सिंथेटिक उदाहरण')}</h2><p>{t(language, 'Real mode is tab-memory only. Synthetic cases contain no citizen data.', 'रियल मोड केवल टैब मेमोरी में है। सिंथेटिक मामलों में नागरिक डेटा नहीं है।')}</p></div></div>
-          <div className={styles.choiceFields}>
-            <fieldset className={styles.choiceFieldset}>
-              <legend className={styles.choiceLegend}>{t(language, 'A. Which review do you want?', 'A. आप कौन-सी समीक्षा चाहते हैं?')}</legend>
-              <div className={styles.choiceGroup} role="group">
-                <button type="button" aria-pressed={mode === 'real'} className={`${styles.choice} ${mode === 'real' ? styles.choiceActive : ''}`} onClick={selectRealMode}><strong>{t(language, 'Use my own records manually', 'अपने रिकॉर्ड मैन्युअली उपयोग करें')}</strong><small>{t(language, 'No uploads, no AI, no account, no automatic filing.', 'कोई अपलोड, AI, अकाउंट या स्वचालित फाइलिंग नहीं।')}</small></button>
-                <button type="button" aria-pressed={mode === 'synthetic'} className={`${styles.choice} ${mode === 'synthetic' ? styles.choiceActive : ''}`} onClick={selectSyntheticMode}><strong>{t(language, 'Explore fictional examples', 'काल्पनिक उदाहरण देखें')}</strong><small>{t(language, 'Different vehicle, citizen-reported two-debit pattern, and records-aligned refusal.', 'अलग वाहन, नागरिक द्वारा दर्ज दो-डेबिट पैटर्न और मेल खाते रिकॉर्ड का इनकार।')}</small></button>
-              </div>
-            </fieldset>
-            <fieldset className={styles.choiceFieldset}>
-              <legend className={styles.choiceLegend}>{t(language, 'B. What kind of device is this?', 'B. यह किस तरह का डिवाइस है?')}</legend>
-              <div className={styles.choiceGroup} role="group">
-                <button type="button" aria-pressed={device === 'private'} className={`${styles.choice} ${device === 'private' ? styles.choiceActive : ''}`} onClick={() => setDevice('private')}><strong>{t(language, 'Private device', 'निजी डिवाइस')}</strong><small>{t(language, 'Local copy/download available at the end.', 'अंत में स्थानीय कॉपी/डाउनलोड उपलब्ध।')}</small></button>
-                <button type="button" aria-pressed={device === 'shared'} className={`${styles.choice} ${device === 'shared' ? styles.choiceActive : ''}`} onClick={() => setDevice('shared')}><strong>{t(language, 'Shared or public device', 'साझा या सार्वजनिक डिवाइस')}</strong><small>{t(language, 'In-app copy/download controls are disabled; the page attempts to leave after about 10 minutes of inactivity.', 'ऐप के कॉपी/डाउनलोड नियंत्रण बंद हैं; लगभग 10 मिनट निष्क्रिय रहने पर पेज बाहर निकलने का प्रयास करता है।')}</small></button>
-              </div>
-            </fieldset>
+          <div className={styles.sectionTitle}><div><h2 id="toll-start-title">{t(language, 'Manual self-review or synthetic walkthrough', 'मैन्युअल स्वयं-समीक्षा या सिंथेटिक उदाहरण')}</h2></div></div>
+          <div className={styles.choiceGroup} role="group" aria-label={t(language, 'Review mode', 'समीक्षा मोड')}>
+            <button type="button" aria-pressed={mode === 'real'} className={`${styles.choice} ${mode === 'real' ? styles.choiceActive : ''}`} onClick={selectRealMode}><strong>{t(language, 'Use my own records manually', 'अपने रिकॉर्ड मैन्युअली उपयोग करें')}</strong></button>
+            <button type="button" aria-pressed={mode === 'synthetic'} className={`${styles.choice} ${mode === 'synthetic' ? styles.choiceActive : ''}`} onClick={selectSyntheticMode}><strong>{t(language, 'Explore fictional examples', 'काल्पनिक उदाहरण देखें')}</strong></button>
           </div>
           {mode === 'synthetic' && <div className={styles.fixtureBar}>{tollFixtures.map((fixture) => <button type="button" key={fixture.id} className={`${styles.fixtureChoice} ${fixtureId === fixture.id ? styles.choiceActive : ''}`} onClick={() => chooseFixture(fixture)}><span className={styles.syntheticChip}>SYNTHETIC</span><strong>{fixture.label}</strong><small>{fixture.description}</small></button>)}</div>}
-          {mode === 'real' && <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={consent.manual} onChange={(event) => setConsent({ ...consent, manual: event.target.checked })} />{t(language, 'I understand this is manual self-review and no record is inspected, submitted, or authenticated.', 'मैं समझता/समझती हूँ कि यह मैन्युअल स्वयं-समीक्षा है और कोई रिकॉर्ड देखा, जमा या प्रमाणित नहीं होता।')}</label><label className={styles.check}><input type="checkbox" checked={consent.minimum} onChange={(event) => setConsent({ ...consent, minimum: event.target.checked })} />{t(language, 'I will use only last-four identifiers and will not enter credentials or full financial data.', 'मैं केवल अंतिम-चार पहचान का उपयोग करूँगा/करूँगी और क्रेडेंशियल या पूरा वित्तीय डेटा दर्ज नहीं करूँगा/करूँगी।')}</label></div>}
-          <p className={styles.restricted}><strong>{t(language, 'Never enter:', 'कभी दर्ज न करें:')}</strong> {t(language, 'OTP, UPI PIN, card PIN/CVV, password, complete card/account/tag/reference number, Aadhaar, phone/address, RC image, or a bank statement.', 'OTP, UPI PIN, कार्ड PIN/CVV, पासवर्ड, पूरा कार्ड/खाता/टैग/रेफरेंस नंबर, आधार, फ़ोन/पता, RC तस्वीर या बैंक स्टेटमेंट।')}</p>
-          {error && <p className={styles.inlineError} role="alert">{error}</p>}
+          <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={device === 'shared'} onChange={(event) => setDevice(event.target.checked ? 'shared' : 'private')} />{t(language, 'This is a shared or public device', 'यह साझा या सार्वजनिक डिवाइस है')}</label></div>
+          {device === 'shared' && <p className={styles.restricted}>{t(language, 'For safety, this review clears after about 10 minutes without deliberate activity, and copy and download stay disabled.', 'सुरक्षा के लिए, लगभग 10 मिनट तक कोई जानबूझकर गतिविधि न होने पर यह समीक्षा साफ़ हो जाती है, और कॉपी तथा डाउनलोड बंद रहते हैं।')}</p>}
           <div className={styles.actions}><a className={styles.buttonQuiet} href="/review">{t(language, 'Review an e-Challan instead', 'इसके बजाय ई-चालान समीक्षा करें')}</a><button type="button" className={styles.button} onClick={continueStart}>{t(language, 'Start transaction check', 'लेन-देन जाँच शुरू करें')} →</button></div>
         </section>}
 
@@ -440,7 +406,7 @@ export default function TollSakshiApp() {
         </section>}
 
         {step === 'reconcile' && <section className={styles.panel} aria-labelledby="reconcile-title">
-          <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Transaction-to-Journey Map', 'लेन-देन से यात्रा नक्शा')}</p><h2 id="reconcile-title">{t(language, 'Where the supplied entries agree, conflict, or stop', 'दी गई प्रविष्टियाँ कहाँ मेल, अंतर या रुकती हैं')}</h2><p>{t(language, 'A map of questions—not a bank or toll decision.', 'प्रश्नों का नक्शा—बैंक या टोल का निर्णय नहीं।')}</p></div></div>
+          <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Transaction-to-Journey Map', 'लेन-देन से यात्रा नक्शा')}</p><h2 id="reconcile-title">{t(language, 'Where the supplied entries agree, conflict, or stop', 'दी गई प्रविष्टियाँ कहाँ मेल, अंतर या रुकती हैं')}</h2></div></div>
           <div className={styles.resultHero} data-tone={assessment.finding === 'records-align' || assessment.finding === 'already-corrected' ? 'good' : assessment.finding === 'insufficient' ? 'stop' : 'warn'}><span className={styles.resultIcon} aria-hidden="true">{assessment.finding === 'records-align' || assessment.finding === 'already-corrected' ? '✓' : assessment.finding === 'insufficient' ? 'i' : '!'}</span><div><h2>{assessment.title}</h2><p>{assessment.reasons.join(' ')}</p><p><strong>{t(language, 'Based only on your answers.', 'केवल आपके उत्तरों पर आधारित।')}</strong> {t(language, 'The issuer and plaza records were not authenticated here.', 'जारीकर्ता और प्लाज़ा रिकॉर्ड यहाँ प्रमाणित नहीं हुए।')}</p></div></div>
           <div className={styles.journeyMap} role="table" aria-label={t(language, 'Relevant transaction checks', 'प्रासंगिक लेन-देन जाँच')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{visibleMapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{row.status}</span></div>)}</div>
           <details className={styles.disclosure}>
@@ -455,11 +421,9 @@ export default function TollSakshiApp() {
           <div className={styles.sectionTitle}><div>{isNoDisputeOutcome ? <>
             <p className={styles.eyebrow}>{t(language, 'Review complete', 'समीक्षा पूरी')}</p>
             <h2 id="packet-title">{t(language, 'Keep the outcome with your evidence checklist', 'परिणाम को अपनी सबूत सूची के साथ रखें')}</h2>
-            <p>{t(language, 'This is a limited self-review based on your confirmed entries.', 'यह आपकी पुष्टि की गई प्रविष्टियों पर आधारित सीमित स्वयं-समीक्षा है।')}</p>
           </> : <>
             <p className={styles.eyebrow}>{t(language, 'Next action', 'अगला कदम')}</p>
             <h2 id="packet-title">{t(language, 'Use the official route, then review what remains', 'आधिकारिक रास्ता उपयोग करें, फिर बची जाँच देखें')}</h2>
-            <p>{t(language, 'The account provider or responsible authority remains the decision-maker.', 'खाता प्रदाता या जिम्मेदार प्राधिकरण ही निर्णयकर्ता रहता है।')}</p>
           </>}</div></div>
 
           {isNoDisputeOutcome ? <section className={styles.terminalOutcome} aria-labelledby="terminal-outcome-title">
@@ -476,6 +440,7 @@ export default function TollSakshiApp() {
             <p className={styles.eyebrow}>{t(language, 'Primary official route', 'मुख्य आधिकारिक रास्ता')}</p>
             <h3 id="official-route-title">{displayedRoute}</h3>
             <p>{t(language, 'Open the destination independently. Do not use a phone number or link copied from the debit message.', 'गंतव्य स्वतंत्र रूप से खोलें। डेबिट संदेश से कॉपी फ़ोन नंबर या लिंक उपयोग न करें।')}</p>
+            <p>{t(language, 'A UPI PIN sends money; it is never needed to receive a refund. Never share an OTP, PIN, CVV, or a full account, card, or tag number with anyone who contacts you about this debit.', 'UPI PIN पैसे भेजता है; रिफंड पाने के लिए इसकी कभी आवश्यकता नहीं होती। इस डेबिट के बारे में संपर्क करने वाले किसी भी व्यक्ति के साथ OTP, PIN, CVV या पूरा खाता, कार्ड या टैग नंबर कभी साझा न करें।')}</p>
             <div className={styles.sourceGrid}>
               {(assessment.route === 'issuer' || assessment.route === 'issuer-and-1033' || assessment.route === 'verify-records') && (isNhaiFastagSource ? <a href="https://fastag.ihmcl.com" target="_blank" rel="noreferrer"><strong>{t(language, 'Verified IHMCL customer portal — NHAI FASTag ↗', 'सत्यापित IHMCL ग्राहक पोर्टल — NHAI FASTag ↗')}</strong><small>{t(language, 'For a bank-neutral NHAI FASTag or NHAI Prepaid Wallet.', 'बैंक-न्यूट्रल NHAI FASTag या NHAI Prepaid Wallet के लिए।')}</small></a> : <a href="https://www.npci.org.in/product/netc/netc-fastag-helpline" target="_blank" rel="noreferrer"><strong>{t(language, assessment.shouldPrepareIssuerNote ? 'Find the current issuer route ↗' : 'Find the official FASTag account route ↗', assessment.shouldPrepareIssuerNote ? 'वर्तमान जारीकर्ता रास्ता खोजें ↗' : 'आधिकारिक FASTag खाता रास्ता खोजें ↗')}</strong><small>{t(language, 'NPCI issuer directory; verify the issuer before continuing.', 'NPCI जारीकर्ता निर्देशिका; आगे बढ़ने से पहले जारीकर्ता जाँचें।')}</small></a>)}
               {(assessment.route === '1033' || assessment.route === 'issuer-and-1033' || (isNhaiFastagSource && assessment.route === 'issuer')) && <a href="https://ihmcl.co.in/24x7-national-highways-helpline-1033-page/" target="_blank" rel="noreferrer"><strong>{t(language, '1033 scope for National Highways ↗', 'राष्ट्रीय राजमार्ग के लिए 1033 दायरा ↗')}</strong><small>{t(language, 'For NHAI FASTag or plaza/road issues on NHAI tolled stretches.', 'NHAI टोल मार्गों पर FASTag या प्लाज़ा/सड़क समस्या के लिए।')}</small></a>}

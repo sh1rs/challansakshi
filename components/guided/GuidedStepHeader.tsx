@@ -65,27 +65,19 @@ export function GuidedStepHeader({
     blocked: labels.stateBlocked ?? defaultStateLabels.blocked,
     'safe-stop': labels.stateSafeStop ?? defaultStateLabels['safe-stop'],
   };
-  const currentIndex = steps.findIndex((step) => step.state === 'current');
-  const completedCount = steps.filter((step) => step.state === 'complete').length;
-  const completedCurrentStep = currentIndex >= 0 && statusTone === 'complete' ? 1 : 0;
-  const progress = steps.length === 0
-    ? 0
-    : Math.round(((completedCount + completedCurrentStep) / steps.length) * 100);
 
   return (
     <section className={styles.guide} aria-labelledby={headingId}>
       <div className={styles.guideTopline}>
         <p>{currentLabel}</p>
-        <span aria-hidden="true">{progress}%</span>
       </div>
-      <div className={styles.progressTrack} aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
 
       <div className={styles.primaryInstruction}>
-        <span>{copy.doNow}</span>
+        <span className={styles.visuallyHidden}>{copy.doNow}</span>
         <h2 id={headingId} ref={headingRef} tabIndex={-1}>{instruction}</h2>
       </div>
 
-      <div className={styles.status} role="status" aria-live="polite" data-tone={statusTone}><span>{copy.status}</span><strong>{status}</strong></div>
+      <div className={styles.status} role="status" aria-live="polite" data-tone={statusTone}><span className={styles.visuallyHidden}>{copy.status}</span><strong>{status}</strong></div>
 
       <details className={styles.guideDisclosure}>
         <summary>{copy.why}</summary>

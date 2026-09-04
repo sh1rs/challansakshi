@@ -14,11 +14,6 @@ type StagePresentation = {
 const stagePresentation = {
   en: {
     standard: {
-      safety: {
-        heading: 'Set the privacy boundary',
-        help: 'Choose who is reviewing, what kind of device this is, and each safety acknowledgement.',
-        action: 'Continue safely',
-      },
       source: {
         heading: 'Open the official service',
         help: 'Choose the official route yourself, record how you obtained the copy, then choose a local file or manual facts.',
@@ -36,11 +31,6 @@ const stagePresentation = {
       },
     },
     simple: {
-      safety: {
-        heading: 'Choose a safe way to start',
-        help: 'Tell us who is checking and whether this device is yours or shared.',
-        action: 'Start',
-      },
       source: {
         heading: 'Find the record yourself',
         help: 'Open an official service. Then choose a file here or type the facts yourself.',
@@ -60,11 +50,6 @@ const stagePresentation = {
   },
   hi: {
     standard: {
-      safety: {
-        heading: 'गोपनीयता सीमा तय करें',
-        help: 'समीक्षक, डिवाइस का प्रकार और हर सुरक्षा स्वीकृति चुनें।',
-        action: 'सुरक्षित रूप से आगे',
-      },
       source: {
         heading: 'आधिकारिक सेवा खोलें',
         help: 'आधिकारिक रास्ता स्वयं चुनें, कॉपी मिलने का तरीका दर्ज करें, फिर स्थानीय फ़ाइल या मैन्युअल तथ्य चुनें।',
@@ -82,11 +67,6 @@ const stagePresentation = {
       },
     },
     simple: {
-      safety: {
-        heading: 'सुरक्षित शुरुआत चुनें',
-        help: 'बताएँ कौन जाँच रहा है और डिवाइस निजी है या साझा।',
-        action: 'शुरू करें',
-      },
       source: {
         heading: 'रिकॉर्ड स्वयं खोजें',
         help: 'आधिकारिक सेवा खोलें। फिर फ़ाइल चुनें या तथ्य स्वयं लिखें।',
@@ -269,83 +249,47 @@ const officialHandoffEnglish = {
     'official-service': 'Official service',
   },
   verified: 'Route last verified',
-  lookupHeading: 'Optional challan number aid',
-  lookupLabel: 'Challan number recorded in this review',
-  lookupWarning: 'Clipboard history and device tools are outside ChallanSakshi’s control.',
-  copyLookup: 'Copy challan number',
   categoryHeading: 'Reviewed category',
   categoryLabel: 'Category value for the official service',
   copyCategory: 'Copy reviewed category',
   descriptionHeading: 'Reviewed description',
   descriptionLabel: 'Description to review before using the official service',
-  descriptionHelp: 'Keep this factual and limited to the evidence you personally checked.',
   descriptionCounter: 'of 500 Unicode code points',
   copyDescription: 'Copy reviewed description',
   sharedInstruction: 'Select this reviewed description and type or paste it into the official service yourself.',
-  checklistHeading: 'Before you leave',
-  checklists: {
-    nextgen: [
-      'Enter the challan number directly on the official service, or use the separate private-device copy aid.',
-      'Choose any offence requested by the official service yourself.',
-      'Review the description before submitting on the official service.',
-    ],
-    legacy: [
-      'Enter the challan number directly on the official service, or use the separate private-device copy aid.',
-      'Review the category and description before submitting on the official service.',
-      'Choose any original JPEG, JPG, or PNG attachment directly on the official service; ChallanSakshi does not process or upload it.',
-    ],
-  },
   fallback: {
     heading: 'The original official service did not work for you.',
     body: 'This is your report, not a verified government service status. Your field pack and original destination have not changed.',
     openPrefix: 'Open the official services directory',
   },
-  safetyBoundary: 'Review every field before leaving ChallanSakshi. Nothing has been submitted.',
   roles: {
     self: {
       heading: 'My case',
-      confirmations: {
-        affectedPersonInspectedEvidence: 'I inspected the supplied evidence.',
-        affectedPersonInspectedReadableRecord: 'I inspected a readable comparison record.',
-        affectedPersonConfirmedEntitlement: 'I confirm that I am entitled to raise this matter.',
-        affectedPersonConfirmedPack: 'I reviewed and confirmed this field pack.',
-      },
+      confirmation: 'I checked the evidence and my vehicle record, I am entitled to raise this matter, and I have reviewed this description.',
     },
     helper: {
       heading: 'Helping someone present',
       submitBoundary: 'The affected person—not the helper—must independently authenticate, declare, and submit on the official service.',
       confirmations: {
-        affectedPersonPresent: 'The affected person is present.',
-        affectedPersonInspectedEvidence: 'The affected person inspected the supplied evidence.',
-        affectedPersonInspectedReadableRecord: 'The affected person inspected a readable comparison record.',
-        affectedPersonConfirmedEntitlement: 'The affected person confirmed they are entitled to raise this matter.',
-        affectedPersonRequestedPreparation: 'The affected person asked me to prepare this information.',
-        affectedPersonConfirmedPack: 'The affected person reviewed and confirmed this field pack.',
+        affectedPersonPresentAndReviewed: 'The affected person is present, checked the evidence and their vehicle record, and confirmed they are entitled to raise this matter.',
+        affectedPersonRequestedAndConfirmedPack: 'They asked me to prepare this and have reviewed and confirmed this description.',
       },
     },
   },
-  leaveHeading: 'You are leaving ChallanSakshi',
-  leaveBody: 'The official service opens in a new tab. Sign in, declare, and submit there yourself.',
+  openHeading: 'Open the official service',
+  openBody: 'Opens {domain} in a new tab. Sign in, check every field, and submit there yourself. Nothing is sent from ChallanSakshi.',
   openPrefix: 'Open',
   activated: 'Official service opened from this review. ChallanSakshi cannot see what happened there.',
   returnAnnouncements: {
     self: {
-      selectedPrefix: 'Selected return note:',
-      selectedBoundary: 'Citizen-reported and unverified; this does not show submission or acceptance.',
       recorded: 'Return note recorded in this tab only. Citizen-reported and unverified; not a submission or official acceptance.',
     },
     helper: {
-      selectedPrefix: 'Selected return note for the affected person:',
-      selectedBoundary: 'Affected-person-reported and entered by the present helper; unverified. This does not show submission or acceptance.',
       recorded: 'Return note recorded in this tab only for the affected person. Affected-person-reported and entered by the present helper; unverified. Not a submission or official acceptance.',
     },
   },
   copyStatusLabel: 'Copy status',
   copyFeedback: {
-    lookup: {
-      failed: 'Copy failed. The challan number remains visible and selectable; copy it manually. Nothing opened.',
-      copied: 'Challan number copied. Nothing opened or was submitted.',
-    },
     category: {
       failed: 'Copy failed. The reviewed category remains visible and selectable; copy it manually. Nothing opened.',
       copied: 'Reviewed category copied. Nothing opened or was submitted.',
@@ -368,25 +312,18 @@ const officialHandoffEnglish = {
     correctionNeeded: 'I need to correct my pack',
   },
   referenceLabel: 'Last 4 characters of the official reference, recorded by you',
-  returnBasis: {
-    self: 'Citizen-reported; not verified by ChallanSakshi.',
-    helper: 'Affected-person-reported; entered with a present helper. Not verified by ChallanSakshi.',
-  },
   returnAuthorization: {
-    affectedPersonPresent: 'The affected person is still present for this return note.',
-    affectedPersonRequestedReturnRecording: 'The affected person asked me to record what happened.',
-    affectedPersonConfirmedReturnState: 'The affected person confirmed this exact return state.',
-    affectedPersonConfirmedReferenceFragment: 'The affected person confirmed these exact last four characters.',
+    affectedPersonConfirmedReturn: 'The affected person is still present and confirmed this return note (and the reference characters, if entered).',
   },
   returnReadiness: {
-    currentPackRequired: 'Confirm the current reviewed field pack first.',
+    currentPackRequired: 'Confirm the reviewed description first.',
     officialLinkNotActivated: 'Open the official service from this review first.',
     returnStateRequired: 'Choose what happened on the official service.',
     referenceFragmentIncomplete: 'Enter exactly four reference characters or leave the field blank.',
     affectedPersonPresentRequired: 'The affected person must still be present.',
-    affectedPersonRecordingRequestRequired: 'The affected person must ask you to record this return note.',
-    affectedPersonReturnStateConfirmationRequired: 'The affected person must confirm this exact return state.',
-    affectedPersonReferenceConfirmationRequired: 'The affected person must confirm these exact last four characters.',
+    affectedPersonRecordingRequestRequired: 'The affected person must confirm this return note.',
+    affectedPersonReturnStateConfirmationRequired: 'The affected person must confirm what happened.',
+    affectedPersonReferenceConfirmationRequired: 'The affected person must confirm the four reference characters.',
   },
   recordReturn: 'Record this return locally',
   receiptDownload: 'Download redacted continuation receipt',
@@ -411,35 +348,37 @@ const officialHandoffEnglish = {
 
 const officialHandoffSimpleEnglish = {
   ...officialHandoffEnglish,
-  safetyBoundary: 'Check every field yourself. ChallanSakshi has not sent anything.',
   roles: {
-    ...officialHandoffEnglish.roles,
+    self: {
+      ...officialHandoffEnglish.roles.self,
+      confirmation: 'I checked the evidence and my vehicle record, this matter is mine to raise, and I have read this description.',
+    },
     helper: {
       ...officialHandoffEnglish.roles.helper,
       submitBoundary: 'The person—not the helper—must sign in, declare, and submit on the official site.',
+      confirmations: {
+        affectedPersonPresentAndReviewed: 'The person is here, checked the evidence and their vehicle record, and confirmed this matter is theirs to raise.',
+        affectedPersonRequestedAndConfirmedPack: 'They asked me to prepare this and have read and confirmed this description.',
+      },
     },
   },
+  openBody: 'Opens {domain} in a new tab. Sign in, check every field, and send it there yourself. ChallanSakshi sends nothing.',
   returnStates: {
     acknowledgementSeen: 'I saw an acknowledgement',
     portalUnavailable: 'The official site did not work',
     notSubmitted: 'I did not send it',
     correctionNeeded: 'I need to fix my pack',
   },
-  returnBasis: {
-    self: 'You reported this. ChallanSakshi did not verify it.',
-    helper: 'The present person reported this; the helper only typed it. ChallanSakshi did not verify it.',
-  },
   returnAnnouncements: {
     self: {
-      selectedPrefix: 'You selected:',
-      selectedBoundary: 'You reported this; it is not verified. ChallanSakshi did not see a submission or acceptance.',
       recorded: 'Your return note is recorded only on this tab and is not verified. ChallanSakshi did not submit it or verify acceptance.',
     },
     helper: {
-      selectedPrefix: 'Selected for the present person:',
-      selectedBoundary: 'The present person reported this; the helper only typed it. It is not verified, and ChallanSakshi did not see a submission or acceptance.',
       recorded: 'Return note for the present person is recorded only on this tab. The helper only typed it; it is not verified. ChallanSakshi did not submit it or verify acceptance.',
     },
+  },
+  returnAuthorization: {
+    affectedPersonConfirmedReturn: 'The person is still here and confirmed this return note (and the reference characters, if entered).',
   },
   helper: {
     ...officialHandoffEnglish.helper,
@@ -455,83 +394,47 @@ const officialHandoffHindi = {
     'official-service': 'आधिकारिक सेवा',
   },
   verified: 'रास्ते की अंतिम जाँच',
-  lookupHeading: 'वैकल्पिक चालान नंबर सहायता',
-  lookupLabel: 'इस समीक्षा में दर्ज चालान नंबर',
-  lookupWarning: 'क्लिपबोर्ड इतिहास और डिवाइस टूल ChallanSakshi के नियंत्रण से बाहर हैं।',
-  copyLookup: 'चालान नंबर कॉपी करें',
   categoryHeading: 'समीक्षित श्रेणी',
   categoryLabel: 'आधिकारिक सेवा के लिए श्रेणी मान',
   copyCategory: 'समीक्षित श्रेणी कॉपी करें',
   descriptionHeading: 'समीक्षित विवरण',
   descriptionLabel: 'आधिकारिक सेवा उपयोग करने से पहले जाँचने वाला विवरण',
-  descriptionHelp: 'इसे तथ्यात्मक रखें और केवल उन सबूतों तक सीमित रखें जिन्हें आपने स्वयं जाँचा है।',
   descriptionCounter: '500 यूनिकोड कोड पॉइंट में से',
   copyDescription: 'समीक्षित विवरण कॉपी करें',
   sharedInstruction: 'इस समीक्षित विवरण को चुनें और आधिकारिक सेवा में स्वयं टाइप या पेस्ट करें।',
-  checklistHeading: 'जाने से पहले',
-  checklists: {
-    nextgen: [
-      'चालान नंबर आधिकारिक सेवा पर स्वयं दर्ज करें या निजी डिवाइस की अलग कॉपी सहायता उपयोग करें।',
-      'आधिकारिक सेवा द्वारा माँगा गया अपराध स्वयं चुनें।',
-      'आधिकारिक सेवा पर जमा करने से पहले विवरण जाँचें।',
-    ],
-    legacy: [
-      'चालान नंबर आधिकारिक सेवा पर स्वयं दर्ज करें या निजी डिवाइस की अलग कॉपी सहायता उपयोग करें।',
-      'आधिकारिक सेवा पर जमा करने से पहले श्रेणी और विवरण जाँचें।',
-      'मूल जेपीईजी, जेपीजी या पीएनजी संलग्नक आधिकारिक सेवा पर स्वयं चुनें; ChallanSakshi इसे संसाधित या अपलोड नहीं करता।',
-    ],
-  },
   fallback: {
     heading: 'मूल आधिकारिक सेवा आपके लिए नहीं चली।',
     body: 'यह आपकी रिपोर्ट है, किसी सरकारी रुकावट की सत्यापित सूचना नहीं। आपका फ़ील्ड पैक और मूल गंतव्य नहीं बदले हैं।',
     openPrefix: 'आधिकारिक सेवा निर्देशिका खोलें',
   },
-  safetyBoundary: 'ChallanSakshi छोड़ने से पहले हर फ़ील्ड जाँचें। कुछ भी जमा नहीं हुआ है।',
   roles: {
     self: {
       heading: 'मेरा मामला',
-      confirmations: {
-        affectedPersonInspectedEvidence: 'मैंने दिए गए सबूत को जाँचा है।',
-        affectedPersonInspectedReadableRecord: 'मैंने तुलना के लिए पढ़ने योग्य रिकॉर्ड जाँचा है।',
-        affectedPersonConfirmedEntitlement: 'मैं पुष्टि करता हूँ कि मुझे यह मामला उठाने का अधिकार है।',
-        affectedPersonConfirmedPack: 'मैंने इस फ़ील्ड पैक को जाँचकर पुष्ट किया है।',
-      },
+      confirmation: 'मैंने सबूत और अपना वाहन रिकॉर्ड जाँचा है, मुझे यह मामला उठाने का अधिकार है, और मैंने यह विवरण जाँच लिया है।',
     },
     helper: {
       heading: 'मौजूद व्यक्ति की मदद',
       submitBoundary: 'मददगार नहीं, प्रभावित व्यक्ति को आधिकारिक सेवा पर स्वयं प्रमाणीकरण, घोषणा और जमा करना होगा।',
       confirmations: {
-        affectedPersonPresent: 'प्रभावित व्यक्ति मौजूद है।',
-        affectedPersonInspectedEvidence: 'प्रभावित व्यक्ति ने दिए गए सबूत को जाँचा है।',
-        affectedPersonInspectedReadableRecord: 'प्रभावित व्यक्ति ने तुलना का पढ़ने योग्य रिकॉर्ड जाँचा है।',
-        affectedPersonConfirmedEntitlement: 'प्रभावित व्यक्ति ने मामला उठाने का अधिकार पुष्ट किया है।',
-        affectedPersonRequestedPreparation: 'प्रभावित व्यक्ति ने मुझसे यह जानकारी तैयार करने को कहा है।',
-        affectedPersonConfirmedPack: 'प्रभावित व्यक्ति ने इस फ़ील्ड पैक को जाँचकर पुष्ट किया है।',
+        affectedPersonPresentAndReviewed: 'प्रभावित व्यक्ति मौजूद है, उसने सबूत और अपना वाहन रिकॉर्ड जाँचा है, और पुष्टि की है कि उसे यह मामला उठाने का अधिकार है।',
+        affectedPersonRequestedAndConfirmedPack: 'उन्होंने मुझसे इसे तैयार करने को कहा है और यह विवरण जाँचकर पुष्ट किया है।',
       },
     },
   },
-  leaveHeading: 'आप ChallanSakshi छोड़ रहे हैं',
-  leaveBody: 'आधिकारिक सेवा नए टैब में खुलेगी। वहाँ स्वयं साइन इन, घोषणा और जमा करें।',
+  openHeading: 'आधिकारिक सेवा खोलें',
+  openBody: '{domain} नए टैब में खुलेगा। वहाँ स्वयं साइन इन करें, हर फ़ील्ड जाँचें और जमा करें। ChallanSakshi से कुछ नहीं भेजा जाता।',
   openPrefix: 'आधिकारिक सेवा खोलें',
   activated: 'आधिकारिक सेवा इस समीक्षा से खोली गई। ChallanSakshi वहाँ हुई कार्रवाई नहीं देख सकता।',
   returnAnnouncements: {
     self: {
-      selectedPrefix: 'चुना गया वापसी नोट:',
-      selectedBoundary: 'नागरिक द्वारा बताया गया और असत्यापित; यह जमा या स्वीकृति नहीं दिखाता।',
       recorded: 'वापसी नोट केवल इस टैब में दर्ज हुआ। नागरिक द्वारा बताया गया और असत्यापित; यह जमा या आधिकारिक स्वीकृति नहीं है।',
     },
     helper: {
-      selectedPrefix: 'प्रभावित व्यक्ति के लिए चुना गया वापसी नोट:',
-      selectedBoundary: 'प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या स्वीकृति नहीं दिखाता।',
       recorded: 'प्रभावित व्यक्ति का वापसी नोट केवल इस टैब में दर्ज हुआ। प्रभावित व्यक्ति द्वारा बताया गया और मौजूद मददगार द्वारा दर्ज; असत्यापित। यह जमा या आधिकारिक स्वीकृति नहीं है।',
     },
   },
   copyStatusLabel: 'कॉपी की स्थिति',
   copyFeedback: {
-    lookup: {
-      failed: 'कॉपी नहीं हुई। चालान नंबर दिखता और चुना जा सकता है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
-      copied: 'चालान नंबर कॉपी हुआ। कुछ नहीं खुला या जमा हुआ।',
-    },
     category: {
       failed: 'कॉपी नहीं हुई। समीक्षित श्रेणी दिखती और चुनी जा सकती है; इसे स्वयं कॉपी करें। कुछ नहीं खुला।',
       copied: 'समीक्षित श्रेणी कॉपी हुई। कुछ नहीं खुला या जमा हुआ।',
@@ -554,25 +457,18 @@ const officialHandoffHindi = {
     correctionNeeded: 'मुझे अपने पैक में सुधार करना है',
   },
   referenceLabel: 'आधिकारिक संदर्भ के अंतिम चार अक्षर, आपके द्वारा दर्ज',
-  returnBasis: {
-    self: 'नागरिक द्वारा बताया गया; ChallanSakshi ने सत्यापित नहीं किया।',
-    helper: 'प्रभावित व्यक्ति द्वारा बताया गया; मौजूद मददगार ने दर्ज किया। ChallanSakshi ने सत्यापित नहीं किया।',
-  },
   returnAuthorization: {
-    affectedPersonPresent: 'इस वापसी नोट के लिए प्रभावित व्यक्ति अभी भी मौजूद है।',
-    affectedPersonRequestedReturnRecording: 'प्रभावित व्यक्ति ने मुझसे हुई कार्रवाई दर्ज करने को कहा है।',
-    affectedPersonConfirmedReturnState: 'प्रभावित व्यक्ति ने वापसी की यही स्थिति पुष्ट की है।',
-    affectedPersonConfirmedReferenceFragment: 'प्रभावित व्यक्ति ने अंतिम चार अक्षर ठीक यही पुष्ट किए हैं।',
+    affectedPersonConfirmedReturn: 'प्रभावित व्यक्ति अभी भी मौजूद है और उसने यह वापसी नोट (और दर्ज किए गए संदर्भ अक्षर, यदि कोई हों) पुष्ट किया है।',
   },
   returnReadiness: {
-    currentPackRequired: 'पहले मौजूदा समीक्षित फ़ील्ड पैक की पुष्टि करें।',
+    currentPackRequired: 'पहले समीक्षित विवरण की पुष्टि करें।',
     officialLinkNotActivated: 'पहले इस समीक्षा से आधिकारिक सेवा खोलें।',
     returnStateRequired: 'आधिकारिक सेवा पर क्या हुआ, यह चुनें।',
     referenceFragmentIncomplete: 'संदर्भ के ठीक चार अक्षर दर्ज करें या फ़ील्ड खाली छोड़ें।',
     affectedPersonPresentRequired: 'प्रभावित व्यक्ति का अभी भी मौजूद होना ज़रूरी है।',
-    affectedPersonRecordingRequestRequired: 'प्रभावित व्यक्ति को यह वापसी नोट दर्ज करने के लिए कहना होगा।',
-    affectedPersonReturnStateConfirmationRequired: 'प्रभावित व्यक्ति को वापसी की यही स्थिति पुष्ट करनी होगी।',
-    affectedPersonReferenceConfirmationRequired: 'प्रभावित व्यक्ति को अंतिम चार अक्षर ठीक यही पुष्ट करने होंगे।',
+    affectedPersonRecordingRequestRequired: 'प्रभावित व्यक्ति को यह वापसी नोट पुष्ट करना होगा।',
+    affectedPersonReturnStateConfirmationRequired: 'प्रभावित व्यक्ति को पुष्ट करना होगा कि क्या हुआ।',
+    affectedPersonReferenceConfirmationRequired: 'प्रभावित व्यक्ति को संदर्भ के चार अक्षर पुष्ट करने होंगे।',
   },
   recordReturn: 'यह वापसी स्थानीय रूप से दर्ज करें',
   receiptDownload: 'संपादित निरंतरता रसीद डाउनलोड करें',
@@ -597,35 +493,37 @@ const officialHandoffHindi = {
 
 const officialHandoffSimpleHindi = {
   ...officialHandoffHindi,
-  safetyBoundary: 'हर फ़ील्ड खुद जाँचें। ChallanSakshi ने कुछ नहीं भेजा है।',
   roles: {
-    ...officialHandoffHindi.roles,
+    self: {
+      ...officialHandoffHindi.roles.self,
+      confirmation: 'मैंने सबूत और अपना वाहन रिकॉर्ड देख लिया है, यह मामला उठाना मेरा हक़ है, और यह विवरण मैंने पढ़ लिया है।',
+    },
     helper: {
       ...officialHandoffHindi.roles.helper,
       submitBoundary: 'व्यक्ति को खुद साइन इन, घोषणा और आधिकारिक साइट पर जमा करना होगा; मददगार यह नहीं करेगा।',
+      confirmations: {
+        affectedPersonPresentAndReviewed: 'व्यक्ति यहाँ मौजूद है, उसने सबूत और अपना वाहन रिकॉर्ड देख लिया है, और कहा है कि यह मामला उठाना उसका हक़ है।',
+        affectedPersonRequestedAndConfirmedPack: 'उन्होंने मुझसे इसे तैयार करने को कहा है और यह विवरण पढ़कर पुष्ट किया है।',
+      },
     },
   },
+  openBody: '{domain} नए टैब में खुलेगा। वहाँ खुद साइन इन करें, हर फ़ील्ड देखें और जमा करें। ChallanSakshi कुछ नहीं भेजता।',
   returnStates: {
     acknowledgementSeen: 'मुझे पावती दिखी',
     portalUnavailable: 'आधिकारिक साइट नहीं चली',
     notSubmitted: 'मैंने नहीं भेजा',
     correctionNeeded: 'मुझे अपना पैक ठीक करना है',
   },
-  returnBasis: {
-    self: 'यह आपने बताया है। ChallanSakshi ने इसकी जाँच नहीं की।',
-    helper: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। ChallanSakshi ने जाँच नहीं की।',
-  },
   returnAnnouncements: {
     self: {
-      selectedPrefix: 'आपने चुना:',
-      selectedBoundary: 'यह आपने बताया है और सत्यापित नहीं है; ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
       recorded: 'आपका वापसी नोट केवल इस टैब में दर्ज है और सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
     },
     helper: {
-      selectedPrefix: 'मौजूद व्यक्ति के लिए चुना:',
-      selectedBoundary: 'मौजूद व्यक्ति ने बताया; मददगार ने केवल लिखा। यह सत्यापित नहीं है और ChallanSakshi ने जमा या स्वीकृति नहीं देखी।',
       recorded: 'मौजूद व्यक्ति का वापसी नोट केवल इस टैब में दर्ज है। मददगार ने केवल लिखा; यह सत्यापित नहीं है। ChallanSakshi ने इसे जमा नहीं किया या स्वीकृति सत्यापित नहीं की।',
     },
+  },
+  returnAuthorization: {
+    affectedPersonConfirmedReturn: 'व्यक्ति अभी भी यहाँ है और उसने यह वापसी नोट (और लिखे गए संदर्भ अक्षर, अगर कोई हों) पुष्ट किया है।',
   },
   helper: {
     ...officialHandoffHindi.helper,

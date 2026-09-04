@@ -28,6 +28,7 @@ describe('GuidedStepHeader', () => {
     }));
 
     expect(html).toContain('Do this now');
+    expect(html).toMatch(/visuallyHidden[^>]*>Do this now</);
     expect(html).toContain('Why this matters');
     expect(html).toContain('Source and jurisdiction still needed');
     expect(html).toContain('Compare the official evidence with your vehicle record.');
@@ -75,7 +76,7 @@ describe('GuidedStepHeader', () => {
     expect(disclosure).toContain('aria-label="e-Challan review steps"');
   });
 
-  it('does not present a safe-stopped journey as 100 percent complete', () => {
+  it('shows a safe-stopped journey as stopped and skipped instead of as progress', () => {
     const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
       currentLabel: 'Step 4 of 4 · Official next step',
       instruction: 'Verify the record through an official service.',
@@ -92,9 +93,10 @@ describe('GuidedStepHeader', () => {
       ],
     }));
 
-    expect(html).toContain('>25%</span>');
-    expect(html).toContain('width:25%');
-    expect(html).not.toContain('>100%</span>');
+    expect(html).toContain('Safe stop: Verify the source');
+    expect(html).toContain('Skipped: Compare the evidence');
+    expect(html).not.toMatch(/\d+%/);
+    expect(source).not.toContain('progressTrack');
   });
 
   it('uses localized progress-state labels when supplied', () => {

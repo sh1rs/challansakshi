@@ -34,6 +34,38 @@ const actionReadyBase: CitizenChallanAnswers = {
   reviewRevisionId: 'review-1',
 };
 
+import { deriveImageInspected } from '../lib/public-challan';
+
+describe('derived photograph inspection', () => {
+  const unclear = {
+    plateObservation: 'unclear',
+    categoryObservation: 'unclear',
+    colourObservation: 'unclear',
+    offenceObservation: 'unclear',
+    timestampStatus: 'unclear',
+    locationStatus: 'unclear',
+  } as const;
+
+  it('treats a selected photograph as inspection', () => {
+    expect(deriveImageInspected(unclear, true)).toBe(true);
+  });
+
+  it('stays false when nothing was recorded and no photograph was chosen', () => {
+    expect(deriveImageInspected(unclear, false)).toBe(false);
+  });
+
+  it.each([
+    ['plateObservation', 'different'],
+    ['categoryObservation', 'match'],
+    ['colourObservation', 'not-visible'],
+    ['offenceObservation', 'appears-visible'],
+    ['timestampStatus', 'displayed'],
+    ['locationStatus', 'not-found'],
+  ] as const)('counts a recorded %s as inspection', (key, value) => {
+    expect(deriveImageInspected({ ...unclear, [key]: value }, false)).toBe(true);
+  });
+});
+
 describe('public challan self-review', () => {
   it('blocks a message-only notice before comparison', () => {
     const result = assessCitizenChallanReview({ ...complete, sourceStatus: 'message-only' });

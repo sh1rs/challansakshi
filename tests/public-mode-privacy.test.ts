@@ -155,18 +155,13 @@ describe('real-mode privacy isolation', () => {
     expect(tollApp, 'components/public-beta/TollSakshiApp.tsx').toMatch(/<PublicBetaShell[^>]*englishOnly/);
   });
 
-  it('keeps FASTag manual entry compact while retaining the visible local-only and credential boundaries', () => {
+  it('keeps FASTag manual entry compact now that the product boundary copy lives in the shared footer', () => {
     const tollApp = publicModeFiles.find((file) => file.path === 'components/public-beta/TollSakshiApp.tsx')?.source ?? '';
 
-    expect(tollApp).toMatch(/\{step === 'start' && <section className=\{`\$\{styles\.hero\}/);
-    expect(tollApp).toContain('function TollSafetyBoundary');
-    expect(tollApp).toContain('<TollSafetyBoundary language={language} />');
+    expect(tollApp).not.toMatch(/\{step === 'start' && <section className=\{`\$\{styles\.hero\}/);
+    expect(tollApp).not.toContain('TollSafetyBoundary');
     expect(tollApp).not.toContain('<SafetyBoundary');
-    expect(tollApp).toContain('No uploads. Your entries stay in this tab.');
-    expect(tollApp).toContain('They are not sent to an AI model, bank, toll operator, or authority.');
     expect(tollApp).not.toContain('Opening a PDF creates another browser-local tab');
-    expect(tollApp).toContain('Never enter a password, OTP, Aadhaar, PIN, CVV, or full account/tag/reference number here.');
-    expect(tollApp).toContain('A UPI PIN sends money; it is never needed to receive a refund.');
     expect(tollApp).toContain('Issue and source');
     expect(tollApp).toContain('Transaction details');
     expect(tollApp).toContain('Passing image');

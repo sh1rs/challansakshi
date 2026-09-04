@@ -3,7 +3,8 @@ import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { LocalRecordIntake, type LocalRecordSelection } from '../components/public-beta/LocalRecordIntake';
-import { PublicBetaShell, SafetyBoundary } from '../components/public-beta/PublicBetaShell';
+import CitizenReviewApp from '../components/public-beta/CitizenReviewApp';
+import { PublicBetaShell } from '../components/public-beta/PublicBetaShell';
 import { getCitizenReviewPresentation } from '../lib/citizen-review-presentation';
 
 const reviewSource = readFileSync(
@@ -50,11 +51,22 @@ function mediaBlock(source: string, query: string) {
   return '';
 }
 
-function expectExplicitSixteenPixelRule(source: string, selector: string) {
+function expectExplicitMinimumPixelRule(source: string, selector: string, minimum: 15 | 16) {
   const matchingRule = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter((match) => (
     match[1].split(',').map((item) => item.trim()).includes(selector)
   )).at(-1);
-  expect(matchingRule?.[2], selector).toMatch(/font-size:\s*(?:1[6-9]|[2-9]\d)px/);
+  const size = Number(matchingRule?.[2].match(/font-size:\s*(\d+)px/)?.[1] ?? 0);
+  expect(size, selector).toBeGreaterThanOrEqual(minimum);
+}
+
+// Controls (inputs, selects, buttons, links) stay at 16px on narrow screens so
+// mobile browsers never zoom into them; reading copy may sit at 15px.
+function expectExplicitSixteenPixelRule(source: string, selector: string) {
+  expectExplicitMinimumPixelRule(source, selector, 16);
+}
+
+function expectExplicitFifteenPixelRule(source: string, selector: string) {
+  expectExplicitMinimumPixelRule(source, selector, 15);
 }
 
 describe('citizen review release contracts', () => {
@@ -99,7 +111,7 @@ describe('citizen review release contracts', () => {
   });
 
   it('makes manual entry and a selected official record mutually exclusive', () => {
-    const manualHandler = reviewSource.match(/const useManual\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\};/)?.[1] ?? '';
+    const manualHandler = reviewSource.match(/const chooseManualEntry\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\};/)?.[1] ?? '';
     expect(manualHandler).toMatch(/URL\.revokeObjectURL\(recordSelectionRef\.current\.previewUrl\)/);
     expect(manualHandler).toMatch(/setRecordSelection\(null\)/);
     expect(manualHandler).toMatch(/setManualEntryMode\(true\)/);
@@ -151,29 +163,55 @@ describe('citizen review release contracts', () => {
     expect(publicStyles).not.toMatch(/\.quickExit::(?:before|after)[^{]*\{[^}]*content\s*:/);
   });
 
-  it('keeps the short browser-local boundary visible and discloses the full privacy qualifications', () => {
-    const html = renderToStaticMarkup(createElement(
-      SafetyBoundary,
-      { language: 'en' },
-      createElement('p', undefined, 'Keep this decision-critical warning visible.'),
-    ));
+  it('carries the single product boundary in the footer instead of repeating it on every step', () => {
+    const html = renderToStaticMarkup(createElement(CitizenReviewApp));
+    const footer = html.match(/<footer\b[\s\S]*?<\/footer>/)?.[0] ?? '';
+    const credentialWarning = 'Never enter a government password, CAPTCHA, OTP, Aadhaar, or payment credentials here.';
 
-    expect(html).toContain('Your files and answers stay in this browser. They are not uploaded.');
-    expect(html).toContain('<summary>Privacy details</summary>');
-    expect(html).toContain('hosting provider still receives ordinary page-request metadata');
-    expect(html).toContain('Opening a PDF creates another browser-local tab');
-    expect(html).toContain('Keep this decision-critical warning visible.');
-    expect(html.indexOf('Keep this decision-critical warning visible.')).toBeGreaterThan(html.indexOf('</details>'));
+    expect(footer).toContain(credentialWarning);
+    expect(footer).toContain('Your files and answers stay in this browser and are not uploaded.');
+    expect(html.split(credentialWarning)).toHaveLength(2);
+    expect(html).not.toContain('Privacy details');
+    expect(html).not.toContain('Local only · Not uploaded · Not saved');
+    expect(html).not.toContain('I understand this is manual self-review');
+    expect(reviewSource).not.toContain('SafetyBoundary');
+    expect(reviewSource).not.toContain('styles.hero');
+  });
+
+  it('starts on the record step with sensible defaults instead of a separate safety screen', () => {
+    expect(reviewSource).toMatch(/type Step = 'source' \| 'observations' \| 'result'/);
+    expect(reviewSource).toMatch(/useState<Step>\('source'\)/);
+    expect(reviewSource).toMatch(/useState<Role>\('self'\)/);
+    expect(reviewSource).toMatch(/useState<Device>\('private'\)/);
+    expect(reviewSource).toMatch(/useState<JurisdictionConfirmation>\(\{ status: 'unconfirmed' \}\)/);
+    expect(reviewSource).toContain('I am helping someone else, and they are here with me');
+    expect(reviewSource).toContain('This is a shared or public device');
+    expect(reviewSource).not.toContain('Continue safely');
+    expect(reviewSource).not.toContain('Use synthetic demo');
+  });
+
+  it('derives photo inspection from the citizen’s own entries instead of asking a separate question', () => {
+    expect(reviewSource).not.toContain('id="image-inspected"');
+    expect(reviewSource).toMatch(/deriveImageInspected\(rawAnswers, photographSelection !== null\)/);
+    expect(reviewSource).not.toMatch(/rawAnswers\.plateObservation !== 'unclear'/);
+    expect(reviewSource).toMatch(/setRawAnswers\(\{ \.\.\.nextAnswers, imageInspected: false \}\)/);
+    expect(reviewSource).not.toMatch(/disabled=\{!answers\.imageInspected\}/);
+  });
+
+  it('lands each step at the compact guide header without an animated jump', () => {
+    expect(reviewSource).toMatch(/heading\.focus\(\{ preventScroll: true \}\)/);
+    expect(reviewSource).toMatch(/scrollIntoView\(\{ block: 'start', behavior: 'instant' as ScrollBehavior \}\)/);
   });
 
   it('makes the review route action-first while keeping named detail disclosures available', () => {
-    expect(reviewSource).toMatch(/step === 'safety'[\s\S]*?<section className=\{`\$\{styles\.hero\}/);
-    expect(reviewSource).toContain('Choose where to check');
     expect(reviewSource).toContain('How did you get this record?');
-    expect(reviewSource).toContain('Add a record or enter facts');
+    expect(reviewSource).toContain('Add the challan copy (optional)');
+    expect(reviewSource).toMatch(/className=\{styles\.officialRouteLink\}/);
+    expect(reviewSource.indexOf('officialRouteLink')).toBeLessThan(reviewSource.indexOf('How did you get this record?'));
     expect(reviewSource).toContain('More photo details');
     expect(reviewSource).toContain('Dates and notice details');
-    expect(reviewSource).toContain('Other records');
+    expect(reviewSource).not.toContain('Other records');
+    expect(reviewSource).not.toContain('id="custody-record"');
     expect(reviewSource).toContain('Evidence details');
     expect(reviewSource).toContain('Review history');
     expect(reviewSource).toContain('Preview local summary');
@@ -256,19 +294,6 @@ describe('citizen review release contracts', () => {
     );
   });
 
-  it('keeps the /review credential warning outside the guide and privacy disclosures', () => {
-    const reviewBoundary = reviewSource.match(/<SafetyBoundary\s+language=\{language\}>[\s\S]*?<\/SafetyBoundary>/)?.[0] ?? '';
-
-    expect(reviewBoundary).toContain('Never enter a government password, CAPTCHA, OTP, Aadhaar, or payment credentials here.');
-    expect(reviewBoundary).toContain('सरकारी पासवर्ड, CAPTCHA, OTP, Aadhaar या भुगतान क्रेडेंशियल यहाँ कभी दर्ज न करें।');
-    expect(reviewBoundary.indexOf('Never enter a government password')).toBeGreaterThan(
-      reviewBoundary.indexOf('<SafetyBoundary'),
-    );
-    expect(reviewBoundary.indexOf('Never enter a government password')).toBeGreaterThan(
-      reviewBoundary.indexOf('>'),
-    );
-  });
-
   it('opens a selected PDF locally without contradicting the object-src security policy', () => {
     const selection = {
       meta: {
@@ -298,7 +323,7 @@ describe('citizen review release contracts', () => {
     expect(reviewSource).toContain('Open selected PDF locally');
   });
 
-  it('describes the selected-file boundary without denying ordinary hosting requests', () => {
+  it('keeps the intake free of over-claims and repeated boundary copy', () => {
     const shell = renderToStaticMarkup(createElement(LocalRecordIntake, {
       record: null,
       photograph: null,
@@ -307,9 +332,12 @@ describe('citizen review release contracts', () => {
       language: 'en',
     }));
 
-    expect(shell).toContain('No selected file or answer has been uploaded to ChallanSakshi or an authority');
+    expect(shell).toContain('Choose challan copy');
+    expect(shell).toContain('Choose photo from the challan');
     expect(shell).not.toContain('has left this browser tab');
     expect(shell).not.toContain('Nothing has left this device');
+    expect(shell).not.toContain('Not uploaded');
+    expect(shell).not.toContain('<details');
   });
 
   it('sets every reviewed essential 320px selector to at least 16px explicitly', () => {
@@ -318,7 +346,6 @@ describe('citizen review release contracts', () => {
     const chromeNarrow = mediaBlock(chromeStyles, '(max-width: 480px)');
     const guideMobile = mediaBlock(guidedStyles, '(max-width: 420px)');
     for (const selector of [
-      '.heroCompact .lede',
       '.button',
       '.buttonSecondary',
       '.buttonQuiet',
@@ -329,12 +356,11 @@ describe('citizen review release contracts', () => {
       '.observationCard select',
       '.serviceGrid button',
       '.serviceGrid a',
-      '.artifact pre',
-      '.panel small',
-      '.passport em',
-      '.boundary strong',
     ]) {
       expectExplicitSixteenPixelRule(publicMobile, selector);
+    }
+    for (const selector of ['.artifact pre', '.panel small', '.passport em', '.panel p', '.check']) {
+      expectExplicitFifteenPixelRule(publicMobile, selector);
     }
     for (const selector of ['.headerButton', '.languages button', '.englishOnly']) {
       expectExplicitSixteenPixelRule(chromeMobile, selector);
@@ -350,9 +376,21 @@ describe('citizen review release contracts', () => {
       '.detailsContent p',
       '.stepList li',
     ]) {
-      expectExplicitSixteenPixelRule(guideMobile, selector);
+      expectExplicitFifteenPixelRule(guideMobile, selector);
     }
     expect(publicMobile).toMatch(/\.header\s*\{[^}]*flex-wrap:\s*wrap/);
+    for (const [source, rule] of [
+      [publicBaseStyles, /\.field input, \.field select\s*\{[^}]*min-height:\s*48px/],
+      [publicBaseStyles, /\.disclosure summary\s*\{[^}]*min-height:\s*48px/],
+      [publicBaseStyles, /\.buttonQuiet\s*\{[^}]*min-height:\s*48px/],
+      [publicBaseStyles, /\.check\s*\{[^}]*min-height:\s*48px/],
+      [publicBaseStyles, /\.fieldHint a, \.officialRouteLink\s*\{[^}]*min-height:\s*48px/],
+      [chromeStyles, /\.footerLinks a\s*\{[^}]*min-height:\s*48px/],
+      [guidedStyles, /\.guideDisclosure summary\s*\{[^}]*min-height:\s*48px/],
+    ] as const) {
+      expect(source).toMatch(rule);
+    }
+    expect(guidedStyles).toMatch(/\.guideDisclosure summary::before\s*\{[^}]*content:/);
     expect(chromeStyles).toMatch(/\.headerButton[^}]*min-height:\s*48px/);
     expect(chromeStyles).toMatch(/\.languages button[^}]*min-height:\s*48px/);
     expect(guidedStyles).toMatch(/\.stepList li\s*\{[^}]*color:\s*#(?:[0-9a-f]{6})/);
@@ -380,7 +418,6 @@ describe('citizen review release contracts', () => {
 
   it('routes stage presentation through keyed standard and simple copy', () => {
     expect(reviewSource).toMatch(/getCitizenReviewPresentation\(language,\s*simpleMode\)/);
-    expect(reviewSource).toMatch(/presentation\.stages\.safety/);
     expect(reviewSource).toMatch(/presentation\.stages\.source/);
     expect(reviewSource).toMatch(/presentation\.stages\.observations/);
     expect(reviewSource).toMatch(/presentation\.stages\.result/);
@@ -409,15 +446,16 @@ describe('citizen review release contracts', () => {
     expect(publicStyles).toMatch(
       /\.brand\s*\{[^}]*min-height:\s*48px[^}]*display:\s*inline-flex/,
     );
-    expectExplicitSixteenPixelRule(publicMobile, '.infoSection p');
-    expectExplicitSixteenPixelRule(publicMobile, '.infoSection li');
-    expectExplicitSixteenPixelRule(publicMobile, '.footerLinks a');
-    expectExplicitSixteenPixelRule(publicMobile, '.footer p');
+    const chromeMobileFooter = mediaBlock(chromeStyles, '(max-width: 700px)');
+    expectExplicitFifteenPixelRule(publicMobile, '.infoSection p');
+    expectExplicitFifteenPixelRule(publicMobile, '.infoSection li');
+    expectExplicitSixteenPixelRule(chromeMobileFooter, '.footerLinks a');
+    expectExplicitFifteenPixelRule(chromeMobileFooter, '.footer p');
     expect(publicMobile).toMatch(
       /\.infoSection a\s*\{[^}]*display:\s*inline-flex[^}]*min-height:\s*48px/,
     );
-    expect(publicMobile).toMatch(
-      /\.footerLinks a\s*\{[^}]*display:\s*flex[^}]*min-height:\s*48px/,
+    expect(chromeStyles).toMatch(
+      /\.footerLinks a\s*\{[^}]*min-height:\s*48px[^}]*display:\s*inline-flex/,
     );
     expect(publicMobile).toMatch(
       /\.infoPage h1\s*\{[^}]*font-size:\s*(?:3[0-9]|[12][0-9])px[^}]*overflow-wrap:\s*anywhere/,

@@ -128,6 +128,25 @@ export function calculateEnteredOfficialDeadline(deadline: string, referenceDate
   };
 }
 
+/**
+ * Inspection is derived, not asked: selecting the supplied photograph, or
+ * recording any fact that can only be read off it, means the citizen looked.
+ * Leaving every image fact at its 'unclear' default with no photograph keeps
+ * the conservative insufficient-review outcome.
+ */
+export function deriveImageInspected(
+  answers: Pick<CitizenChallanAnswers, 'plateObservation' | 'categoryObservation' | 'colourObservation' | 'offenceObservation' | 'timestampStatus' | 'locationStatus'>,
+  hasPhotograph: boolean,
+): boolean {
+  return hasPhotograph
+    || answers.plateObservation !== 'unclear'
+    || answers.categoryObservation !== 'unclear'
+    || answers.colourObservation !== 'unclear'
+    || answers.offenceObservation !== 'unclear'
+    || answers.timestampStatus !== 'unclear'
+    || answers.locationStatus !== 'unclear';
+}
+
 export function assessCitizenChallanReview(answers: CitizenChallanAnswers): CitizenReviewAssessment {
   if (answers.sourceStatus === 'message-only' || answers.sourceStatus === 'not-selected') {
     return {

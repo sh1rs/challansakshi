@@ -20,35 +20,21 @@ type Language = 'en' | 'hi';
 
 const copy = {
   en: {
-    receiptHeading: 'Local only · Not uploaded · Not saved',
-    mechanicsHeading: 'How local review works',
-    nothingLeft: 'No selected file or answer has been uploaded to ChallanSakshi or an authority',
-    login: 'Government login information · never collected',
-    recordPending: 'Selected record · not yet chosen',
-    recordReady: 'Selected record · ready for local review',
-    photoPending: 'Selected photograph · not yet chosen',
-    photoReady: 'Selected photograph · ready for local review',
     selectedRecord: 'Selected notice',
     selectedPhotograph: 'Selected photograph',
-    upload: 'Server upload: off',
-    saved: 'Saved case: off',
     recordTitle: 'Challan copy',
-    recordHelp: 'Choose the challan print, receipt, or screenshot you obtained yourself.',
+    recordHelp: 'The challan print, receipt, or screenshot you obtained yourself.',
     photoTitle: 'Photo from the challan',
-    photoHelp: 'Add the photograph you want to inspect beside the record.',
+    photoHelp: 'The photograph you want to inspect beside the record.',
     chooseRecord: 'Choose challan copy',
     choosePhoto: 'Choose photo from the challan',
-    replace: 'Replace',
     remove: 'Remove',
-    memory: 'Memory only',
-    category: 'MIME category',
-    previewReady: 'Local image preview ready',
-    pdfReady: 'PDF selected · open locally to review',
+    memory: 'memory only',
     openPdf: 'Open selected PDF locally',
     inputRecord: 'Choose an official record from this device',
     inputPhoto: 'Choose a supplied photograph from this device',
     imageAlt: 'Citizen-selected evidence preview',
-    pdfNote: 'Open this browser-local copy in a new tab to review it. No file is uploaded. Close the PDF tab yourself, especially on a shared device.',
+    pdfNote: 'Opens in a new browser-local tab. Close the PDF tab yourself, especially on a shared device.',
     errors: {
       'empty-file': 'This file is empty. Choose a record or photograph that contains the information you want to review.',
       'file-too-large': 'This file is larger than 12 MiB. Choose a smaller PDF or image before previewing it.',
@@ -56,35 +42,21 @@ const copy = {
     },
   },
   hi: {
-    receiptHeading: 'केवल स्थानीय · अपलोड नहीं · सेव नहीं',
-    mechanicsHeading: 'स्थानीय समीक्षा कैसे काम करती है',
-    nothingLeft: 'कोई चुनी हुई फ़ाइल या उत्तर ChallanSakshi या किसी प्राधिकरण पर अपलोड नहीं हुआ है',
-    login: 'सरकारी लॉगिन जानकारी · कभी एकत्र नहीं की जाती',
-    recordPending: 'चुना गया रिकॉर्ड · अभी नहीं चुना गया',
-    recordReady: 'चुना गया रिकॉर्ड · स्थानीय समीक्षा के लिए तैयार',
-    photoPending: 'चुनी गई तस्वीर · अभी नहीं चुनी गई',
-    photoReady: 'चुनी गई तस्वीर · स्थानीय समीक्षा के लिए तैयार',
     selectedRecord: 'चुना गया नोटिस',
     selectedPhotograph: 'चुनी गई तस्वीर',
-    upload: 'सर्वर अपलोड: बंद',
-    saved: 'सेव किया गया केस: बंद',
     recordTitle: 'चालान की कॉपी',
-    recordHelp: 'चालान प्रिंट, रसीद या स्क्रीनशॉट चुनें जो आपने स्वयं प्राप्त किया है।',
+    recordHelp: 'चालान प्रिंट, रसीद या स्क्रीनशॉट जो आपने स्वयं प्राप्त किया है।',
     photoTitle: 'चालान की तस्वीर',
-    photoHelp: 'वह तस्वीर जोड़ें जिसे आप रिकॉर्ड के साथ देखना चाहते हैं।',
+    photoHelp: 'वह तस्वीर जिसे आप रिकॉर्ड के साथ देखना चाहते हैं।',
     chooseRecord: 'चालान की कॉपी चुनें',
     choosePhoto: 'चालान की तस्वीर चुनें',
-    replace: 'बदलें',
     remove: 'हटाएँ',
     memory: 'केवल मेमोरी में',
-    category: 'MIME श्रेणी',
-    previewReady: 'स्थानीय चित्र प्रीव्यू तैयार है',
-    pdfReady: 'PDF चुना गया · स्थानीय रूप से खोलकर देखें',
     openPdf: 'चुना गया PDF स्थानीय रूप से खोलें',
     inputRecord: 'इस डिवाइस से आधिकारिक रिकॉर्ड चुनें',
     inputPhoto: 'इस डिवाइस से दी गई तस्वीर चुनें',
     imageAlt: 'नागरिक द्वारा चुनी गई साक्ष्य तस्वीर का प्रीव्यू',
-    pdfNote: 'इसे देखने के लिए ब्राउज़र की स्थानीय कॉपी नए टैब में खोलें। फ़ाइल अपलोड नहीं होती। खासकर साझा डिवाइस पर PDF टैब स्वयं बंद करें।',
+    pdfNote: 'नए ब्राउज़र-स्थानीय टैब में खुलता है। खासकर साझा डिवाइस पर PDF टैब स्वयं बंद करें।',
     errors: {
       'empty-file': 'यह फ़ाइल खाली है। ऐसा रिकॉर्ड या तस्वीर चुनें जिसमें वह जानकारी हो जिसे आप देखना चाहते हैं।',
       'file-too-large': 'यह फ़ाइल 12 MiB से बड़ी है। प्रीव्यू से पहले छोटा PDF या चित्र चुनें।',
@@ -140,7 +112,6 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
   return (
     <section className={styles.intakeRow} aria-labelledby={`${role}-title`}>
       <div className={styles.rowCopy}>
-        <p className={styles.eyebrow}>{isPhotograph ? 'B' : 'A'}</p>
         <h3 id={`${role}-title`}>{title}</h3>
         <p>{isPhotograph ? text.photoHelp : text.recordHelp}</p>
       </div>
@@ -151,7 +122,6 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
         tabIndex={-1}
         type="file"
         accept={ACCEPTED_RECORD_TYPES}
-        capture={isPhotograph ? 'environment' : undefined}
         aria-label={isPhotograph ? text.inputPhoto : text.inputRecord}
         disabled={disabled}
         onChange={chooseFile}
@@ -161,11 +131,10 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
         <div className={styles.selection}>
           <div className={styles.metadata}>
             <strong>{isPhotograph ? text.selectedPhotograph : text.selectedRecord}</strong>
-            <span>{formatLocalRecordSize(selection.meta.size)}</span>
-            <span>{text.category}: {selection.meta.type}</span>
-            <span>{text.memory}</span>
-            <span>{text.upload}</span>
-            <span>{selection.meta.previewKind === 'image' ? text.previewReady : text.pdfReady}</span>
+            <span>{formatLocalRecordSize(selection.meta.size)} · {selection.meta.type} · {text.memory}</span>
+            <button type="button" className={styles.remove} onClick={clearSelection} disabled={disabled}>
+              {text.remove}
+            </button>
           </div>
 
           <div className={styles.preview}>
@@ -174,21 +143,12 @@ function IntakeRow({ role, selection, onSelectionChange, inputRef, disabled, lan
               <img src={selection.previewUrl} alt={text.imageAlt} />
             ) : (
               <div className={styles.pdfOpen}>
-                <p>{text.pdfNote}</p>
                 <a href={selection.previewUrl} target="_blank" rel="noopener noreferrer">
                   {text.openPdf}
                 </a>
+                <p>{text.pdfNote}</p>
               </div>
             )}
-          </div>
-
-          <div className={styles.actions}>
-            <button type="button" onClick={() => inputRef.current?.click()} disabled={disabled}>
-              {text.replace}
-            </button>
-            <button type="button" className={styles.remove} onClick={clearSelection} disabled={disabled}>
-              {text.remove}
-            </button>
           </div>
         </div>
       ) : (
@@ -212,27 +172,10 @@ export function LocalRecordIntake(props: {
 }): JSX.Element {
   const recordInputRef = useRef<HTMLInputElement>(null);
   const photographInputRef = useRef<HTMLInputElement>(null);
-  const text = copy[props.language];
   const disabled = props.disabled ?? false;
 
   return (
     <div className={styles.intake}>
-      <aside className={styles.receipt} aria-label={text.receiptHeading}>
-        <strong>{text.receiptHeading}</strong>
-      </aside>
-
-      <details className={styles.mechanics}>
-        <summary>{text.mechanicsHeading}</summary>
-        <ul>
-          <li>{text.nothingLeft}</li>
-          <li>{text.login}</li>
-          <li>{props.record ? text.recordReady : text.recordPending}</li>
-          <li>{props.photograph ? text.photoReady : text.photoPending}</li>
-          <li>{text.upload}</li>
-          <li>{text.saved}</li>
-        </ul>
-      </details>
-
       <div className={styles.rows}>
         <IntakeRow
           role="official-record"

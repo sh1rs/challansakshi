@@ -49,8 +49,7 @@ describe('guided journey progress', () => {
 
   it('shows evidence observation as skipped when a message-only source safely stops the review', () => {
     expect(buildChallanGuidedProgress('result', 'message-only')).toEqual([
-      { id: 'safety', label: 'Start safely', state: 'complete' },
-      { id: 'source', label: 'Get official record', state: 'safe-stop' },
+      { id: 'source', label: 'Get the official record', state: 'safe-stop' },
       { id: 'observations', label: 'Check the evidence', state: 'skipped' },
       { id: 'result', label: 'Decide and resolve', state: 'current' },
     ]);
@@ -59,16 +58,14 @@ describe('guided journey progress', () => {
   it('uses compact source guidance before evidence comparison', () => {
     expect(getChallanGuideContent({
       step: 'source',
-      safetyReady: true,
       sourceStatus: 'not-selected',
-      jurisdictionSelected: false,
       observationsReady: false,
       worksheetAvailable: false,
       exportAllowed: true,
     })).toMatchObject({
-      currentLabel: 'Step 2 of 4 · Get the official record',
-      instruction: 'Open the official record, then add its facts or a supplied record.',
-      status: 'Official source and record needed',
+      currentLabel: 'Step 1 of 3 · Get the official record',
+      instruction: 'Open the official record yourself, then add a copy or enter its facts.',
+      status: 'Choose how you got this record',
       next: 'Confirm entered facts before comparing evidence.',
     });
   });
@@ -76,30 +73,25 @@ describe('guided journey progress', () => {
   it('describes a recorded source without claiming confirmation', () => {
     expect(getChallanGuideContent({
       step: 'source',
-      safetyReady: true,
       sourceStatus: 'official-service',
-      jurisdictionSelected: true,
       observationsReady: false,
       worksheetAvailable: false,
       resultAvailable: false,
       exportAllowed: true,
     })).toMatchObject({
-      status: 'Source and review method recorded',
+      status: 'Source recorded',
       next: 'Confirm entered facts before comparing evidence.',
     });
   });
 
   it.each([
-    ['safety', '4 में से चरण 1 · सुरक्षित शुरुआत', 'सुरक्षित शुरुआत'],
-    ['source', '4 में से चरण 2 · आधिकारिक रिकॉर्ड पाएँ', 'आधिकारिक रिकॉर्ड पाएँ'],
-    ['observations', '4 में से चरण 3 · सबूत जाँचें', 'सबूत जाँचें'],
-    ['result', '4 में से चरण 4 · निर्णय और समाधान', 'निर्णय और समाधान'],
+    ['source', '3 में से चरण 1 · आधिकारिक रिकॉर्ड पाएँ', 'आधिकारिक रिकॉर्ड पाएँ'],
+    ['observations', '3 में से चरण 2 · सबूत जाँचें', 'सबूत जाँचें'],
+    ['result', '3 में से चरण 3 · निर्णय और समाधान', 'निर्णय और समाधान'],
   ] as const)('localizes the %s guide stage and progress label in Hindi', (step, currentLabel, stageLabel) => {
     const content = getChallanGuideContent({
       step,
-      safetyReady: true,
       sourceStatus: 'official-service',
-      jurisdictionSelected: true,
       observationsReady: true,
       worksheetAvailable: false,
       resultAvailable: step === 'result',
@@ -119,9 +111,7 @@ describe('guided journey progress', () => {
 
   it('uses simple presentation across every stage without changing review readiness', () => {
     const inputs = {
-      safetyReady: true,
       sourceStatus: 'official-service',
-      jurisdictionSelected: true,
       observationsReady: true,
       worksheetAvailable: false,
       resultAvailable: true,
@@ -129,7 +119,7 @@ describe('guided journey progress', () => {
       language: 'en' as const,
     };
 
-    for (const step of ['safety', 'source', 'observations', 'result'] as const) {
+    for (const step of ['source', 'observations', 'result'] as const) {
       const standard = getChallanGuideContent({ ...inputs, step, simpleMode: false });
       const simple = getChallanGuideContent({ ...inputs, step, simpleMode: true });
       expect(simple.instruction).not.toBe(standard.instruction);
@@ -140,9 +130,7 @@ describe('guided journey progress', () => {
   it('completes result progress when a conservative non-dispute result is available', () => {
     expect(getChallanGuideContent({
       step: 'result',
-      safetyReady: true,
       sourceStatus: 'official-service',
-      jurisdictionSelected: true,
       observationsReady: true,
       worksheetAvailable: false,
       resultAvailable: true,
@@ -155,14 +143,13 @@ describe('guided journey progress', () => {
   it('turns a message-only source into a plain-language safe stop instead of an evidence task', () => {
     expect(getChallanGuideContent({
       step: 'source',
-      safetyReady: true,
       sourceStatus: 'message-only',
-      jurisdictionSelected: true,
       observationsReady: false,
       worksheetAvailable: false,
       exportAllowed: true,
     })).toMatchObject({
-      currentLabel: 'Step 2 of 4 · Get the official record',
+      currentLabel: 'Step 1 of 3 · Get the official record',
+      instruction: 'Do not use the message link. Open the official service yourself.',
       status: 'Safe stop: verify the record before comparing evidence',
       statusTone: 'safe-stop',
       next: 'Use the verified official route to obtain the record; evidence comparison will stay skipped.',
@@ -192,9 +179,7 @@ describe('guided journey progress', () => {
   it('keeps an e-Challan worksheet available for on-screen review on a shared device', () => {
     expect(getChallanGuideContent({
       step: 'result',
-      safetyReady: true,
       sourceStatus: 'official-portal',
-      jurisdictionSelected: true,
       observationsReady: true,
       worksheetAvailable: true,
       exportAllowed: false,

@@ -82,15 +82,16 @@ describe('citizen homepage routing', () => {
     }
   });
 
-  it('keeps the five situation shortcuts in one named native disclosure', () => {
+  it('keeps the five situation shortcuts visible in one named navigation landmark', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
-    const disclosure = html.match(/<details\b[\s\S]*?<\/details>/)?.[0] ?? '';
+    const situations = html.match(/<nav\b[^>]*aria-label="Common challan situations"[^>]*>[\s\S]*?<\/nav>/)?.[0] ?? '';
 
-    expect(disclosure).toContain('<summary>Not sure? Choose your situation</summary>');
+    expect(situations).toContain('Not sure? Choose your situation');
     for (const situation of SITUATION_LINKS) {
-      expect(disclosure).toContain(`href="${situation.href}"`);
+      expect(situations).toContain(`href="${situation.href}"`);
     }
-    expect(disclosure.match(/<a\b/g)).toHaveLength(5);
+    expect(situations.match(/<a\b/g)).toHaveLength(5);
+    expect(html).not.toContain('<details');
   });
 
   it('makes the FASTag doorway one complete semantic link', () => {
@@ -106,16 +107,14 @@ describe('citizen homepage routing', () => {
     expect(link.replace(/^<a\b[^>]*>/, '').replace(/<\/a>$/, '')).not.toMatch(/<(?:a|button)\b/i);
   });
 
-  it('describes the browser-local file boundary without implying optional upload', () => {
+  it('states the browser-local boundary once, in the footer, without implying optional upload', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
+    const footer = html.match(/<footer\b[\s\S]*?<\/footer>/)?.[0] ?? '';
 
-    const privacyBand = html.match(/<section\b[^>]*aria-label="Your privacy is built in"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? '';
-    expect(privacyBand).toContain('Files stay in this browser');
-    expect(privacyBand).toContain('Nothing is uploaded to ChallanSakshi, AI, or an authority');
-    expect(privacyBand).toContain('Payments and submissions stay on official services');
-    expect(privacyBand.match(/<li\b/g)).toHaveLength(3);
-    expect(privacyBand).toContain('href="/privacy"');
-    expect(privacyBand).toContain('Read full privacy details');
+    expect(footer).toContain('Your files and answers stay in this browser and are not uploaded.');
+    expect(footer).toContain('href="/privacy"');
+    expect(html).not.toContain('Your privacy is built in');
+    expect(html.match(/not uploaded/g)).toHaveLength(1);
     expect(html).not.toContain('Selected files stay in this browser tab');
     expect(html).not.toContain('processed locally by default');
     expect(html).not.toContain('future product decision');
@@ -127,18 +126,16 @@ describe('citizen homepage routing', () => {
     expect(mobile).toMatch(/\.actionCta\s*\{[^}]*min-width:\s*48px/);
   });
 
-  it('keeps mobile citizen explanations at 16px', () => {
+  it('keeps mobile citizen explanations at 15px or larger', () => {
     const mobile = citizenHomeStyles.slice(citizenHomeStyles.indexOf('@media (max-width: 700px)'));
 
     for (const selector of [
       '.actionCopy p',
-      '.situationDisclosure summary',
-      '.situationDisclosure a',
-      '.privacyBand li',
-      '.privacyLink',
+      '.situationsHeading',
+      '.situations a',
       '.fastagDoorway p',
     ]) {
-      expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*16px/);
+      expect(ruleFor(mobile, selector), selector).toMatch(/font-size:\s*1[5-9]px/);
     }
   });
 

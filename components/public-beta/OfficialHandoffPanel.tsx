@@ -116,6 +116,7 @@ export type OfficialHandoffPanelProps = Readonly<{
 
 function Confirmation(props: {
   checked: boolean;
+  disabled?: boolean;
   label: string;
   onChange: (checked: boolean) => void;
 }): JSX.Element {
@@ -124,6 +125,7 @@ function Confirmation(props: {
       <input
         type="checkbox"
         checked={props.checked}
+        disabled={props.disabled}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
       />
       <span>{props.label}</span>
@@ -131,16 +133,20 @@ function Confirmation(props: {
   );
 }
 
+type CopyFeedback = Readonly<Record<'category' | 'description', Readonly<Record<'failed' | 'copied', string>>>>;
+
 function CopyStatus({
   status,
   feedback,
   label,
 }: {
   status: OfficialHandoffPanelProps['copyStatus'];
-  feedback: Readonly<Record<'lookup' | 'category' | 'description', Readonly<Record<'failed' | 'copied', string>>>>;
+  feedback: CopyFeedback;
   label: string;
 }): JSX.Element {
-  const message = status.status === 'idle' ? null : feedback[status.field][status.status];
+  const message = status.status === 'idle' || status.field === 'lookup'
+    ? null
+    : feedback[status.field][status.status];
   return (
     <div
       className={`${styles.copyStatusRegion}${message ? ` ${styles.status}` : ''}`}
@@ -169,7 +175,6 @@ export function OfficialHandoffPanel({
   confirmedPack,
   packConfirmation,
   copyStatus,
-  lookupValue,
   officialLinkStatus,
   receiptState,
   returnDraft,
@@ -208,50 +213,89 @@ export function OfficialHandoffPanel({
     'needs-correction': copy.returnStates.correctionNeeded,
   } as const;
 
+  // One visible checkbox per role stands for the same underlying permission keys the
+  // controller and pack builder already require; nothing in the data contract changes.
+  const selfConfirmed = packConfirmation.affectedPersonInspectedEvidence
+    && packConfirmation.affectedPersonInspectedReadableRecord
+    && packConfirmation.affectedPersonConfirmedEntitlement
+    && packConfirmation.affectedPersonConfirmedPack;
+  const helperReviewed = packConfirmation.affectedPersonPresent
+    && packConfirmation.affectedPersonInspectedEvidence
+    && packConfirmation.affectedPersonInspectedReadableRecord
+    && packConfirmation.affectedPersonConfirmedEntitlement;
+  const helperConfirmedPack = packConfirmation.affectedPersonRequestedPreparation
+    && packConfirmation.affectedPersonConfirmedPack;
+  const referenceFragmentEntered = returnDraft.selectedReturnState === 'acknowledgement-seen'
+    && returnDraft.referenceLastFour.length === 4;
+  const helperReturnConfirmed = returnAuthorization.affectedPersonPresent
+    && returnAuthorization.affectedPersonRequestedReturnRecording
+    && returnAuthorization.affectedPersonConfirmedReturnState
+    && (!referenceFragmentEntered || returnAuthorization.affectedPersonConfirmedReferenceFragment);
+
+  const changeSelfConfirmation = (checked: boolean) => {
+    callbacks.onAffectedPersonInspectedEvidenceChange(checked);
+    callbacks.onAffectedPersonInspectedReadableRecordChange(checked);
+    callbacks.onAffectedPersonConfirmedEntitlementChange(checked);
+    callbacks.onAffectedPersonConfirmedPackChange(checked);
+  };
+  const changeHelperReview = (checked: boolean) => {
+    callbacks.onAffectedPersonPresentChange(checked);
+    callbacks.onAffectedPersonInspectedEvidenceChange(checked);
+    callbacks.onAffectedPersonInspectedReadableRecordChange(checked);
+    callbacks.onAffectedPersonConfirmedEntitlementChange(checked);
+  };
+  const changeHelperPackConfirmation = (checked: boolean) => {
+    callbacks.onAffectedPersonRequestedPreparationChange(checked);
+    callbacks.onAffectedPersonConfirmedPackChange(checked);
+  };
+  const changeHelperReturnConfirmation = (checked: boolean) => {
+    // Unticking withdraws the return attestations; it is not a departure signal, so the
+    // confirmed pack and link activation stay intact and recording remains blocked.
+    if (checked) callbacks.onReturnAffectedPersonPresentChange(true);
+    callbacks.onReturnRecordingRequestedChange(checked);
+    callbacks.onReturnStateConfirmedChange(checked);
+    if (referenceFragmentEntered) callbacks.onReturnReferenceConfirmedChange(checked);
+  };
+
+  const officialAnchor = showOfficialAnchor ? (
+    <a
+      className={`${styles.officialAnchor} ${officialLinkStatus === 'not-activated' ? styles.primaryAction : styles.secondaryAction}`}
+      href={draft.destination.canonicalUrl}
+      target="_blank"
+      rel="noreferrer"
+      onClick={eligible ? (event) => {
+        if (!callbacks.onOfficialLinkActivate()) event.preventDefault();
+      } : undefined}
+    >
+      {copy.openPrefix} {draft.destination.serviceName}
+    </a>
+  ) : null;
+
   return (
     <section className={styles.panel} aria-labelledby="official-handoff-heading">
       <p className={styles.eyebrow}>{copy.eyebrow}</p>
       {draft.status === 'abstained' ? (
         <h2 id="official-handoff-heading">{copy.abstainedHeading}</h2>
       ) : (
-        <>
+        <div className={styles.destination}>
           <h2 id="official-handoff-heading">{draft.destination.serviceName}</h2>
           <p className={styles.purpose} data-purpose={draft.destination.purpose}>{purpose}</p>
           <p className={styles.domain}>{draft.destination.domain}</p>
           <p className={styles.verified}>{copy.verified}: {draft.destination.lastVerifiedAt}</p>
-        </>
+        </div>
       )}
 
       {draft.status !== 'eligible' ? (
-        <p className={styles.closedReason} role="status">
-          {copy.eligibility[draft.status]}
-        </p>
+        <>
+          <p className={styles.closedReason} role="status">
+            {copy.eligibility[draft.status]}
+          </p>
+          {officialAnchor}
+        </>
       ) : (
         <>
           {privateDevice ? (
             <CopyStatus status={copyStatus} feedback={copy.copyFeedback} label={copy.copyStatusLabel} />
-          ) : null}
-
-          {privateDevice ? (
-            <section className={styles.fieldGroup} aria-labelledby="handoff-lookup-heading">
-              <h3 id="handoff-lookup-heading">{copy.lookupHeading}</h3>
-              <label className={styles.referenceField} htmlFor="handoff-lookup">
-                <span>{copy.lookupLabel}</span>
-                <input
-                  id="handoff-lookup"
-                  value={lookupValue ?? ''}
-                  autoComplete="off"
-                  onChange={(event) => callbacks.onLookupValueChange(event.currentTarget.value)}
-                />
-              </label>
-              <p className={styles.fieldHelp}>{copy.lookupWarning}</p>
-              {lookupValue ? <p className={styles.selectableValue}>{lookupValue}</p> : null}
-              {lookupValue ? (
-                <button type="button" className={styles.copyButton} onClick={() => callbacks.onCopyField('lookup')}>
-                  {copy.copyLookup}
-                </button>
-              ) : null}
-            </section>
           ) : null}
 
           {draft.mappedCategory ? (
@@ -280,7 +324,6 @@ export function OfficialHandoffPanel({
               onChange={(event) => callbacks.onDescriptionChange(event.currentTarget.value)}
               aria-invalid={draft.descriptionError ? true : undefined}
             />
-            <p className={styles.fieldHelp}>{copy.descriptionHelp}</p>
             <p className={styles.fieldHelp} role="status" aria-live="polite">
               {language === 'hi'
                 ? `${copy.descriptionCounter} ${draft.descriptionCodePointCount}`
@@ -289,71 +332,51 @@ export function OfficialHandoffPanel({
             {draft.descriptionError ? <p className={styles.error} role="alert">{draft.descriptionError}</p> : null}
             <p className={styles.selectableValue}>{draft.normalizedDescription}</p>
             {privateDevice && confirmedPack ? (
-              <>
-                <button
-                  type="button"
-                  className={styles.copyButton}
-                  onClick={() => callbacks.onCopyField('description')}
-                >
-                  {copy.copyDescription}
-                </button>
-              </>
+              <button
+                type="button"
+                className={styles.copyButton}
+                onClick={() => callbacks.onCopyField('description')}
+              >
+                {copy.copyDescription}
+              </button>
             ) : <p className={styles.manualCopy}>{copy.sharedInstruction}</p>}
-          </section>
-
-          <section className={styles.checklist} aria-labelledby="handoff-checklist-heading">
-            <h3 id="handoff-checklist-heading">{copy.checklistHeading}</h3>
-            <ul>
-              {(draft.routeKey === 'legacy' || draft.routeKey === 'nextgen'
-                ? copy.checklists[draft.routeKey]
-                : draft.checklist).map((item) => <li key={item}>{item}</li>)}
-            </ul>
           </section>
 
           <section className={styles.confirmationGroup} aria-labelledby="handoff-role-heading">
             <h3 id="handoff-role-heading">{helping ? copy.roles.helper.heading : copy.roles.self.heading}</h3>
             {helping ? (
               <>
-                <Confirmation checked={packConfirmation.affectedPersonPresent} label={copy.roles.helper.confirmations.affectedPersonPresent} onChange={callbacks.onAffectedPersonPresentChange} />
-                <Confirmation checked={packConfirmation.affectedPersonInspectedEvidence} label={copy.roles.helper.confirmations.affectedPersonInspectedEvidence} onChange={callbacks.onAffectedPersonInspectedEvidenceChange} />
-                <Confirmation checked={packConfirmation.affectedPersonInspectedReadableRecord} label={copy.roles.helper.confirmations.affectedPersonInspectedReadableRecord} onChange={callbacks.onAffectedPersonInspectedReadableRecordChange} />
-                <Confirmation checked={packConfirmation.affectedPersonConfirmedEntitlement} label={copy.roles.helper.confirmations.affectedPersonConfirmedEntitlement} onChange={callbacks.onAffectedPersonConfirmedEntitlementChange} />
-                <Confirmation checked={packConfirmation.affectedPersonRequestedPreparation} label={copy.roles.helper.confirmations.affectedPersonRequestedPreparation} onChange={callbacks.onAffectedPersonRequestedPreparationChange} />
-                <Confirmation checked={packConfirmation.affectedPersonConfirmedPack} label={copy.roles.helper.confirmations.affectedPersonConfirmedPack} onChange={callbacks.onAffectedPersonConfirmedPackChange} />
+                <Confirmation
+                  checked={helperReviewed}
+                  label={copy.roles.helper.confirmations.affectedPersonPresentAndReviewed}
+                  onChange={changeHelperReview}
+                />
+                <Confirmation
+                  checked={helperConfirmedPack}
+                  disabled={!helperReviewed}
+                  label={copy.roles.helper.confirmations.affectedPersonRequestedAndConfirmedPack}
+                  onChange={changeHelperPackConfirmation}
+                />
                 <p className={styles.boundary}>{copy.roles.helper.submitBoundary}</p>
               </>
             ) : (
-              <>
-                <Confirmation checked={packConfirmation.affectedPersonInspectedEvidence} label={copy.roles.self.confirmations.affectedPersonInspectedEvidence} onChange={callbacks.onAffectedPersonInspectedEvidenceChange} />
-                <Confirmation checked={packConfirmation.affectedPersonInspectedReadableRecord} label={copy.roles.self.confirmations.affectedPersonInspectedReadableRecord} onChange={callbacks.onAffectedPersonInspectedReadableRecordChange} />
-                <Confirmation checked={packConfirmation.affectedPersonConfirmedEntitlement} label={copy.roles.self.confirmations.affectedPersonConfirmedEntitlement} onChange={callbacks.onAffectedPersonConfirmedEntitlementChange} />
-                <Confirmation checked={packConfirmation.affectedPersonConfirmedPack} label={copy.roles.self.confirmations.affectedPersonConfirmedPack} onChange={callbacks.onAffectedPersonConfirmedPackChange} />
-              </>
+              <Confirmation
+                checked={selfConfirmed}
+                label={copy.roles.self.confirmation}
+                onChange={changeSelfConfirmation}
+              />
             )}
           </section>
+
+          {showOfficialAnchor ? (
+            <section className={styles.openService} aria-labelledby="handoff-open-heading">
+              <h3 id="handoff-open-heading">{copy.openHeading}</h3>
+              <p>{copy.openBody.replace('{domain}', draft.destination.domain)}</p>
+              {officialAnchor}
+            </section>
+          ) : null}
         </>
       )}
-
-      {draft.status !== 'abstained' ? (
-        <section className={styles.leaving} aria-labelledby="handoff-leaving-heading">
-          <h3 id="handoff-leaving-heading">{copy.leaveHeading}</h3>
-          <p>{copy.leaveBody}</p>
-          <p className={styles.boundary}>{copy.safetyBoundary}</p>
-          {showOfficialAnchor ? (
-            <a
-              className={`${styles.officialAnchor} ${officialLinkStatus === 'not-activated' ? styles.primaryAction : styles.secondaryAction}`}
-              href={draft.destination.canonicalUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={eligible ? (event) => {
-                if (!callbacks.onOfficialLinkActivate()) event.preventDefault();
-              } : undefined}
-            >
-              {copy.openPrefix} {draft.destination.serviceName}
-            </a>
-          ) : null}
-        </section>
-      ) : null}
 
       {eligible && confirmedPack && officialLinkStatus === 'activated' ? (
         <section className={styles.returnSection}>
@@ -372,12 +395,6 @@ export function OfficialHandoffPanel({
               </label>
             ))}
           </fieldset>
-          {returnDraft.selectedReturnState ? (
-            <p className={styles.status} role="status" aria-live="polite">
-              {returnAnnouncement.selectedPrefix} {returnLabels[returnDraft.selectedReturnState]}{language === 'hi' ? '।' : '.'}{' '}
-              {returnAnnouncement.selectedBoundary}
-            </p>
-          ) : null}
           {returnDraft.selectedReturnState === 'portal-unavailable' ? (
             <aside className={styles.status}>
               <strong>{copy.fallback.heading}</strong>{' '}{copy.fallback.body}{' '}
@@ -385,9 +402,6 @@ export function OfficialHandoffPanel({
                 {copy.fallback.openPrefix}: {draft.fallback.serviceName}
               </a>
             </aside>
-          ) : null}
-          {returnRecorded ? (
-            <p className={styles.status} role="status" aria-live="polite">{returnAnnouncement.recorded}</p>
           ) : null}
           {privateDevice && returnDraft.selectedReturnState === 'acknowledgement-seen' ? (
             <label className={styles.referenceField}>
@@ -400,17 +414,12 @@ export function OfficialHandoffPanel({
             </label>
           ) : null}
           {helping ? (
-            <div className={styles.confirmationGroup}>
-              <Confirmation checked={returnAuthorization.affectedPersonPresent} label={copy.returnAuthorization.affectedPersonPresent} onChange={callbacks.onReturnAffectedPersonPresentChange} />
-              <Confirmation checked={returnAuthorization.affectedPersonRequestedReturnRecording} label={copy.returnAuthorization.affectedPersonRequestedReturnRecording} onChange={callbacks.onReturnRecordingRequestedChange} />
-              <Confirmation checked={returnAuthorization.affectedPersonConfirmedReturnState} label={copy.returnAuthorization.affectedPersonConfirmedReturnState} onChange={callbacks.onReturnStateConfirmedChange} />
-              {returnDraft.selectedReturnState === 'acknowledgement-seen'
-                && returnDraft.referenceLastFour.length === 4 ? (
-                  <Confirmation checked={returnAuthorization.affectedPersonConfirmedReferenceFragment} label={copy.returnAuthorization.affectedPersonConfirmedReferenceFragment} onChange={callbacks.onReturnReferenceConfirmedChange} />
-                ) : null}
-            </div>
+            <Confirmation
+              checked={helperReturnConfirmed}
+              label={copy.returnAuthorization.affectedPersonConfirmedReturn}
+              onChange={changeHelperReturnConfirmation}
+            />
           ) : null}
-          <p className={styles.boundary}>{helping ? copy.returnBasis.helper : copy.returnBasis.self}</p>
           {returnReadinessMessage ? (
             <p id="handoff-return-readiness" className={styles.status} role="status">
               {returnReadinessMessage}
@@ -425,6 +434,9 @@ export function OfficialHandoffPanel({
           >
             {copy.recordReturn}
           </button>
+          {returnRecorded ? (
+            <p className={styles.status} role="status" aria-live="polite">{returnAnnouncement.recorded}</p>
+          ) : null}
           {privateDevice && returnRecorded ? (
             <button className={`${styles.action} ${styles.primaryAction}`} type="button" onClick={callbacks.onDownloadReceipt}>{copy.receiptDownload}</button>
           ) : null}

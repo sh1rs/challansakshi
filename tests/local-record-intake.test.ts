@@ -87,7 +87,7 @@ describe('local official-record intake', () => {
     );
   });
 
-  it('shows a compact local receipt and discloses the full processing mechanics', () => {
+  it('renders the two optional intake rows without repeated boundary copy', () => {
     const html = renderToStaticMarkup(createElement(LocalRecordIntake, {
       record: null,
       photograph: null,
@@ -96,11 +96,13 @@ describe('local official-record intake', () => {
       language: 'en',
     }));
 
-    expect(html).toContain('Local only · Not uploaded · Not saved');
     expect(html).toContain('Challan copy');
     expect(html).toContain('Photo from the challan');
-    expect(html).toContain('<summary>How local review works</summary>');
-    expect(html).toContain('No selected file or answer has been uploaded to ChallanSakshi or an authority');
+    expect(html).toContain('Choose challan copy');
+    expect(html).toContain('Choose photo from the challan');
+    expect(html).not.toContain('Not uploaded');
+    expect(html).not.toContain('<details');
+    expect(intakeComponentSource).not.toContain('capture=');
   });
 
   it('renders only a generic selected-role label with safe type and size feedback', () => {
@@ -136,24 +138,21 @@ describe('local official-record intake', () => {
     expect(html).toContain('4.0 KiB');
   });
 
-  it('keeps local-intake guidance and controls at 16px on narrow screens', () => {
+  it('keeps local-intake controls at 16px and guidance at 15px or larger on narrow screens', () => {
     const mobile = mediaBlock(intakeStyles, '(max-width: 420px)');
+    const escape = (selector: string) => selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    for (const selector of ['.choose', '.remove', '.pdfOpen a']) {
+      expect(mobile, selector).toMatch(new RegExp(`${escape(selector)}[^{}]*\\{[^}]*font-size:\\s*16px`));
+    }
     for (const selector of [
-      '.receipt strong',
-      '.mechanics summary',
-      '.mechanics li',
       '.rowCopy p:last-child',
-      '.choose',
-      '.actions button',
       '.metadata strong',
       '.metadata span',
       '.preview p',
       '.error',
     ]) {
-      expect(mobile, selector).toMatch(
-        new RegExp(`${selector.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[^{}]*\\{[^}]*font-size:\\s*16px`),
-      );
+      expect(mobile, selector).toMatch(new RegExp(`${escape(selector)}[^{}]*\\{[^}]*font-size:\\s*1[5-9]px`));
     }
   });
 });

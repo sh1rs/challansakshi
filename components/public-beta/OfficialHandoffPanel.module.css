@@ -1,8 +1,8 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 24px;
+  gap: 14px;
+  padding: 18px;
   color: var(--pb-ink);
   background: var(--pb-paper);
   border: 1px solid var(--pb-line);
@@ -18,10 +18,16 @@
 
 .eyebrow {
   color: var(--pb-teal-dark);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.destination {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .purpose,
@@ -36,15 +42,19 @@
   color: var(--pb-muted);
 }
 
+.verified,
+.fieldHelp {
+  font-size: 13px;
+}
+
 .fieldGroup,
-.checklist,
 .confirmationGroup,
-.leaving,
+.openService,
 .returnSection {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 18px;
+  gap: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--pb-line);
 }
 
@@ -61,7 +71,7 @@
 }
 
 .fieldGroup textarea {
-  min-height: 150px;
+  min-height: 96px;
   resize: vertical;
 }
 
@@ -86,16 +96,25 @@
 
 .confirmation input,
 .returnChoice input {
+  flex: 0 0 auto;
   width: 20px;
   height: 20px;
   margin-top: 2px;
   accent-color: var(--pb-teal-dark);
 }
 
+.confirmation input:disabled {
+  cursor: not-allowed;
+}
+
+.confirmation input:disabled + span {
+  color: var(--pb-muted);
+}
+
 .returnChoices {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -103,7 +122,7 @@
 }
 
 .returnChoices legend {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding: 0;
   color: var(--pb-ink);
   font-size: 1.17em;
@@ -185,6 +204,6 @@
   }
 
   .panel {
-    padding: 18px;
+    padding: 16px;
   }
 }
