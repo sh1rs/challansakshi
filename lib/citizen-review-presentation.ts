@@ -14,72 +14,52 @@ type StagePresentation = {
 const stagePresentation = {
   en: {
     standard: {
-      source: {
-        heading: 'Open the official service',
-        help: 'Choose the official route yourself, record how you obtained the copy, then choose a local file or manual facts.',
-        action: 'Continue to fact checking',
+      check: {
+        heading: 'Check your challan',
+        help: 'Answer only the questions that can still change or explain the safe result.',
+        action: 'See my next step',
       },
-      observations: {
-        heading: 'Check the selected record beside every fact',
-        help: 'Record only what you can personally read. Mark anything else unclear or not supplied.',
-        action: 'Decide and resolve',
-      },
-      result: {
-        heading: 'What your confirmed entries support',
-        help: 'Read the conservative finding, missing evidence, timeline, and exact official route.',
+      resolve: {
+        heading: 'Your next step',
+        help: 'Read the bounded finding, what it means, and the current official route.',
         action: 'Edit answers',
       },
     },
     simple: {
-      source: {
-        heading: 'Find the record yourself',
-        help: 'Open an official service. Then choose a file here or type the facts yourself.',
-        action: 'Check the facts',
+      check: {
+        heading: 'Check your challan',
+        help: 'Answer one question at a time. Use unclear when you cannot tell.',
+        action: 'See my next step',
       },
-      observations: {
-        heading: 'Check one fact at a time',
-        help: 'Choose what you can see. Use unclear when you cannot tell.',
-        action: 'See the result',
-      },
-      result: {
-        heading: 'What your answers show',
-        help: 'Read what is clear, what is missing, and where to go next.',
+      resolve: {
+        heading: 'Your next step',
+        help: 'Read what your answers show and where to go next.',
         action: 'Change answers',
       },
     },
   },
   hi: {
     standard: {
-      source: {
-        heading: 'आधिकारिक सेवा खोलें',
-        help: 'आधिकारिक रास्ता स्वयं चुनें, कॉपी मिलने का तरीका दर्ज करें, फिर स्थानीय फ़ाइल या मैन्युअल तथ्य चुनें।',
-        action: 'तथ्य जाँच पर आगे',
+      check: {
+        heading: 'अपना चालान जाँचें',
+        help: 'केवल उन प्रश्नों का उत्तर दें जो सुरक्षित नतीजे को बदल या समझा सकते हैं।',
+        action: 'अगला कदम देखें',
       },
-      observations: {
-        heading: 'हर तथ्य के साथ चुना रिकॉर्ड जाँचें',
-        help: 'केवल वही दर्ज करें जो आप स्वयं पढ़ सकें। बाकी को अस्पष्ट या नहीं दिया गया चिह्नित करें।',
-        action: 'निर्णय और समाधान',
-      },
-      result: {
-        heading: 'आपकी पुष्ट प्रविष्टियाँ क्या दिखाती हैं',
-        help: 'सावधान नतीजा, गायब सबूत, समयरेखा और सटीक आधिकारिक रास्ता पढ़ें।',
+      resolve: {
+        heading: 'आपका अगला कदम',
+        help: 'सावधान नतीजा, उसका मतलब और मौजूदा आधिकारिक रास्ता पढ़ें।',
         action: 'उत्तर बदलें',
       },
     },
     simple: {
-      source: {
-        heading: 'रिकॉर्ड स्वयं खोजें',
-        help: 'आधिकारिक सेवा खोलें। फिर फ़ाइल चुनें या तथ्य स्वयं लिखें।',
-        action: 'तथ्य जाँचें',
+      check: {
+        heading: 'अपना चालान जाँचें',
+        help: 'एक-एक प्रश्न का उत्तर दें। तय न हो तो अस्पष्ट चुनें।',
+        action: 'अगला कदम देखें',
       },
-      observations: {
-        heading: 'एक-एक तथ्य जाँचें',
-        help: 'जो दिखे वही चुनें। तय न हो तो अस्पष्ट चुनें।',
-        action: 'नतीजा देखें',
-      },
-      result: {
-        heading: 'आपके उत्तर क्या दिखाते हैं',
-        help: 'क्या साफ़ है, क्या गायब है और आगे कहाँ जाना है, पढ़ें।',
+      resolve: {
+        heading: 'आपका अगला कदम',
+        help: 'आपके उत्तर क्या दिखाते हैं और आगे कहाँ जाना है, पढ़ें।',
         action: 'उत्तर बदलें',
       },
     },
@@ -544,6 +524,8 @@ const evidenceFields: Record<string, string> = {
   'Evidence timestamp': 'सबूत समय',
   'Evidence location': 'सबूत स्थान',
   'Citizen vehicle record': 'नागरिक वाहन रिकॉर्ड',
+  'Official notice copy': 'आधिकारिक नोटिस की कॉपी',
+  'Event-time custody record': 'घटना-समय अभिरक्षा रिकॉर्ड',
 };
 
 const evidenceValues: Record<string, string> = {
@@ -649,6 +631,7 @@ const assessmentHi: Record<string, string> = {
   'You could not find a timestamp in the supplied evidence.': 'आपको दिए गए सबूत में समय नहीं मिला।',
   'You could not find a location in the supplied evidence.': 'आपको दिए गए सबूत में स्थान नहीं मिला।',
   'A vehicle record you can compare against': 'तुलना के लिए पढ़ने योग्य वाहन रिकॉर्ड',
+  'A readable independent vehicle record you can compare against': 'तुलना के लिए पढ़ने योग्य स्वतंत्र वाहन रिकॉर्ड',
   'A copy of the official notice': 'आधिकारिक नोटिस की कॉपी',
   'Any available event-time custody record (context only)': 'घटना समय का उपलब्ध अभिरक्षा रिकॉर्ड, केवल संदर्भ के लिए',
   'Official notice or official-service status': 'आधिकारिक नोटिस या सेवा स्थिति',
@@ -672,6 +655,7 @@ const assessmentSimpleEn: Record<string, string> = {
   'You could not find a timestamp in the supplied evidence.': 'No time was found in the evidence.',
   'You could not find a location in the supplied evidence.': 'No place was found in the evidence.',
   'A vehicle record you can compare against': 'A readable vehicle record',
+  'A readable independent vehicle record you can compare against': 'A readable independent vehicle record',
   'A copy of the official notice': 'The official notice copy',
   'Any available event-time custody record (context only)': 'Any record showing who had the vehicle then',
   'Official notice or official-service status': 'The official notice or current status',
@@ -695,6 +679,7 @@ const assessmentSimpleHi: Record<string, string> = {
   'You could not find a timestamp in the supplied evidence.': 'सबूत में समय नहीं मिला।',
   'You could not find a location in the supplied evidence.': 'सबूत में स्थान नहीं मिला।',
   'A vehicle record you can compare against': 'पढ़ने योग्य वाहन रिकॉर्ड',
+  'A readable independent vehicle record you can compare against': 'पढ़ने योग्य स्वतंत्र वाहन रिकॉर्ड',
   'A copy of the official notice': 'आधिकारिक नोटिस की कॉपी',
   'Any available event-time custody record (context only)': 'उस समय वाहन किसके पास था, उसका रिकॉर्ड',
   'Official notice or official-service status': 'आधिकारिक नोटिस या मौजूदा स्थिति',

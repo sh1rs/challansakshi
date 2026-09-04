@@ -1,7 +1,7 @@
 import type { Language } from './domain';
 import {
-  OFFICIAL_AUXILIARY_ROUTES,
   OFFICIAL_ROUTE_REGISTRY_VERSION,
+  resolveCurrentOfficialAuxiliaryRoute,
   resolveOfficialDestination,
   type JurisdictionConfirmation,
   type OfficialAuxiliaryRoute,
@@ -164,7 +164,7 @@ export type CitizenReviewHandoffView = Readonly<{
   nowIso: string;
   jurisdictionConfirmation: JurisdictionConfirmation;
   destination: OfficialDestination;
-  lookupRoute: OfficialAuxiliaryRoute;
+  lookupRoute: OfficialAuxiliaryRoute | null;
   actionReadyProjection: ActionReadyReviewProjection;
   draft: CitizenReviewHandoffDraft;
   contextSignature: string;
@@ -432,9 +432,11 @@ export function buildCitizenReviewHandoffView(
     resultRevisionId: state.resultRevisionId,
     packRevisionId: state.packRevisionId,
   } as CitizenReviewHandoffDraft;
-  const lookupRoute = destination.key === 'nextgen'
-    ? OFFICIAL_AUXILIARY_ROUTES['nextgen-service-landing']
-    : OFFICIAL_AUXILIARY_ROUTES['national-record-lookup'];
+  const lookupResolution = resolveCurrentOfficialAuxiliaryRoute(
+    destination.key === 'nextgen' ? 'nextgen-service-landing' : 'national-record-lookup',
+    input.nowIso,
+  );
+  const lookupRoute = lookupResolution.status === 'current' ? lookupResolution.route : null;
   return {
     role: input.role,
     deviceMode: input.deviceMode,

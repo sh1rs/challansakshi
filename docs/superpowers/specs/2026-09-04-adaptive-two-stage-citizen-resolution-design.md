@@ -1,6 +1,6 @@
 # ChallanSakshi adaptive two-stage citizen resolution design
 
-**Status:** Approved in chat on 2026-09-04; written specification pending owner review
+**Status:** Approved by the owner and implemented on 2026-09-05; locally verified with 807 unit/regression tests, 29 browser acceptance tests, exact route-expiry runs, typecheck, lint, and production build. Not deployed. Evidence and implementation-layout adjustments: `docs/superpowers/verification/2026-09-05-adaptive-citizen-resolution.md`.
 **Repository:** `/Users/shars/Desktop/challansakshi`
 **Branch:** `codex/challansakshi-resolution-layer`
 **Starting tree:** `0603833`

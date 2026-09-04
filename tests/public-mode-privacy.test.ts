@@ -2,9 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// These four route modules are the complete real-mode boundary. Following every
+// These home/review/toll route modules are the complete real-mode boundary. Following every
 // relative import/export keeps the audit current when a route gains a new local dependency.
 const publicModeEntryPoints = [
+  'app/page.tsx',
   'app/review/page.tsx',
   'app/fastag/page.tsx',
   'app/manual/challan/page.tsx',
@@ -92,9 +93,9 @@ describe('real-mode privacy isolation', () => {
     }
 
     const queryReaders = publicModeFiles.filter(({ source }) => source.includes('URLSearchParams'));
-    expect(queryReaders.map(({ path }) => path)).toEqual(['lib/citizen-home.ts']);
-    expect(queryReaders[0].source).toMatch(/new URLSearchParams\(search\)\.get\('goal'\)/);
-    expect(queryReaders[0].source).not.toMatch(/URLSearchParams[\s\S]*?\.(?:set|append|delete)\s*\(/);
+    expect(queryReaders).toEqual([]);
+    const reviewRoute = publicModeFiles.find(({ path }) => path === 'app/review/page.tsx')!.source;
+    expect(reviewRoute).toContain('parseCitizenGoalValue(query.goal)');
     const queryKeys = publicModeFiles.flatMap(({ source }) => (
       [...source.matchAll(/[?&]([a-zA-Z0-9_-]+)=/g)].map((match) => match[1])
     ));

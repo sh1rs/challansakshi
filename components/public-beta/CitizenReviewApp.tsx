@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { GuidedStepHeader } from '../guided/GuidedStepHeader';
-import { parseCitizenGoal, type CitizenGoal } from '../../lib/citizen-home';
+import type { CitizenGoal } from '../../lib/citizen-home';
+import { useClientReady } from '../shared/useClientReady';
+import { CitizenReviewCheck } from './CitizenReviewCheck';
+import adaptive from './CitizenReviewAdaptive.module.css';
+import { deriveCitizenReviewQuestionPlan, type CitizenReviewInputId, type CitizenReviewDecisionQuestionId } from '../../lib/citizen-review-question-plan';
+import { createCitizenReviewState, getCitizenReviewAnswers, getCitizenReviewFactsSignature, changeCitizenReviewAnswer, selectCitizenReviewFile, confirmCitizenReviewState, confirmCitizenReviewHelper, invalidateCitizenReviewFacts, type CitizenReviewDevice } from '../../lib/citizen-review-state';
 import {
   getCitizenReviewPresentation,
   localizeAssessment,
-  localizeDeadline,
 } from '../../lib/citizen-review-presentation';
 import type { Language } from '../../lib/domain';
 import {
@@ -17,21 +20,19 @@ import {
   buildCitizenTimeline,
   type CitizenEvidencePresentationView,
 } from '../../lib/evidence-intelligence';
-import { buildChallanGuidedProgress, getChallanGuideContent } from '../../lib/guided-journey';
 import {
   assessCitizenChallanReview,
   calculateEnteredOfficialDeadline,
   citizenSituationForFinding,
-  deriveImageInspected,
-  type CitizenChallanAnswers,
   type CitizenSituation,
-  type Observation,
-  type OffenceObservation,
   type RecordAvailability,
 } from '../../lib/public-challan';
 import { startSharedDeviceInactivityGuard } from '../../lib/shared-device-inactivity';
 import {
   ALL_ISSUING_JURISDICTION_CODES,
+  getOfficialRouteFreshnessToken,
+  getOfficialRouteFreshnessDelayMs,
+  resolveCurrentOfficialAuxiliaryRoute,
   type IssuingJurisdictionCode,
   type JurisdictionConfirmation,
 } from '../../lib/official-destinations';
@@ -70,24 +71,9 @@ import { LocalRecordIntake, type LocalRecordSelection } from './LocalRecordIntak
 import { OfficialHandoffPanel } from './OfficialHandoffPanel';
 import { PublicBetaShell, publicBetaStyles as styles } from './PublicBetaShell';
 
-type Step = 'source' | 'observations' | 'result';
-type Role = 'self' | 'helper';
-type Device = 'private' | 'shared';
+type Step = 'check' | 'resolve';
+type Device = CitizenReviewDevice;
 type ReviewError = { step: Step; message: string };
-
-const defaults: CitizenChallanAnswers = {
-  sourceStatus: 'not-selected',
-  imageInspected: false,
-  plateObservation: 'unclear',
-  categoryObservation: 'unclear',
-  colourObservation: 'unclear',
-  offenceObservation: 'unclear',
-  timestampStatus: 'unclear',
-  locationStatus: 'unclear',
-  ownRecordAvailable: 'unclear',
-  noticeCopyAvailable: 'unclear',
-  custodyRecordAvailable: 'not-applicable',
-};
 
 function freshOpaqueRevisionId() {
   const bytes = new Uint8Array(16);
@@ -264,8 +250,8 @@ const resultText: Record<
       'नागरिक द्वारा दर्ज महत्वपूर्ण असंगति',
     ],
     simpleTitle: [
-      'The photo and vehicle record look different',
-      'तस्वीर और वाहन रिकॉर्ड अलग दिखते हैं',
+      'Possible vehicle mismatch',
+      'वाहन में संभावित अंतर',
     ],
     body: [
       'Your observations contain a readable plate or vehicle-category conflict. Official verification is still required.',
@@ -330,29 +316,32 @@ function EvidenceRows({
 
 type CitizenReviewAppProps = Readonly<{
   readRenderNowMs?: () => number;
+  initialGoal?: CitizenGoal | null;
+  initialNowIso?: string;
 }>;
 
-export default function CitizenReviewApp({ readRenderNowMs = Date.now }: CitizenReviewAppProps = {}) {
+export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGoal = null, initialNowIso = new Date().toISOString() }: CitizenReviewAppProps = {}) {
+  const clientReady = useClientReady();
   const [language, setLanguage] = useState<Language>('en');
-  const [step, setStep] = useState<Step>('source');
-  const [goal, setGoal] = useState<CitizenGoal | null>(null);
-  // Reviewer and device default to the common case; helper and shared-device
-  // modes are opt-in switches on the first step instead of a separate screen.
-  const [role, setRole] = useState<Role>('self');
-  const [device, setDevice] = useState<Device>('private');
+  const [reviewState, setReviewState] = useState(() => createCitizenReviewState(initialGoal));
+  const step = reviewState.phase;
+  const role = reviewState.role;
+  const confirmedSignature = reviewState.confirmedFactsSignature;
+  const helperSignature = reviewState.helperConfirmedSignature;
+  const [device, setDevice] = useState<Device>('unknown');
   const [recordSelection, setRecordSelection] = useState<LocalRecordSelection | null>(null);
   const [photographSelection, setPhotographSelection] = useState<LocalRecordSelection | null>(null);
-  const [confirmedSignature, setConfirmedSignature] = useState('');
   const [artifactSignature, setArtifactSignature] = useState('');
-  const [simpleMode, setSimpleMode] = useState(false);
-  const [manualEntryMode, setManualEntryMode] = useState(false);
-  const [helperSignature, setHelperSignature] = useState('');
-  const [rawAnswers, setRawAnswers] = useState<CitizenChallanAnswers>(defaults);
+  const simpleMode = true;
+  const [expandedQuestion, setExpandedQuestion] = useState<CitizenReviewDecisionQuestionId | null>(null);
+  const [fileIntakeRequested, setFileIntakeRequested] = useState(false);
+  const [preparationOpen, setPreparationOpen] = useState(false);
   const [jurisdiction, setJurisdiction] = useState<JurisdictionConfirmation>({ status: 'unconfirmed' });
   const [handoffState, setHandoffState] = useState<CitizenReviewHandoffControllerState>(() => (
     createCitizenReviewHandoffController({
       resultRevisionId: freshOpaqueRevisionId(),
       packRevisionId: freshOpaqueRevisionId(),
+      deviceMode: 'shared',
     })
   ));
   const [vehicleSuffix, setVehicleSuffix] = useState('');
@@ -360,10 +349,11 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   const [officialDeadline, setOfficialDeadline] = useState('');
   const [offence, setOffence] = useState('');
   const [referenceDate, setReferenceDate] = useState(indiaDateNow);
-  const [routeNowIso, setRouteNowIso] = useState(() => new Date().toISOString());
+  const [routeNowIso, setRouteNowIso] = useState(initialNowIso);
   const [error, setError] = useState<ReviewError | null>(null);
   const [artifactStatus, setArtifactStatus] = useState<{ signature: string; message: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const questionFocusRef = useRef<CitizenReviewDecisionQuestionId | null>(null);
   const previousStep = useRef(step);
   const signatureRef = useRef('');
   const confirmedSignatureRef = useRef('');
@@ -373,47 +363,22 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   const clearAndExitRef = useRef<() => void>(() => undefined);
   const handoffStateRef = useRef(handoffState);
 
-  // Photo inspection is derived instead of asked: choosing a supplied
-  // photograph or recording any visible photo fact means the citizen looked at
-  // it. Leaving every photo fact at "cannot determine" without a photograph
-  // keeps the conservative insufficient-review finding.
-  const imageInspected = deriveImageInspected(rawAnswers, photographSelection !== null);
-  const answers = useMemo<CitizenChallanAnswers>(
-    () => ({ ...rawAnswers, imageInspected }),
-    [rawAnswers, imageInspected],
-  );
-
-  const signature = useMemo(
-    () => JSON.stringify({
-      answers,
-      jurisdiction,
-      vehicleSuffix,
-      eventDate,
-      officialDeadline,
-      offence,
-      manualEntryMode,
-      recordSelected: Boolean(recordSelection),
-      photographSelected: Boolean(photographSelection),
-    }),
-    [
-      answers,
-      jurisdiction,
-      vehicleSuffix,
-      eventDate,
-      officialDeadline,
-      offence,
-      manualEntryMode,
-      recordSelection,
-      photographSelection,
-    ],
-  );
-  const factsConfirmed = confirmedSignature === signature && confirmedSignature !== '';
+  const answers = useMemo(() => getCitizenReviewAnswers(reviewState), [reviewState]);
+  const questionPlan = useMemo(() => deriveCitizenReviewQuestionPlan({
+    answers, answeredQuestionIds: reviewState.answeredQuestionIds,
+    hasSelectedPhotograph: reviewState.photograph.present,
+  }), [answers, reviewState.answeredQuestionIds, reviewState.photograph.present]);
+  const signature = useMemo(() => getCitizenReviewFactsSignature(reviewState), [reviewState]);
+  const factsConfirmed = confirmedSignature === signature && confirmedSignature !== '' && role !== 'unselected';
   const helperConfirmed = factsConfirmed && helperSignature === signature && helperSignature !== '';
-  const presentationSignature = `${signature}|${language}|${simpleMode ? 'simple' : 'standard'}`;
+  const evidenceConfirmed = factsConfirmed && (role !== 'helper' || helperConfirmed);
+  const routeFreshnessToken = getOfficialRouteFreshnessToken('national-record-lookup', routeNowIso);
+  const presentationSignature = JSON.stringify({ signature, language, device, jurisdiction, vehicleSuffix, eventDate, officialDeadline, offence, routeFreshnessToken });
+  const artifactInputRef = useRef(presentationSignature);
   const summaryGenerated = artifactSignature === presentationSignature && artifactSignature !== '';
   const presentation = getCitizenReviewPresentation(language, simpleMode);
   const reviewRole = role === 'helper' ? 'present-helper' : 'self';
-  const reviewDevice = device === 'shared' ? 'shared' : 'private';
+  const reviewDevice = device === 'private' ? 'private' : 'shared';
   const jurisdictionLabel = jurisdiction.status === 'confirmed'
     ? jurisdiction.code
     : t(language, 'I am not sure', 'मुझे पता नहीं');
@@ -431,24 +396,10 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     }
   }, [officialDeadline, referenceDate]);
 
-  const observationsReady = factsConfirmed
-    && (role !== 'helper' || helperConfirmed)
-    && (vehicleSuffix.length === 0 || vehicleSuffix.length === 4)
-    && (!officialDeadline || Boolean(deadline));
-
-  const guide = getChallanGuideContent({
-    step,
-    sourceStatus: answers.sourceStatus,
-    observationsReady,
-    worksheetAvailable: factsConfirmed && assessment.canPrepareWorksheet,
-    resultAvailable: step === 'result' && (factsConfirmed || answers.sourceStatus === 'message-only'),
-    exportAllowed: device !== 'shared',
-    language,
-    simpleMode,
-  });
-  const canonicalView = factsConfirmed
+  const canonicalView = evidenceConfirmed
     ? buildCitizenEvidenceView({
       answers,
+      answeredQuestionIds: reviewState.answeredQuestionIds,
       assessment,
       confirmation: 'confirmed',
       recordMeta: recordSelection?.meta,
@@ -467,9 +418,10 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     summaryGenerated: generated,
     language,
   });
-  const summaryFor = (generated: boolean) => (factsConfirmed
+  const summaryFor = (generated: boolean) => (evidenceConfirmed
     ? buildCitizenEvidenceSummary({
       answers,
+      answeredQuestionIds: reviewState.answeredQuestionIds,
       assessment,
       confirmation: 'confirmed',
       jurisdiction: jurisdictionLabel,
@@ -487,12 +439,18 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   const situation = citizenSituationForFinding(assessment.finding);
   const copy = resultText[situation];
   const resultTitle = (simpleMode ? copy.simpleTitle : copy.title)[language === 'hi' ? 1 : 0];
-  const resultBody = simpleMode
-    ? copy.simple[language === 'hi' ? 1 : 0]
-    : copy.body[language === 'hi' ? 1 : 0];
+  const resultBody = situation === 'material-inconsistency-recorded'
+    ? answers.plateObservation === 'different'
+      ? t(language, 'You marked the readable plate in the photo as different from your vehicle record.', 'आपने तस्वीर की पढ़ने योग्य नंबर प्लेट को अपने वाहन रिकॉर्ड से अलग बताया।')
+      : t(language, 'You marked the vehicle type in the photo as different from your vehicle record.', 'आपने तस्वीर में वाहन के प्रकार को अपने वाहन रिकॉर्ड से अलग बताया।')
+    : situation === 'insufficient-review'
+      ? answers.ownRecordAvailable !== 'present'
+        ? t(language, 'You need a readable RC or independent vehicle record before comparing the photo.', 'तस्वीर की तुलना से पहले पढ़ने योग्य RC या स्वतंत्र वाहन रिकॉर्ड चाहिए।')
+        : t(language, 'You could not inspect the photo, so no vehicle comparison was made.', 'आप तस्वीर नहीं देख सके, इसलिए वाहन की तुलना नहीं की गई।')
+      : copy.simple[language === 'hi' ? 1 : 0];
   const handoffViewInput = useMemo(() => ({
     answers,
-    factsConfirmed,
+    factsConfirmed: evidenceConfirmed && device !== 'unknown' && step === 'resolve',
     jurisdictionConfirmation: jurisdiction,
     role: reviewRole,
     deviceMode: reviewDevice,
@@ -501,7 +459,9 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     nowIso: routeNowIso,
   } as const), [
     answers,
-    factsConfirmed,
+    evidenceConfirmed,
+    device,
+    step,
     jurisdiction,
     reviewRole,
     reviewDevice,
@@ -529,19 +489,10 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   const currentExtensionPreparation = handoffRenderState.extensionPreparation;
 
   useEffect(() => {
-    let active = true;
-    const parsedGoal = parseCitizenGoal(window.location.search);
-    queueMicrotask(() => {
-      if (active) setGoal(parsedGoal);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     signatureRef.current = signature;
-  }, [signature]);
+    confirmedSignatureRef.current = confirmedSignature;
+    artifactInputRef.current = presentationSignature;
+  }, [signature, confirmedSignature, presentationSignature]);
 
   useEffect(() => {
     handoffStateRef.current = handoffState;
@@ -574,6 +525,10 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   }, [handoffState.confirmedPack, handoffView.contextSignature, handoffViewInput, hasCurrentHandoffPack, renderNowMs]);
 
   useEffect(() => () => {
+    operationToken.current += 1;
+    signatureRef.current = '';
+    confirmedSignatureRef.current = '';
+    artifactInputRef.current = '';
     if (recordSelectionRef.current?.previewUrl) {
       URL.revokeObjectURL(recordSelectionRef.current.previewUrl);
     }
@@ -604,23 +559,21 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
       setReferenceDate(indiaDateNow());
       setRouteNowIso(new Date().toISOString());
     };
-    const timer = window.setInterval(refresh, 60000);
+    const delay = getOfficialRouteFreshnessDelayMs('national-record-lookup', routeNowIso);
+    const timer = delay === null ? undefined : window.setTimeout(refresh, delay);
     window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
       window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
     };
-  }, []);
+  }, [routeNowIso]);
 
   useEffect(() => {
     if (previousStep.current !== step) {
       previousStep.current = step;
-      const heading = headingRef.current;
-      if (!heading) return;
-      // Land on the new step instantly: no animated jump, and the compact
-      // guide header (not the site chrome) becomes the top of the viewport.
-      heading.focus({ preventScroll: true });
-      (heading.closest('section') ?? heading).scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
+      headingRef.current?.focus({ preventScroll: true });
     }
   }, [step]);
 
@@ -631,34 +584,34 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const invalidate = () => {
-    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
+    const next = invalidateCitizenReviewHandoff(handoffStateRef.current, {
       resultRevisionId: freshOpaqueRevisionId(),
       packRevisionId: freshOpaqueRevisionId(),
-    }));
-    confirmedSignatureRef.current = '';
-    setConfirmedSignature('');
-    setHelperSignature('');
+    });
+    handoffStateRef.current = next;
+    setHandoffState(next);
     setError(null);
     invalidateArtifact();
   };
 
   const reset = () => {
-    setStep('source');
-    setRole('self');
-    setDevice('private');
+    setReviewState(createCitizenReviewState());
+    setDevice('unknown');
     setRecordSelection(null);
     setPhotographSelection(null);
     recordSelectionRef.current = null;
     photographSelectionRef.current = null;
+    confirmedSignatureRef.current = '';
     invalidate();
-    setManualEntryMode(false);
-    setRawAnswers(defaults);
+    setHandoffState(current => ({ ...current, role: 'self', deviceMode: 'shared' }));
     setJurisdiction({ status: 'unconfirmed' });
     setVehicleSuffix('');
     setEventDate('');
     setOfficialDeadline('');
     setOffence('');
     setError(null);
+    setPreparationOpen(false);
+    setFileIntakeRequested(false);
   };
 
   const clearAndExit = () => {
@@ -688,28 +641,48 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     return guard.stop;
   }, [device]);
 
-  const goToStep = (nextStep: Step) => {
-    setError(null);
-    setStep(nextStep);
+  const editAnswers = () => {
+    // Move focus off the departing subtree before React removes it.
+    headingRef.current?.focus({ preventScroll: true });
+    invalidate();
+    confirmedSignatureRef.current = '';
+    setReviewState(invalidateCitizenReviewFacts);
+    setExpandedQuestion(questionPlan.visible.at(-1) ?? 'source');
+    setPreparationOpen(false);
   };
+
+  const expandQuestion = (id: CitizenReviewDecisionQuestionId) => {
+    questionFocusRef.current = id;
+    setExpandedQuestion(id);
+  };
+
+  useEffect(() => {
+    const id = questionFocusRef.current;
+    if (!id || expandedQuestion !== id) return;
+    questionFocusRef.current = null;
+    const group = document.getElementById(`review-question-${id}`);
+    const control = group?.querySelector<HTMLInputElement>('input:checked') ?? group?.querySelector<HTMLInputElement>('input');
+    control?.focus({ preventScroll: true });
+  }, [expandedQuestion]);
 
   const showError = (message: string) => setError({ step, message });
 
-  const chooseDevice = (nextDevice: Device) => {
+  const chooseDevice = (nextDevice: 'private' | 'shared') => {
     invalidate();
     setHandoffState((current) => ({ ...current, deviceMode: nextDevice }));
     setDevice(nextDevice);
   };
 
-  const chooseRole = (nextRole: Role) => {
+  const changeAnswer = (id: CitizenReviewInputId, value: string) => {
     invalidate();
-    setHandoffState((current) => ({ ...current, role: nextRole === 'helper' ? 'present-helper' : 'self' }));
-    setRole(nextRole);
-  };
-
-  const changeAnswers = (nextAnswers: CitizenChallanAnswers) => {
-    invalidate();
-    setRawAnswers({ ...nextAnswers, imageInspected: false });
+    confirmedSignatureRef.current = '';
+    if (id === 'plate' && value === 'unavailable') {
+      if (photographSelectionRef.current?.previewUrl) URL.revokeObjectURL(photographSelectionRef.current.previewUrl);
+      photographSelectionRef.current = null;
+      setPhotographSelection(null);
+    }
+    setReviewState(current => changeCitizenReviewAnswer(current, id, value));
+    setExpandedQuestion(null);
   };
 
   const changeJurisdiction = (nextJurisdiction: JurisdictionConfirmation) => {
@@ -737,15 +710,6 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     setOffence(nextValue);
   };
 
-  const changeHelperConfirmation = (nextSignature: string) => {
-    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
-      resultRevisionId: freshOpaqueRevisionId(),
-      packRevisionId: freshOpaqueRevisionId(),
-    }));
-    invalidateArtifact();
-    setHelperSignature(nextSignature);
-  };
-
   const changeLanguage = (nextLanguage: Language) => {
     setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
       resultRevisionId: freshOpaqueRevisionId(),
@@ -755,71 +719,42 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     setLanguage(nextLanguage);
   };
 
-  const changeSimpleMode = (nextSimpleMode: boolean) => {
-    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
-      resultRevisionId: freshOpaqueRevisionId(),
-      packRevisionId: freshOpaqueRevisionId(),
-    }));
-    invalidateArtifact();
-    setSimpleMode(nextSimpleMode);
-  };
-
   const quickExit = clearAndExit;
 
-  const continueSource = () => {
-    if (answers.sourceStatus === 'not-selected') {
-      showError(t(
-        language,
-        'Choose how you got this record.',
-        'चुनें कि यह रिकॉर्ड आपको कैसे मिला।',
-      ));
+  const confirmAnswers = (targetRole: 'self' | 'helper') => {
+    const result = confirmCitizenReviewState(reviewState, targetRole);
+    if (result.missing.length) {
+      showError(t(language, 'Choose an answer to continue.', 'आगे बढ़ने के लिए उत्तर चुनें।'));
+      const firstMissing = result.missing[0];
+      setExpandedQuestion(firstMissing);
+      const control = document.querySelector<HTMLInputElement>(`#review-question-${firstMissing} input`);
+      control?.focus({ preventScroll: true });
+      const rect = control?.getBoundingClientRect();
+      if (control && rect && (rect.top < 0 || rect.bottom > window.innerHeight)) control.scrollIntoView({ block: 'nearest' });
       return;
     }
-    if (answers.sourceStatus === 'message-only') {
-      goToStep('result');
+    if ((vehicleSuffix && vehicleSuffix.length !== 4) || (officialDeadline && !deadline)) {
+      showError(t(language, 'Check the optional last four characters or deadline you entered.', 'दर्ज किए आखिरी चार अक्षर/अंक या अंतिम तारीख जाँचें।'));
       return;
     }
-    // No selected copy means the citizen types the facts on the next step.
-    if (!recordSelection && !manualEntryMode) {
-      chooseManualEntry();
-    }
-    goToStep('observations');
+    if (result.state.phase !== step) headingRef.current?.focus({ preventScroll: true });
+    invalidate();
+    setHandoffState(current => ({ ...current, role: targetRole === 'helper' ? 'present-helper' : 'self' }));
+    confirmedSignatureRef.current = result.state.confirmedFactsSignature;
+    setReviewState(result.state);
   };
 
-  const continueObservations = () => {
-    if (!factsConfirmed) {
-      showError(t(
-        language,
-        'Confirm every fact or mark it unclear/not supplied.',
-        'हर तथ्य पुष्ट करें या अस्पष्ट/नहीं दिया गया चिह्नित करें।',
-      ));
-      return;
-    }
-    if (role === 'helper' && !helperConfirmed) {
-      showError(t(
-        language,
-        'The citizen must confirm the final entries after the facts checkbox.',
-        'तथ्य चेकबॉक्स के बाद नागरिक अंतिम प्रविष्टियाँ पुष्ट करे।',
-      ));
-      return;
-    }
-    if (vehicleSuffix && vehicleSuffix.length !== 4) {
-      showError(t(
-        language,
-        'Enter exactly four registration characters or leave it blank.',
-        'ठीक चार वाहन अक्षर/अंक दर्ज करें या खाली छोड़ें।',
-      ));
-      return;
-    }
-    if (officialDeadline && !deadline) {
-      showError(t(
-        language,
-        'The copied official date is invalid.',
-        'कॉपी की गई आधिकारिक तारीख अमान्य है।',
-      ));
-      return;
-    }
-    goToStep('result');
+  const selectHelper = () => {
+    invalidate();
+    setHandoffState(current => ({ ...current, role: 'present-helper' }));
+    confirmedSignatureRef.current = '';
+    setReviewState(current => ({ ...invalidateCitizenReviewFacts(current), role: 'helper' }));
+  };
+
+  const confirmAffectedPerson = () => {
+    headingRef.current?.focus({ preventScroll: true });
+    invalidate();
+    setReviewState(confirmCitizenReviewHelper);
   };
 
   const recordChanged = (selection: LocalRecordSelection | null) => {
@@ -832,7 +767,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     }
     recordSelectionRef.current = selection;
     setRecordSelection(selection);
-    if (selection) setManualEntryMode(false);
+    setReviewState(current => selectCitizenReviewFile(current, 'record', selection !== null));
   };
   const photographChanged = (selection: LocalRecordSelection | null) => {
     invalidate();
@@ -844,6 +779,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     }
     photographSelectionRef.current = selection;
     setPhotographSelection(selection);
+    setReviewState(current => selectCitizenReviewFile(current, 'photograph', selection !== null));
   };
   const chooseManualEntry = () => {
     invalidate();
@@ -852,19 +788,30 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
     }
     recordSelectionRef.current = null;
     setRecordSelection(null);
-    setManualEntryMode(true);
+    setReviewState(current => selectCitizenReviewFile(current, 'record', false));
   };
 
-  const beginArtifactOperation = () => ({
-    token: ++operationToken.current,
-    actionSignature: signatureRef.current,
-    actionPresentationSignature: presentationSignature,
-  });
+  const beginArtifactOperation = () => {
+    const nowIso = new Date().toISOString();
+    if (resolveCurrentOfficialAuxiliaryRoute('national-record-lookup', nowIso).status !== 'current' || routeFreshnessToken !== getOfficialRouteFreshnessToken('national-record-lookup', nowIso)) {
+      invalidate();
+      setRouteNowIso(nowIso);
+      return null;
+    }
+    if (signatureRef.current !== signature || confirmedSignatureRef.current !== signature || artifactInputRef.current !== presentationSignature) return null;
+    return {
+      token: ++operationToken.current,
+      actionSignature: signature,
+      actionPresentationSignature: presentationSignature,
+    };
+  };
 
   const operationIsCurrent = (token: number, actionSignature: string) => (
     operationToken.current === token
     && signatureRef.current === actionSignature
     && confirmedSignatureRef.current === actionSignature
+    && artifactInputRef.current === presentationSignature
+    && routeFreshnessToken === getOfficialRouteFreshnessToken('national-record-lookup', new Date().toISOString())
   );
 
   const completeArtifactOperation = (
@@ -879,8 +826,9 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const copySummary = async () => {
-    if (device === 'shared' || !factsConfirmed) return;
+    if (device !== 'private' || !factsConfirmed || (role === 'helper' && !helperConfirmed)) return;
     const operation = beginArtifactOperation();
+    if (!operation) return;
     try {
       await navigator.clipboard.writeText(summaryFor(true));
       completeArtifactOperation(
@@ -908,8 +856,9 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const saveSummary = () => {
-    if (device === 'shared' || !factsConfirmed) return;
+    if (device !== 'private' || !factsConfirmed || (role === 'helper' && !helperConfirmed)) return;
     const operation = beginArtifactOperation();
+    if (!operation) return;
     downloadSummary(summaryFor(true));
     completeArtifactOperation(
       operation.token,
@@ -920,8 +869,9 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const printSummary = () => {
-    if (device === 'shared' || !factsConfirmed) return;
+    if (device !== 'private' || !factsConfirmed || (role === 'helper' && !helperConfirmed)) return;
     const operation = beginArtifactOperation();
+    if (!operation) return;
     window.print();
     completeArtifactOperation(
       operation.token,
@@ -985,7 +935,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const copyHandoffField = async (field: Parameters<typeof requestCitizenReviewCopy>[1]) => {
-    if (device === 'shared') return;
+    if (device !== 'private') return;
     const nowIso = new Date().toISOString();
     const current = handoffStateRef.current;
     const action = currentHandoffForAction(current, nowIso);
@@ -1026,7 +976,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
   };
 
   const downloadHandoffReceipt = () => {
-    if (device === 'shared') return;
+    if (device !== 'private') return;
     const nowIso = new Date().toISOString();
     const current = handoffStateRef.current;
     const action = currentHandoffForAction(current, nowIso);
@@ -1057,520 +1007,134 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
       : currentExtensionPreparation,
   };
 
-  const observationOptions: Array<[Observation, string]> = [
-    ['match', t(language, 'Appears to match', 'मेल खाता दिखता है')],
-    ['different', t(language, 'Appears materially different', 'महत्वपूर्ण रूप से अलग')],
-    ['unclear', t(language, 'Cannot determine', 'तय नहीं')],
-    ['not-visible', t(language, 'Not visible', 'दिखाई नहीं देता')],
-  ];
+
   const recordOptions: Array<[RecordAvailability, string]> = [
     ['present', t(language, 'Available and readable', 'उपलब्ध और पढ़ने योग्य')],
-    ['unclear', t(language, 'Available but unclear', 'उपलब्ध लेकिन अस्पष्ट')],
-    ['missing', t(language, 'Not located', 'नहीं मिला')],
+    ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
+    ['missing', t(language, 'Not available', 'उपलब्ध नहीं')],
     ['not-applicable', t(language, 'Not applicable', 'लागू नहीं')],
   ];
+  const deviceQuestion = (
+    <fieldset className={adaptive.device}>
+      <legend>{t(language, 'Is this your own/private device or a shared device?', 'यह आपका निजी डिवाइस है या साझा डिवाइस?')}</legend>
+      <div className={adaptive.options}>
+        {(['private', 'shared'] as const).map(value => <label data-required-action className={adaptive.option} key={value}>
+          <input type="radio" name="review-device" value={value} checked={device === value} onChange={() => chooseDevice(value)} />
+          {value === 'private' ? t(language, 'My private device', 'मेरा निजी डिवाइस') : t(language, 'A shared device', 'साझा डिवाइस')}
+        </label>)}
+      </div>
+      {device === 'shared' && <p className={adaptive.subtle}>{presentation.sharedInactivityNotice}</p>}
+    </fieldset>
+  );
+  const lookupResolution = resolveCurrentOfficialAuxiliaryRoute('national-record-lookup', routeNowIso);
+  const lookup = lookupResolution.status === 'current' ? lookupResolution.route : null;
+  const safeLookup = lookup ? <div>
+    <a data-required-action className={adaptive.secondary} data-official-lookup href={lookup.canonicalUrl} target="_blank" rel="noopener noreferrer"
+      onClick={event => {
+        const nowIso = new Date().toISOString();
+        const current = resolveCurrentOfficialAuxiliaryRoute('national-record-lookup', nowIso);
+        setRouteNowIso(nowIso);
+        if (current.status !== 'current' || current.route.canonicalUrl !== lookup.canonicalUrl) event.preventDefault();
+      }}>
+      {lookupResolution.status === 'current' && lookupResolution.usedFallback
+        ? t(language, 'Open the official services directory', 'आधिकारिक सेवा निर्देशिका खोलें')
+        : t(language, 'Open official e-Challan service', 'आधिकारिक ई-चालान सेवा खोलें')} ↗
+    </a>
+    <p className={adaptive.subtle}>{t(language, 'Route checked', 'रास्ता जाँचा गया')}: {lookup.lastVerifiedAt}</p>
+  </div> : <p role="status">{t(language, 'The official link needs a fresh check. Find the service independently; no case details have been sent.', 'आधिकारिक लिंक की दोबारा जाँच चाहिए। सेवा स्वतंत्र रूप से खोजें; केस का कोई विवरण नहीं भेजा गया।')}</p>;
+
+  const optionalDetails = <details className={adaptive.details}>
+    <summary>{t(language, 'Add a copy, state, or more details', 'कॉपी, राज्य या अन्य विवरण जोड़ें')}</summary>
+    <div className={adaptive.fieldGrid}>
+      <SelectField id="review-jurisdiction" label={t(language, 'Issuing state or union territory', 'चालान जारी करने वाला राज्य या केंद्र शासित प्रदेश')}
+        value={jurisdiction.status === 'confirmed' ? jurisdiction.code : ''}
+        onChange={value => changeJurisdiction(value ? { status: 'confirmed', code: value as IssuingJurisdictionCode } : { status: 'unconfirmed' })}
+        options={[[ '', t(language, 'Not sure yet', 'अभी पता नहीं')], ...ALL_ISSUING_JURISDICTION_CODES.map(code => [code, code] as [string, string])]} />
+      <div className={styles.field}><label htmlFor="review-suffix">{t(language, 'Registration: last four characters (optional)', 'वाहन नंबर: आखिरी चार अक्षर/अंक (वैकल्पिक)')}</label>
+        <input id="review-suffix" maxLength={4} value={vehicleSuffix} onChange={event => changeVehicleSuffix(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} /></div>
+      <div className={styles.field}><label htmlFor="review-offence">{t(language, 'Offence on the notice (optional)', 'नोटिस पर उल्लंघन (वैकल्पिक)')}</label>
+        <input id="review-offence" maxLength={120} value={offence} onChange={event => changeOffence(event.target.value)} /></div>
+      <div className={styles.field}><label htmlFor="review-event-date">{t(language, 'Event date (optional)', 'घटना की तारीख (वैकल्पिक)')}</label>
+        <input id="review-event-date" type="date" value={eventDate} onChange={event => changeEventDate(event.target.value)} /></div>
+      <div className={styles.field}><label htmlFor="review-deadline">{t(language, 'Deadline shown on the notice (optional)', 'नोटिस पर अंतिम तारीख (वैकल्पिक)')}</label>
+        <input id="review-deadline" type="date" value={officialDeadline} onChange={event => changeOfficialDeadline(event.target.value)} /></div>
+      {reviewState.answeredQuestionIds.source && answers.sourceStatus !== 'message-only' && <SelectField id="review-notice-copy" label={t(language, 'Notice copy (optional)', 'नोटिस की कॉपी (वैकल्पिक)')}
+        value={reviewState.answeredQuestionIds['notice-copy'] ? answers.noticeCopyAvailable : ''}
+        onChange={value => changeAnswer('notice-copy', value)} options={[[ '', t(language, 'Not answered', 'उत्तर नहीं दिया')], ...recordOptions]} />}
+    </div>
+    <button data-required-action className={adaptive.secondary} type="button" onClick={() => setFileIntakeRequested(true)}>{t(language, 'Preview a copy on this device', 'इस डिवाइस पर कॉपी देखें')}</button>
+    {fileIntakeRequested && step === 'check' && deviceQuestion}
+    {fileIntakeRequested && device !== 'unknown' && <>
+      {device === 'shared' && <p>{t(language, 'Exit clears this review but cannot close a PDF or image preview opened in another tab; close that tab yourself.', 'बाहर निकलने पर यह समीक्षा साफ़ होगी, लेकिन दूसरे टैब में खुला PDF या चित्र बंद नहीं होगा; वह टैब स्वयं बंद करें।')}</p>}
+      <LocalRecordIntake record={recordSelection} photograph={photographSelection} onRecordChange={recordChanged} onPhotographChange={photographChanged} language={language} />
+      {recordSelection && <button data-required-action className={adaptive.secondary} type="button" onClick={chooseManualEntry}>{t(language, 'Remove copy and use my answers', 'कॉपी हटाएँ और मेरे उत्तर उपयोग करें')}</button>}
+      {recordSelection && <Preview selection={recordSelection} title={t(language, 'Your notice', 'आपका नोटिस')} language={language} />}
+      {photographSelection && <Preview selection={photographSelection} title={t(language, 'Your photo', 'आपकी तस्वीर')} language={language} />}
+    </>}
+  </details>;
+
+  const firstAction = questionPlan.missing.length > 0
+    ? <button data-required-action className={adaptive.primary} type="button" onClick={() => confirmAnswers('self')}>{t(language, 'Continue', 'आगे बढ़ें')}</button>
+    : answers.sourceStatus === 'message-only'
+      ? <button data-required-action className={adaptive.primary} type="button" onClick={() => confirmAnswers('self')}>{t(language, 'Show me the safe next step', 'सुरक्षित अगला कदम दिखाएँ')}</button>
+      : <div className={adaptive.actions}>
+        <p className={adaptive.subtle}>{answers.ownRecordAvailable !== 'present' || !answers.imageInspected
+          ? t(language, 'I confirm which record or service/record photo I could not inspect; ChallanSakshi will not compare what is missing.', 'मैं पुष्टि करता/करती हूँ कि कौन सा रिकॉर्ड या सेवा/रिकॉर्ड की तस्वीर नहीं देख सका/सकी; जो उपलब्ध नहीं है, ChallanSakshi उसकी तुलना नहीं करेगा।')
+          : t(language, 'I checked every answer above against the readable vehicle record and the photo shown in the service or record I opened. Anything I could not see is marked unclear.', 'मैंने ऊपर के हर उत्तर को पढ़ने योग्य वाहन रिकॉर्ड और खोली गई सेवा या रिकॉर्ड की तस्वीर से जाँचा है। जो दिखाई नहीं दिया, उसे अस्पष्ट चिह्नित किया है।')}</p>
+        {role !== 'helper' ? <>
+          <span>{t(language, 'For my own challan', 'अपने चालान के लिए')}</span>
+          <button data-required-action className={adaptive.primary} type="button" onClick={() => confirmAnswers('self')}>{t(language, 'I checked these answers — see my next step', 'मैंने उत्तर जाँचे — अगला कदम दिखाएँ')}</button>
+          <button data-required-action className={adaptive.secondary} type="button" onClick={selectHelper}>{t(language, 'I am helping someone who is here', 'मैं यहाँ मौजूद व्यक्ति की मदद कर रहा/रही हूँ')}</button>
+        </> : <>
+          {!factsConfirmed
+            ? <button data-required-action className={adaptive.primary} type="button" onClick={() => confirmAnswers('helper')}>{t(language, 'I checked these entries as the helper', 'सहायक के रूप में मैंने प्रविष्टियाँ जाँची हैं')}</button>
+            : <button data-required-action className={adaptive.primary} type="button" onClick={confirmAffectedPerson}>{t(language, 'I am here and confirm these final answers', 'मैं यहाँ हूँ और इन अंतिम उत्तरों की पुष्टि करता/करती हूँ')}</button>}
+        </>}
+      </div>;
 
   return (
-    <PublicBetaShell
-      language={language}
-      setLanguage={changeLanguage}
-      service="ChallanSakshi"
-      serviceHindi="चालान साक्षी"
-      onQuickExit={quickExit}
-      simpleMode={simpleMode}
-      onSimpleModeChange={changeSimpleMode}
-    >
-      <main className={styles.main} data-device-context={device}>
-        {device === 'shared' && (
-          <aside className={styles.sharedPrintWarning} data-shared-print-warning>
-            <h1>{t(language, 'Shared-device print blocked', 'साझा-डिवाइस प्रिंट रोका गया')}</h1>
-            <p>{t(
-              language,
-              'ChallanSakshi does not format case details for printing in shared-device mode. Return to the review and use Quick exit & clear.',
-              'साझा-डिवाइस मोड में ChallanSakshi केस विवरण को प्रिंट के लिए तैयार नहीं करता। समीक्षा पर लौटें और तुरंत बाहर निकलें और साफ़ करें उपयोग करें।',
-            )}</p>
-          </aside>
-        )}
-        <GuidedStepHeader
-          {...guide}
-          steps={buildChallanGuidedProgress(step, answers.sourceStatus, language)}
-          progressLabel={presentation.progressLabel}
-          headingRef={headingRef}
-          headingId="challan-guided-step-title"
-          labels={presentation.guideLabels}
-        />
-        {step === 'source' && (
-          <section className={styles.panel} aria-labelledby="challan-guided-step-title">
-            <p className={styles.stepIntro}>
-              {goal === 'evidence'
-                ? t(
-                  language,
-                  'Bring the record and the supplied photograph together here; you compare them on the next step.',
-                  'रिकॉर्ड और दी गई तस्वीर यहाँ साथ लाएँ; अगले चरण में आप उनकी तुलना करेंगे।',
-                )
-                : goal === 'understand'
-                  ? t(
-                    language,
-                    'Open the notice on the official service. The result explains what your entries show and the official next step.',
-                    'आधिकारिक सेवा पर नोटिस खोलें। नतीजा बताएगा कि आपकी प्रविष्टियाँ क्या दिखाती हैं और आधिकारिक अगला कदम क्या है।',
-                  )
-                  : goal === 'resolve'
-                    ? t(
-                      language,
-                      'Tell us how you got the record; the official route appears with your result.',
-                      'बताएँ रिकॉर्ड कैसे मिला; आधिकारिक रास्ता नतीजे के साथ दिखेगा।',
-                    )
-                    : t(
-                      language,
-                      'Open the official service yourself. Then tell us how you got the record.',
-                      'आधिकारिक सेवा स्वयं खोलें। फिर बताएँ कि रिकॉर्ड आपको कैसे मिला।',
-                    )}
-            </p>
-            <p className={styles.fieldHint}>
-              {t(language, 'Find the record:', 'रिकॉर्ड खोजें:')}{' '}
-              <a className={styles.officialRouteLink} href={handoffView.lookupRoute.canonicalUrl} target="_blank" rel="noreferrer">
-                {handoffView.lookupRoute.serviceName}
-              </a>
-            </p>
-            <div className={styles.recordSection}>
-              <h3>
-                {t(
-                  language,
-                  'How did you get this record?',
-                  'यह रिकॉर्ड आपको कैसे मिला?',
-                )}
-              </h3>
-              <div className={styles.choiceGrid}>
-                {([
-                  [
-                    'official-service',
-                    t(
-                      language,
-                      'I opened the official service myself',
-                      'मैंने आधिकारिक सेवा खुद खोली',
-                    ),
-                  ],
-                  [
-                    'downloaded-official-record',
-                    t(
-                      language,
-                      'I downloaded it from an official service',
-                      'मैंने इसे आधिकारिक सेवा से डाउनलोड किया',
-                    ),
-                  ],
-                  [
-                    'message-only',
-                    t(
-                      language,
-                      'I only have a message or forwarded link',
-                      'मेरे पास केवल संदेश या लिंक है',
-                    ),
-                  ],
-                ] as const).map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    aria-pressed={answers.sourceStatus === value}
-                    className={`${styles.choice} ${
-                      answers.sourceStatus === value ? styles.choiceActive : ''
-                    }`}
-                    onClick={() => changeAnswers({ ...answers, sourceStatus: value })}
-                  >
-                    <strong>{label}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={styles.recordSection}>
-              <div className={styles.field}>
-                <label htmlFor="issuing-jurisdiction">
-                  {t(language, 'Issuing state or union territory (optional)', 'जारी करने वाला राज्य या केंद्रशासित प्रदेश (वैकल्पिक)')}
-                </label>
-                <select
-                  id="issuing-jurisdiction"
-                  value={jurisdiction.status === 'confirmed' ? jurisdiction.code : '__unconfirmed__'}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value;
-                    if (value === '__unconfirmed__') changeJurisdiction({ status: 'unconfirmed' });
-                    else changeJurisdiction({ status: 'confirmed', code: value as IssuingJurisdictionCode });
-                  }}
-                >
-                  <option value="__unconfirmed__">{t(language, 'I am not sure', 'मुझे पता नहीं')}</option>
-                  {ALL_ISSUING_JURISDICTION_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className={styles.recordSection}>
-              <h3>
-                {t(
-                  language,
-                  'Add the challan copy (optional)',
-                  'चालान की कॉपी जोड़ें (वैकल्पिक)',
-                )}
-              </h3>
-              <p className={styles.fieldHint}>
-                {t(
-                  language,
-                  'Skip this to type the facts yourself on the next step.',
-                  'इसे छोड़ें तो अगले चरण में तथ्य स्वयं लिखें।',
-                )}
-              </p>
-              <LocalRecordIntake
-                record={recordSelection}
-                photograph={photographSelection}
-                onRecordChange={recordChanged}
-                onPhotographChange={photographChanged}
-                language={language}
-              />
-            </div>
-            <div className={styles.stepOptions}>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={role === 'helper'}
-                  onChange={(e) => chooseRole(e.target.checked ? 'helper' : 'self')}
-                />
-                {t(
-                  language,
-                  'I am helping someone else, and they are here with me',
-                  'मैं किसी और की मदद कर रहा/रही हूँ और वे मेरे साथ मौजूद हैं',
-                )}
-              </label>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={device === 'shared'}
-                  onChange={(e) => chooseDevice(e.target.checked ? 'shared' : 'private')}
-                />
-                {t(language, 'This is a shared or public device', 'यह साझा या सार्वजनिक डिवाइस है')}
-              </label>
-            </div>
-            {device === 'shared' && (
-              <p className={styles.restricted}>{presentation.sharedInactivityNotice}</p>
-            )}
-            {error?.step === step && (
-              <p className={styles.inlineError} role="alert">{error.message}</p>
-            )}
-            <div className={`${styles.actions} ${styles.actionsEnd}`}>
-              <button type="button" className={styles.button} onClick={continueSource}>
-                {answers.sourceStatus === 'message-only'
-                  ? t(language, 'See safe next step', 'सुरक्षित अगला कदम')
-                  : presentation.stages.source.action} →
-              </button>
-            </div>
-          </section>
-        )}
-
-        {step === 'observations' && (
-          <section className={styles.panel} aria-labelledby="challan-guided-step-title">
-            <div className={styles.evidenceWorkspace}>
-              <aside className={styles.previewColumn}>
-                {recordSelection ? (
-                  <Preview
-                    selection={recordSelection}
-                    title={t(language, 'Official record', 'आधिकारिक रिकॉर्ड')}
-                    language={language}
-                  />
-                ) : (
-                  <p>
-                    {t(
-                      language,
-                      'No challan copy was added. Read the facts from the official service you opened and enter them here.',
-                      'चालान की कॉपी नहीं जोड़ी गई। खोली गई आधिकारिक सेवा से तथ्य पढ़कर यहाँ दर्ज करें।',
-                    )}
-                  </p>
-                )}
-                {photographSelection && (
-                  <Preview
-                    selection={photographSelection}
-                    title={t(language, 'Supplied photograph', 'दी गई तस्वीर')}
-                    language={language}
-                  />
-                )}
-              </aside>
-              <div className={styles.observationControls}>
-                <div className={styles.formGrid}>
-                  <SelectField
-                    id="own-record"
-                    label={t(language, 'Your vehicle record (RC) to compare with', 'तुलना के लिए आपका वाहन रिकॉर्ड (RC)')}
-                    value={answers.ownRecordAvailable}
-                    onChange={(v) => changeAnswers({
-                      ...answers,
-                      ownRecordAvailable: v as RecordAvailability,
-                    })}
-                    options={recordOptions}
-                  />
-                </div>
-
-                <div className={styles.observationGrid}>
-                  {([
-                    ['plateObservation', t(language, 'Plate in the photo vs your record', 'तस्वीर की नंबर प्लेट बनाम आपका रिकॉर्ड')],
-                    ['categoryObservation', t(language, 'Vehicle type in the photo', 'तस्वीर में वाहन का प्रकार')],
-                  ] as const).map(([key, label]) => (
-                    <div className={styles.observationCard} key={key}>
-                      <label htmlFor={key}>{label}</label>
-                      <select
-                        id={key}
-                        value={answers[key]}
-                        onChange={(e) => changeAnswers({
-                          ...answers,
-                          [key]: e.target.value as Observation,
-                        })}
-                      >
-                        {observationOptions.map(([v, labelText]) => (
-                          <option value={v} key={v}>{labelText}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-
-                <details className={styles.disclosure}>
-                  <summary>{t(language, 'More photo details', 'तस्वीर के और विवरण')}</summary>
-                  <div className={styles.observationGrid}>
-                    <div className={styles.observationCard}>
-                      <label htmlFor="colourObservation">
-                        {t(language, 'Vehicle colour', 'वाहन रंग')}
-                      </label>
-                      <select
-                        id="colourObservation"
-                        value={answers.colourObservation}
-                        onChange={(e) => changeAnswers({
-                          ...answers,
-                          colourObservation: e.target.value as Observation,
-                        })}
-                      >
-                        {observationOptions.map(([v, labelText]) => (
-                          <option value={v} key={v}>{labelText}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className={styles.observationCard}>
-                      <label htmlFor="offence-observation">
-                        {t(language, 'Offence visibility', 'अपराध दृश्यता')}
-                      </label>
-                      <select
-                        id="offence-observation"
-                        value={answers.offenceObservation}
-                        onChange={(e) => changeAnswers({
-                          ...answers,
-                          offenceObservation: e.target.value as OffenceObservation,
-                        })}
-                      >
-                        <option value="appears-visible">
-                          {t(language, 'Appears visible', 'दिखता है')}
-                        </option>
-                        <option value="not-visible">
-                          {t(language, 'Not visible', 'नहीं दिखता')}
-                        </option>
-                        <option value="not-assessable-from-still">
-                          {t(language, 'Not assessable from one still', 'एक तस्वीर से संभव नहीं')}
-                        </option>
-                        <option value="unclear">{t(language, 'Unclear', 'अस्पष्ट')}</option>
-                      </select>
-                    </div>
-                    <SelectField
-                      id="timestamp-status"
-                      label={t(language, 'Evidence timestamp', 'सबूत समय')}
-                      value={answers.timestampStatus}
-                      onChange={(v) => changeAnswers({
-                        ...answers,
-                        timestampStatus: v as CitizenChallanAnswers['timestampStatus'],
-                      })}
-                      options={[
-                        ['displayed', t(language, 'Displayed', 'दिखाया गया')],
-                        ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
-                        ['not-found', t(language, 'Not found', 'नहीं मिला')],
-                      ]}
-                    />
-                    <SelectField
-                      id="location-status"
-                      label={t(language, 'Evidence location', 'सबूत स्थान')}
-                      value={answers.locationStatus}
-                      onChange={(v) => changeAnswers({
-                        ...answers,
-                        locationStatus: v as CitizenChallanAnswers['locationStatus'],
-                      })}
-                      options={[
-                        ['displayed', t(language, 'Displayed', 'दिखाया गया')],
-                        ['unclear', t(language, 'Unclear', 'अस्पष्ट')],
-                        ['not-found', t(language, 'Not found', 'नहीं मिला')],
-                      ]}
-                    />
-                  </div>
-                </details>
-
-                <details className={styles.disclosure}>
-                  <summary>{t(language, 'Dates and notice details', 'तारीख और नोटिस विवरण')}</summary>
-                  <div className={styles.formGrid}>
-                    <div className={styles.field}>
-                      <label htmlFor="vehicle-suffix">
-                        {t(
-                          language,
-                          'Vehicle registration — last 4 only',
-                          'वाहन नंबर — केवल अंतिम 4',
-                        )}
-                      </label>
-                      <input
-                        id="vehicle-suffix"
-                        value={vehicleSuffix}
-                        maxLength={4}
-                        autoComplete="off"
-                        onChange={(e) => changeVehicleSuffix(
-                          e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4),
-                        )}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="offence">
-                        {t(language, 'Alleged offence category', 'आरोपित अपराध श्रेणी')}
-                      </label>
-                      <input
-                        id="offence"
-                        value={offence}
-                        autoComplete="off"
-                        onChange={(e) => changeOffence(e.target.value.slice(0, 80))}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="event-date">
-                        {t(language, 'Displayed event date', 'दिखाई घटना तारीख')}
-                      </label>
-                      <input
-                        id="event-date"
-                        type="date"
-                        value={eventDate}
-                        max={indiaDateNow()}
-                        onChange={(e) => changeEventDate(e.target.value)}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="official-deadline">
-                        {t(
-                          language,
-                          'Displayed official deadline',
-                          'दिखाई आधिकारिक अंतिम तारीख',
-                        )}
-                      </label>
-                      <input
-                        id="official-deadline"
-                        type="date"
-                        value={officialDeadline}
-                        onChange={(e) => changeOfficialDeadline(e.target.value)}
-                      />
-                    </div>
-                    <SelectField
-                      id="notice-copy"
-                      label={t(language, 'Official notice copy', 'आधिकारिक नोटिस कॉपी')}
-                      value={answers.noticeCopyAvailable}
-                      onChange={(v) => changeAnswers({
-                        ...answers,
-                        noticeCopyAvailable: v as RecordAvailability,
-                      })}
-                      options={recordOptions}
-                    />
-                  </div>
-                  <p className={styles.deadlineCaveat}>
-                    {t(
-                      language,
-                      'Copy the deadline exactly as displayed. ChallanSakshi does not calculate a legal deadline.',
-                      'अंतिम तारीख ठीक वैसे ही लिखें जैसी दिखाई गई है। ChallanSakshi कानूनी समयसीमा की गणना नहीं करता।',
-                    )}
-                  </p>
-                </details>
-              </div>
-            </div>
-            <div className={styles.acknowledgements}>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={factsConfirmed}
-                  onChange={(e) => {
-                    setHandoffState((current) => invalidateCitizenReviewHandoff(current, {
-                      resultRevisionId: freshOpaqueRevisionId(),
-                      packRevisionId: freshOpaqueRevisionId(),
-                    }));
-                    invalidateArtifact();
-                    confirmedSignatureRef.current = e.target.checked ? signature : '';
-                    setConfirmedSignature(e.target.checked ? signature : '');
-                    setHelperSignature('');
-                  }}
-                />
-                {t(
-                  language,
-                  'I checked these entries against the record and photo. Anything I could not see is marked unclear.',
-                  'मैंने ये प्रविष्टियाँ रिकॉर्ड और तस्वीर से मिलाईं। जो नहीं दिखा, उसे अस्पष्ट चिह्नित किया।',
-                )}
-              </label>
-              {role === 'helper' && factsConfirmed && (
-                <label className={styles.check}>
-                  <input
-                    type="checkbox"
-                    checked={helperConfirmed}
-                    onChange={(e) => changeHelperConfirmation(
-                      e.target.checked ? signature : '',
-                    )}
-                  />
-                  {t(
-                    language,
-                    'The citizen is present and confirmed every final entry.',
-                    'नागरिक मौजूद है और हर अंतिम प्रविष्टि पुष्ट की।',
-                  )}
-                </label>
-              )}
-            </div>
-            {error?.step === step && (
-              <p className={styles.inlineError} role="alert">{error.message}</p>
-            )}
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.buttonSecondary}
-                onClick={() => goToStep('source')}
-              >
-                ← {t(language, 'Back', 'पीछे')}
-              </button>
-              <button
-                type="button"
-                className={styles.button}
-                onClick={continueObservations}
-              >
-                {presentation.stages.observations.action} →
-              </button>
-            </div>
-          </section>
-        )}
-
-        {step === 'result' && (
-          <section
-            className={styles.panel}
-            aria-labelledby="challan-guided-step-title"
-            data-print-result
-          >
-            <div className={styles.resultHero} data-tone={copy.tone}>
-              <span className={styles.resultIcon} aria-hidden="true">
-                {copy.tone === 'good' ? '✓' : copy.tone === 'warn' ? '!' : 'i'}
-              </span>
-              <div>
-                <h2>{resultTitle}</h2>
-                <p>{resultBody}</p>
-                <p>
-                  <strong>{presentation.resultLimitationLabel}</strong>{' '}
-                  {presentation.resultLimitation}
-                </p>
-              </div>
-            </div>
+    <PublicBetaShell language={language} setLanguage={changeLanguage} service="ChallanSakshi" serviceHindi="चालान साक्षी" onQuickExit={quickExit} simpleMode={simpleMode} preserveScroll>
+      <main className={adaptive.main} data-device-context={device} data-review-phase={step} inert={!clientReady}>
+        {device !== 'private' && <aside className={styles.sharedPrintWarning} data-shared-print-warning><h1>{t(language, 'Private-device choice required to print', 'प्रिंट करने के लिए निजी डिवाइस चुनना ज़रूरी है')}</h1></aside>}
+        <header className={adaptive.heading}>
+          <p className={adaptive.progress}>{step === 'check' ? t(language, '1 of 2 · Check', '1 / 2 · जाँच') : t(language, '2 of 2 · Resolve', '2 / 2 · अगला कदम')}</p>
+          <h1 ref={headingRef} tabIndex={-1} id="review-heading">{step === 'check' ? t(language, 'Check your challan', 'अपना चालान जाँचें') : t(language, 'Your next step', 'आपका अगला कदम')}</h1>
+        </header>
+        {step === 'check' ? <section className={adaptive.panel} aria-labelledby="review-heading">
+          {!reviewState.answeredQuestionIds.source && safeLookup}
+          <CitizenReviewCheck language={language} state={reviewState} plan={questionPlan} onAnswer={changeAnswer}
+            expandedQuestion={expandedQuestion} onExpand={expandQuestion} errorQuestion={error ? questionPlan.missing[0] : undefined}>
+            {error?.step === step && <p role="alert">{error.message}</p>}
+            {firstAction}
+            {optionalDetails}
+          </CitizenReviewCheck>
+        </section> : <section className={adaptive.panel} aria-labelledby="review-heading" data-print-result>
+          <div data-result-finding className={adaptive.result} data-tone={copy.tone}>
+            <p className={adaptive.subtle}>{t(language, 'What we found', 'क्या पता चला')}</p>
+            <h2>{resultTitle}</h2>
+            <p className={adaptive.subtle}>{t(language, 'What it means', 'इसका मतलब')}</p>
+            <p>{resultBody}</p>
+            <p className={adaptive.subtle}>{t(language, 'What to do now', 'अब क्या करें')}</p>
+            <p>{answers.sourceStatus === 'message-only'
+              ? t(language, 'Do not use the message link. Find your notice on the official service first.', 'संदेश का लिंक उपयोग न करें। पहले आधिकारिक सेवा पर अपना नोटिस खोजें।')
+              : t(language, 'Continue on the official e-Challan service with the record you checked.', 'जाँचे गए रिकॉर्ड के साथ आधिकारिक ई-चालान सेवा पर आगे बढ़ें।')}</p>
+            {factsConfirmed && <p className={adaptive.subtle}>{t(language, 'Based on the answers you confirmed; the authority makes the decision.', 'आपके पुष्ट उत्तरों पर आधारित; निर्णय प्राधिकरण करता है।')}</p>}
+          </div>
+          {safeLookup}
+          {factsConfirmed && <>
+            <button data-required-action className={adaptive.primary} type="button" aria-expanded={preparationOpen} data-grievance-affordance aria-controls="review-preparation" onClick={() => setPreparationOpen(!preparationOpen)}>{t(language, 'Prepare my checklist', 'मेरी चेकलिस्ट तैयार करें')}</button>
+            {preparationOpen && <div id="review-preparation" data-print-preparation>
+              <h2>{t(language, 'Your checklist', 'आपकी चेकलिस्ट')}</h2>
+              {localizedAssessment.missingEvidence.length > 0 && <ul>{localizedAssessment.missingEvidence.map(item => <li key={item}>{item}</li>)}</ul>}
+              {optionalDetails}
+              {deviceQuestion}
+              {device !== 'unknown' && <>
             <OfficialHandoffPanel
               language={language}
               simpleMode={simpleMode}
               reviewContext={{
                 role: reviewRole,
                 deviceMode: reviewDevice,
-                safetyConsent: {
-                  manualReviewAcknowledged: true,
-                  minimumDataAcknowledged: true,
-                  affectedPersonPresentAcknowledged: role === 'helper',
-                },
               }}
               draft={handoffView.draft}
               confirmedPack={currentHandoffPack}
@@ -1670,168 +1234,29 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now }: Citizen
                 onClearPrepared: () => setHandoffState((current) => clearCitizenReviewExtensionPreparation(current)),
               }}
             />
-            {answers.sourceStatus === 'message-only' || !factsConfirmed || !view ? (
-              <div className={styles.stopCard}>
-                <h2>
-                  {t(language, 'Do not use the message link', 'संदेश लिंक उपयोग न करें')}
-                </h2>
-                <p>
-                  {t(
-                    language,
-                    'Find the responsible official service independently. Evidence comparison remains unavailable.',
-                    'जिम्मेदार आधिकारिक सेवा स्वतंत्र रूप से खोजें। सबूत तुलना उपलब्ध नहीं है।',
-                  )}
-                </p>
-              </div>
-            ) : (
-                <>
-                  <div className={styles.resultColumns}>
-                    <section className={styles.listPanel}>
-                      <h3>{presentation.resultSections.established}</h3>
-                      <ul>
-                        {localizedAssessment.materialSignals.length ? (
-                          localizedAssessment.materialSignals.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))
-                        ) : (
-                          <li>
-                            {t(
-                              language,
-                              'No material inconsistency was established.',
-                              'कोई महत्वपूर्ण असंगति स्थापित नहीं हुई।',
-                            )}
-                          </li>
-                        )}
-                      </ul>
-                    </section>
-                    <section className={styles.listPanel}>
-                      <h3>{presentation.resultSections.unclear}</h3>
-                      <ul>
-                        {localizedAssessment.cautions.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </section>
-                  </div>
-                  <section className={styles.listPanel}>
-                    <h3>{presentation.resultSections.missing}</h3>
-                    <ul>
-                      {localizedAssessment.missingEvidence.length ? (
-                        localizedAssessment.missingEvidence.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))
-                      ) : (
-                        <li>
-                          {t(
-                            language,
-                            'No missing record marked.',
-                            'कोई गायब रिकॉर्ड चिह्नित नहीं।',
-                          )}
-                        </li>
-                      )}
-                    </ul>
-                  </section>
-                  {deadline && deadline.status !== 'not-entered' && (
-                    <div className={styles.deadline}>
-                      <strong>
-                        {localizeDeadline(deadline, language, simpleMode)}
-                      </strong>
-                      <p>
-                        {t(
-                          language,
-                          'This is not a legal deadline calculation.',
-                          'यह कानूनी समयसीमा गणना नहीं है।',
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  <details className={styles.disclosure} data-print-evidence>
-                    <summary>{t(language, 'Evidence details', 'सबूत विवरण')}</summary>
-                    <section className={styles.evidenceTableSection}>
-                      <h3>{presentation.resultSections.evidence}</h3>
-                      <p>{presentation.table.confidenceHelp}</p>
-                      <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
-                    </section>
-                  </details>
-                  <details className={styles.disclosure} data-print-timeline>
-                    <summary>{t(language, 'Review history', 'समीक्षा इतिहास')}</summary>
-                    <section className={styles.timeline}>
-                      <h3>{presentation.timelineHeading}</h3>
-                      <ol>
-                        {timelineFor(summaryGenerated).map((item) => (
-                          <li key={item.id}>{item.label}</li>
-                        ))}
-                      </ol>
-                    </section>
-                  </details>
-                  <section className={styles.artifact} data-print-artifact>
-                    <h3>{presentation.summaryHeading}</h3>
-                    <p className={styles.artifactWarning}>
-                      {device === 'shared'
-                        ? t(
-                          language,
-                          'Download, copy, and formatted printing are disabled for this shared-device review. Screenshots, manual text selection, browser history, and backups are outside ChallanSakshi’s control.',
-                          'इस साझा-डिवाइस समीक्षा में डाउनलोड, कॉपी और तैयार प्रिंट बंद हैं। स्क्रीनशॉट, मैन्युअल टेक्स्ट चयन, ब्राउज़र इतिहास और बैकअप ChallanSakshi के नियंत्रण से बाहर हैं।',
-                        )
-                        : t(
-                          language,
-                          'Local actions may leave copies on this device.',
-                          'स्थानीय कार्रवाई से डिवाइस पर कॉपी रह सकती है।',
-                        )}
-                    </p>
-                    <details className={styles.disclosure}>
-                      <summary>
-                        {t(language, 'Preview local summary', 'स्थानीय सारांश का प्रीव्यू')}
-                      </summary>
-                      <pre>{summaryFor(summaryGenerated)}</pre>
-                    </details>
-                    <div className={styles.summaryActions}>
-                      <button
-                        type="button"
-                        className={styles.buttonSecondary}
-                        disabled={device === 'shared'}
-                        onClick={copySummary}
-                      >
-                        {presentation.actions.copy}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.buttonSecondary}
-                        disabled={device === 'shared'}
-                        onClick={printSummary}
-                      >
-                        {presentation.actions.print}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.button}
-                        disabled={device === 'shared'}
-                        onClick={saveSummary}
-                      >
-                        {presentation.actions.download}
-                      </button>
-                    </div>
-                  </section>
-                  {artifactStatus?.signature === presentationSignature && (
-                    <p className={styles.inlineStatus} role="status">
-                      {artifactStatus.message}
-                    </p>
-                  )}
-                </>
-              )}
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.buttonSecondary}
-                onClick={() => goToStep(
-                  answers.sourceStatus === 'message-only' ? 'source' : 'observations',
-                )}
-              >
-                ← {presentation.stages.result.action}
-              </button>
-            </div>
-          </section>
-        )}
+
+              </>}
+              {view && <details className={adaptive.details} data-print-evidence>
+                <summary>{t(language, 'Evidence and history', 'सबूत और इतिहास')}</summary>
+                <EvidenceRows evidence={view} language={language} simpleMode={simpleMode} />
+                <h3>{presentation.timelineHeading}</h3>
+                <ol>{timelineFor(summaryGenerated).map(item => <li key={item.id}>{item.label}</li>)}</ol>
+              </details>}
+              {device !== 'unknown' && <section className={styles.artifact} data-print-artifact>
+                <h3>{presentation.summaryHeading}</h3>
+                {device === 'shared' ? <p>{t(language, 'Copy, download and formatted print are off on shared devices.', 'साझा डिवाइस पर कॉपी, डाउनलोड और तैयार प्रिंट बंद हैं।')}</p> : <p>{t(language, 'Saving or copying leaves a copy on this device.', 'सहेजने या कॉपी करने से इस डिवाइस पर कॉपी रहेगी।')}</p>}
+                <details className={adaptive.details}><summary>{t(language, 'Preview my summary', 'मेरा सारांश देखें')}</summary><pre>{summaryFor(summaryGenerated)}</pre></details>
+                <div className={adaptive.actions}>
+                  <button data-required-action type="button" className={adaptive.secondary} disabled={device !== 'private'} onClick={copySummary}>{presentation.actions.copy}</button>
+                  <button data-required-action type="button" className={adaptive.secondary} disabled={device !== 'private'} onClick={printSummary}>{presentation.actions.print}</button>
+                  <button data-required-action type="button" className={adaptive.primary} disabled={device !== 'private'} onClick={saveSummary}>{presentation.actions.download}</button>
+                </div>
+              </section>}
+              {artifactStatus?.signature === presentationSignature && <p role="status">{artifactStatus.message}</p>}
+            </div>}
+          </>}
+          <button data-required-action className={adaptive.secondary} type="button" onClick={editAnswers}>{t(language, 'Edit my answers', 'मेरे उत्तर बदलें')}</button>
+        </section>}
       </main>
     </PublicBetaShell>
   );

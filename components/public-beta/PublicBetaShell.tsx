@@ -19,6 +19,7 @@ export function PublicBetaShell({
   englishOnly = false,
   simpleMode,
   onSimpleModeChange,
+  preserveScroll = false,
 }: {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -29,12 +30,14 @@ export function PublicBetaShell({
   englishOnly?: boolean;
   simpleMode?: boolean;
   onSimpleModeChange?: (value: boolean) => void;
+  preserveScroll?: boolean;
 }) {
   return (
     <div
       className={styles.app}
       lang={language}
       data-simple-mode={simpleMode === undefined ? undefined : simpleMode}
+      style={preserveScroll ? { overflowAnchor: 'none' } : undefined}
     >
       <CitizenHeader
         language={language}
@@ -44,8 +47,8 @@ export function PublicBetaShell({
         englishOnly={englishOnly}
         utilities={<>
           {simpleMode !== undefined && onSimpleModeChange ? <CitizenHeaderButton type="button" aria-pressed={simpleMode} onClick={() => onSimpleModeChange(!simpleMode)}>{t(language, 'Simple mode', 'सरल भाषा')}</CitizenHeaderButton> : null}
-          {onQuickExit ? <CitizenHeaderButton type="button" tone="danger" aria-label={t(language, 'Quick exit and clear this review', 'तुरंत बाहर निकलें और यह समीक्षा साफ़ करें')} onClick={onQuickExit}>{t(language, 'Quick exit & clear', 'तुरंत बाहर निकलें और साफ़ करें')}</CitizenHeaderButton> : null}
         </>}
+        quickExit={onQuickExit ? <CitizenHeaderButton type="button" tone="danger" aria-label={t(language, 'Quick exit and clear this review', 'तुरंत बाहर निकलें और यह समीक्षा साफ़ करें')} onClick={onQuickExit}>{t(language, 'Exit', 'बाहर')}</CitizenHeaderButton> : undefined}
       />
       {children}
       <CitizenFooter language={language} service={service} />

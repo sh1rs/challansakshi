@@ -8,9 +8,13 @@ import {
   OFFICIAL_DESTINATIONS,
   OFFICIAL_FALLBACK_ROUTE,
   OFFICIAL_ROUTE_REGISTRY_VERSION,
+  getOfficialRouteFreshnessDelayMs,
+  getOfficialRouteFreshnessToken,
   isActionReadyOfficialDestination,
   isVerifiedOfficialDestinationShape,
   isVerifiedOfficialRouteCurrent,
+  resolveCurrentOfficialAuxiliaryCandidate,
+  resolveCurrentOfficialAuxiliaryRoute,
   resolveOfficialDestination,
   type IssuingJurisdictionCode,
   type JurisdictionConfirmation,
@@ -33,6 +37,72 @@ const EXPECTED_UNSUPPORTED_CODES = [
 const confirmed = (code: IssuingJurisdictionCode): JurisdictionConfirmation => ({
   status: 'confirmed',
   code,
+});
+
+const fabricatedAuxiliary = (
+  key: OfficialAuxiliaryRoute['key'],
+  overrides: Partial<OfficialAuxiliaryRoute> = {},
+): OfficialAuxiliaryRoute => ({
+  ...OFFICIAL_AUXILIARY_ROUTES[key],
+  ...overrides,
+});
+
+describe('clocked auxiliary route resolution', () => {
+  it('uses a current requested candidate without replacing its literal route', () => {
+    const requested = fabricatedAuxiliary('nextgen-service-landing');
+    const fallback = fabricatedAuxiliary('national-services-directory');
+
+    expect(resolveCurrentOfficialAuxiliaryCandidate({ requested, fallback, nowIso: VERIFIED_NOW })).toEqual({
+      status: 'current',
+      route: requested,
+      usedFallback: false,
+    });
+  });
+
+  it('uses only an independently current fallback when the requested route is stale', () => {
+    const requested = fabricatedAuxiliary('nextgen-service-landing', { releaseState: 'stale' });
+    const fallback = fabricatedAuxiliary('national-services-directory');
+
+    expect(resolveCurrentOfficialAuxiliaryCandidate({ requested, fallback, nowIso: VERIFIED_NOW })).toEqual({
+      status: 'current',
+      route: fallback,
+      usedFallback: true,
+    });
+  });
+
+  it.each([
+    ['both stale', 'stale', 'stale', VERIFIED_NOW],
+    ['invalid clock', 'current', 'current', 'not-an-instant'],
+  ] as const)('returns a URL-free unavailable result when %s', (_case, requestedState, fallbackState, nowIso) => {
+    const result = resolveCurrentOfficialAuxiliaryCandidate({
+      requested: fabricatedAuxiliary('nextgen-service-landing', { releaseState: requestedState }),
+      fallback: fabricatedAuxiliary('national-services-directory', { releaseState: fallbackState }),
+      nowIso,
+    });
+
+    expect(result).toEqual({ status: 'unavailable', reason: 'requested-and-fallback-not-current' });
+    expect(JSON.stringify(result)).not.toContain('http');
+  });
+
+  it('treats expiresAt as inclusive through the final UTC millisecond and fails closed the next day', () => {
+    expect(resolveCurrentOfficialAuxiliaryRoute('nextgen-service-landing', '2026-10-02T23:59:59.999Z')).toMatchObject({
+      status: 'current',
+      usedFallback: false,
+    });
+    expect(resolveCurrentOfficialAuxiliaryRoute('nextgen-service-landing', '2026-10-03T00:00:00.000Z')).toEqual({
+      status: 'unavailable',
+      reason: 'requested-and-fallback-not-current',
+    });
+  });
+
+  it('emits a stable canonical token without wall clock and a delay capped at 24 hours', () => {
+    expect(getOfficialRouteFreshnessToken('nextgen-service-landing', VERIFIED_NOW)).toBe(
+      '{"registryVersion":"challansakshi.official-routes/v1","requestedKey":"nextgen-service-landing","status":"current","resolvedKey":"nextgen-service-landing","expiresAt":"2026-10-02","usedFallback":false}',
+    );
+    expect(getOfficialRouteFreshnessDelayMs('nextgen-service-landing', VERIFIED_NOW)).toBe(86_400_000);
+    expect(getOfficialRouteFreshnessDelayMs('nextgen-service-landing', '2026-10-02T23:59:59.500Z')).toBe(500);
+    expect(getOfficialRouteFreshnessDelayMs('nextgen-service-landing', 'not-an-instant')).toBeNull();
+  });
 });
 
 describe('official destination registry', () => {

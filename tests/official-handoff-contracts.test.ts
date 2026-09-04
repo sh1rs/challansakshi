@@ -310,11 +310,6 @@ function panelProps(overrides: Partial<OfficialHandoffPanelProps> = {}): Officia
     reviewContext: {
       role: 'self',
       deviceMode: 'private',
-      safetyConsent: {
-        manualReviewAcknowledged: true,
-        minimumDataAcknowledged: true,
-        affectedPersonPresentAcknowledged: false,
-      },
     },
     draft: eligibleDraft(pack),
     confirmedPack: pack,
@@ -835,7 +830,7 @@ describe('controlled official handoff presentation', () => {
     expect(html).not.toContain('data-purpose="official-grievance-service"');
   });
 
-  it('renders only the original typed fallback after the citizen reports portal-unavailable', () => {
+  it('directs portal-unavailable recovery to the parent clock-checked lookup', () => {
     const pack = nextgenPack();
     const html = renderToStaticMarkup(createElement(OfficialHandoffPanel, panelProps({
       draft: eligibleDraft(pack, { fallback: OFFICIAL_DESTINATIONS.nextgen.fallback }),
@@ -845,7 +840,8 @@ describe('controlled official handoff presentation', () => {
     })));
     expect(html).toContain('The original official service did not work for you.');
     expect(html).toContain(OFFICIAL_DESTINATIONS.nextgen.canonicalUrl);
-    expect(html).toContain(OFFICIAL_DESTINATIONS.nextgen.fallback.canonicalUrl);
+    expect(html).not.toContain(`href="${OFFICIAL_DESTINATIONS.nextgen.fallback.canonicalUrl}"`);
+    expect(html).toContain('Use the current official lookup above.');
     expect(html).not.toMatch(/government outage|service outage/i);
   });
 
@@ -917,11 +913,6 @@ describe('controlled official handoff presentation', () => {
       reviewContext: {
         role: 'self',
         deviceMode: 'shared',
-        safetyConsent: {
-          manualReviewAcknowledged: true,
-          minimumDataAcknowledged: true,
-          affectedPersonPresentAcknowledged: false,
-        },
       },
       draft: eligibleDraft(pack),
       confirmedPack: pack,
@@ -1278,13 +1269,13 @@ describe('controlled official handoff presentation', () => {
     {
       status: 'manual',
       destinationKey: 'delhi-manual',
-      exposesRoute: true,
+      exposesRoute: false,
       expected: 'This official destination has no verified field-compatible form in this release. Use the official site and review its current options yourself.',
     },
     {
       status: 'unresolved',
       destinationKey: 'unresolved',
-      exposesRoute: true,
+      exposesRoute: false,
       expected: 'The issuing jurisdiction is not confirmed or no current verified route is available. Use only the official services directory.',
     },
     {
@@ -1293,7 +1284,7 @@ describe('controlled official handoff presentation', () => {
       exposesRoute: false,
       expected: 'This review does not support a confirmed field pack. Check the missing or unclear evidence before preparing official information.',
     },
-  ] as const)('renders the closed $status presentation as one line with the anchor directly below', ({ status, destinationKey, exposesRoute, expected }) => {
+  ] as const)('keeps closed $status destinations non-actionable while the parent owns the current lookup', ({ status, destinationKey, exposesRoute, expected }) => {
     const pack = nextgenPack();
     const common = {
       mappedCategory: null,
@@ -1351,10 +1342,12 @@ describe('controlled official handoff presentation', () => {
       expect(html.slice(reasonEnd, anchorStart)).not.toMatch(/<(?:h3|section|ul|fieldset)/);
       expect(primaryActionCount(html)).toBe(1);
     } else {
-      expect(html).not.toContain(expectedDestination.serviceName);
-      expect(html).not.toContain(expectedDestination.domain);
+      if (status === 'abstained') {
+        expect(html).not.toContain(expectedDestination.serviceName);
+        expect(html).not.toContain(expectedDestination.domain);
+      }
       expect(html).not.toContain(`href="${expectedDestination.canonicalUrl}"`);
-      expect(html).not.toContain(`data-purpose="${expectedDestination.purpose}"`);
+      if (status === 'abstained') expect(html).not.toContain(`data-purpose="${expectedDestination.purpose}"`);
       expect(primaryActionCount(html)).toBe(0);
     }
     expect(html).not.toContain('<textarea');
@@ -1651,7 +1644,8 @@ describe('presentation authority, privacy, and responsive contracts', () => {
     }
     const reviewSource = privacySources.find(({ path }) => path.endsWith('CitizenReviewApp.tsx'))?.source ?? '';
     expect(reviewSource).toMatch(/recordSelected:\s*Boolean\(recordSelection\)/);
-    expect(reviewSource).toMatch(/photographSelected:\s*Boolean\(photographSelection\)/);
+    expect(reviewSource).toContain('getCitizenReviewFactsSignature(reviewState)');
+    expect(reviewSource).toContain("selectCitizenReviewFile(current, 'photograph', selection !== null)");
     expect(reviewSource).not.toMatch(/recordSelection\?\.meta\.(?:type|size|previewKind)|photographSelection\?\.meta\.(?:type|size|previewKind)/);
   });
 

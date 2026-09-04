@@ -43,23 +43,21 @@ export function buildGuidedProgress<Id extends string>(
   }));
 }
 
-export type ChallanGuidedStep = 'source' | 'observations' | 'result';
+export type ChallanGuidedStep = 'check' | 'resolve';
 
 const challanStepLabels = {
   en: {
-    source: 'Get the official record',
-    observations: 'Check the evidence',
-    result: 'Decide and resolve',
+    check: 'Check your challan',
+    resolve: 'Your next step',
   },
   hi: {
-    source: 'आधिकारिक रिकॉर्ड पाएँ',
-    observations: 'सबूत जाँचें',
-    result: 'निर्णय और समाधान',
+    check: 'अपना चालान जाँचें',
+    resolve: 'आपका अगला कदम',
   },
 } as const;
 
 function challanSteps(language: 'en' | 'hi'): readonly GuidedStepDefinition<ChallanGuidedStep>[] {
-  return (['source', 'observations', 'result'] as const).map((id) => ({
+  return (['check', 'resolve'] as const).map((id) => ({
     id,
     label: challanStepLabels[language][id],
   }));
@@ -70,10 +68,9 @@ export function buildChallanGuidedProgress(
   sourceStatus: string,
   language: 'en' | 'hi' = 'en',
 ): GuidedProgressStep<ChallanGuidedStep>[] {
-  const stoppedAtUnverifiedMessage = current === 'result' && sourceStatus === 'message-only';
+  const stoppedAtUnverifiedMessage = current === 'resolve' && sourceStatus === 'message-only';
   return buildGuidedProgress(challanSteps(language), current, stoppedAtUnverifiedMessage ? {
-    source: 'safe-stop',
-    observations: 'skipped',
+    check: 'safe-stop',
   } : {});
 }
 
@@ -100,44 +97,22 @@ export function getChallanGuideContent({
   const safeStop = sourceStatus === 'message-only';
 
   if (language === 'hi') {
-    if (step === 'source') {
-      if (safeStop) return {
-        currentLabel: '3 में से चरण 1 · आधिकारिक रिकॉर्ड पाएँ',
-        instruction: 'संदेश के लिंक का उपयोग न करें। आधिकारिक सेवा स्वयं खोलें।',
-        why: 'केवल संदेश या भेजा हुआ लिंक रिकॉर्ड जाँचने के लिए पर्याप्त नहीं है।',
-        status: 'सुरक्षित रोक: सबूत तुलना से पहले रिकॉर्ड जाँचें',
-        statusTone: 'safe-stop',
-        next: 'रिकॉर्ड पाने के लिए जाँचा हुआ आधिकारिक रास्ता उपयोग करें; सबूत तुलना छोड़ दी जाएगी।',
-      };
-      return {
-        currentLabel: '3 में से चरण 1 · आधिकारिक रिकॉर्ड पाएँ',
-        instruction: simpleMode
-          ? 'आधिकारिक सेवा खोलें, फिर फ़ाइल चुनें या तथ्य स्वयं लिखें।'
-          : 'आधिकारिक रिकॉर्ड स्वयं खोलें, फिर उसकी कॉपी जोड़ें या तथ्य दर्ज करें।',
-        why: simpleMode
-          ? 'संदेश का लिंक असली रिकॉर्ड साबित नहीं करता।'
-          : 'संदेश या भेजा हुआ लिंक अकेले रिकॉर्ड की जाँच नहीं करता।',
-        status: sourceReady ? 'स्रोत दर्ज हुआ' : 'बताएँ यह रिकॉर्ड आपको कैसे मिला',
-        statusTone: sourceReady ? 'ready' : 'needs-action',
-        next: 'सबूत तुलना से पहले अपने दर्ज किए हर तथ्य की पुष्टि करें।',
-      };
-    }
-
-    if (step === 'observations') return {
-      currentLabel: '3 में से चरण 2 · सबूत जाँचें',
+    if (step === 'check') return {
+      currentLabel: '2 में से 1 · अपना चालान जाँचें',
       instruction: simpleMode
-        ? 'एक-एक तथ्य देखें और जो साफ़ न हो उसे अस्पष्ट चुनें।'
-        : 'आधिकारिक तस्वीर की अपने वाहन रिकॉर्ड से तुलना करें और केवल दिखने वाले तथ्य दर्ज करें।',
-      why: simpleMode
-        ? 'नतीजा केवल आपके पुष्ट उत्तर उपयोग करता है।'
-        : 'समीक्षा केवल उन्हीं तथ्यों का उपयोग कर सकती है जिन्हें आपने स्वयं पुष्ट किया।',
-      status: observationsReady ? 'सावधान समीक्षा के लिए तैयार' : 'जो दिखे, अस्पष्ट हो या न दिया गया हो, वह दर्ज करें',
-      statusTone: observationsReady ? 'ready' : 'needs-action',
-      next: 'देखें कि आपके उत्तर क्या दिखाते हैं और क्या स्थापित नहीं कर सकते।',
+        ? 'केवल वही उत्तर दें जो आप आधिकारिक रिकॉर्ड, तस्वीर और अपने वाहन रिकॉर्ड में जाँच सकें।'
+        : 'केवल वही उत्तर दें जो आप आधिकारिक रिकॉर्ड, दी गई तस्वीर और अपने पढ़ने योग्य वाहन रिकॉर्ड में जाँच सकें।',
+      why: 'नतीजा केवल आपके दर्ज और पुष्ट उत्तरों का उपयोग करता है।',
+      status: safeStop
+        ? 'सुरक्षित रोक: यह संदेश चालान सत्यापित नहीं करता'
+        : observationsReady
+          ? 'उत्तर समीक्षा के लिए तैयार हैं'
+          : sourceReady ? 'स्रोत दर्ज हुआ' : 'बताएँ यह रिकॉर्ड आपको कैसे मिला',
+      statusTone: safeStop ? 'safe-stop' : sourceReady ? 'ready' : 'needs-action',
+      next: safeStop ? 'आधिकारिक सेवा स्वतंत्र रूप से खोलें।' : 'वे प्रश्न पूरे करें जो सुरक्षित नतीजे को बदल या समझा सकते हैं।',
     };
-
     return {
-      currentLabel: '3 में से चरण 3 · निर्णय और समाधान',
+      currentLabel: '2 में से 2 · आपका अगला कदम',
       instruction: safeStop
         ? 'तुलना या चुनौती से पहले आधिकारिक सेवा पर रिकॉर्ड जाँचें।'
         : simpleMode
@@ -147,7 +122,7 @@ export function getChallanGuideContent({
         ? 'केवल संदेश से भरोसेमंद सबूत तुलना नहीं हो सकती।'
         : 'यह जानकारी तैयार करता है; केस जमा या तय नहीं करता।',
       status: safeStop
-        ? 'सुरक्षित रोक: सबूत तुलना छोड़ दी गई'
+        ? 'सुरक्षित रोक: यह संदेश चालान सत्यापित नहीं करता'
         : resultAvailable && !exportAllowed
           ? 'नतीजा तैयार है; साझा डिवाइस पर कॉपी और डाउनलोड बंद हैं'
           : resultAvailable
@@ -160,46 +135,26 @@ export function getChallanGuideContent({
     };
   }
 
-  if (step === 'source') {
-    if (safeStop) return {
-      currentLabel: 'Step 1 of 3 · Get the official record',
-      instruction: 'Do not use the message link. Open the official service yourself.',
-      why: 'A message or forwarded link alone does not verify the record.',
-      status: 'Safe stop: verify the record before comparing evidence',
-      statusTone: 'safe-stop',
-      next: 'Use the verified official route to obtain the record; evidence comparison will stay skipped.',
-    };
+  if (step === 'check') {
     return {
-      currentLabel: 'Step 1 of 3 · Get the official record',
+      currentLabel: '1 of 2 · Check your challan',
       instruction: simpleMode
-        ? 'Open an official service, then choose a file here or type the facts yourself.'
-        : 'Open the official record yourself, then add a copy or enter its facts.',
-      why: simpleMode
-        ? 'A message link does not prove the record is official.'
-        : 'A message or forwarded link alone does not verify the record.',
-      status: sourceReady ? 'Source recorded' : 'Choose how you got this record',
-      statusTone: sourceReady ? 'ready' : 'needs-action',
-      next: 'Confirm entered facts before comparing evidence.',
+        ? 'Answer only what you can check in the record, photo, and your vehicle record.'
+        : 'Answer only what you can check in the official record, supplied photo, and your readable vehicle record.',
+      why: 'The result uses only answers you record and confirm.',
+      status: safeStop
+        ? 'Safe stop: this message does not verify a challan'
+        : observationsReady
+          ? 'Answers ready for review'
+          : sourceReady ? 'Source recorded' : 'Choose how you got this record',
+      statusTone: safeStop ? 'safe-stop' : sourceReady ? 'ready' : 'needs-action',
+      next: safeStop ? 'Open the official service independently.' : 'Complete the questions that can still change or explain the safe result.',
     };
   }
-
-  if (step === 'observations') return {
-    currentLabel: 'Step 2 of 3 · Check the evidence',
-    instruction: simpleMode
-      ? 'Check one fact at a time. Choose unclear when you cannot tell.'
-      : 'Compare the official photo with your vehicle record. Record only what you can see.',
-    why: simpleMode
-      ? 'The result uses only answers you confirmed.'
-      : 'The review can use only facts you personally confirmed.',
-    status: observationsReady ? 'Ready for a conservative review' : 'Record what is visible, unclear, or not supplied',
-    statusTone: observationsReady ? 'ready' : 'needs-action',
-    next: 'See what your entries support—and what they cannot establish.',
-  };
-
   return {
-    currentLabel: 'Step 3 of 3 · Decide and resolve',
+    currentLabel: '2 of 2 · Your next step',
     instruction: safeStop
-      ? 'Verify the record through an official service before comparing or contesting anything.'
+      ? 'Do not use the message link. Open the official service independently before relying on the notice.'
       : simpleMode
         ? 'Read the result, missing records, and the official next step.'
         : 'Read the finding, check what is missing, then use the official route.',
@@ -207,7 +162,7 @@ export function getChallanGuideContent({
       ? 'A message-only source cannot support a reliable evidence comparison.'
       : 'This prepares information. It does not submit or decide the case.',
     status: safeStop
-      ? 'Safe stop: evidence comparison was skipped'
+      ? 'Safe stop: this message does not verify a challan'
       : resultAvailable && !exportAllowed
         ? worksheetAvailable
           ? 'Worksheet ready to review; copy and download are disabled on this shared device'
@@ -217,7 +172,7 @@ export function getChallanGuideContent({
           : 'Review the finding and missing evidence before leaving',
     statusTone: safeStop ? 'safe-stop' : resultAvailable ? 'complete' : 'ready',
     next: safeStop
-      ? 'Open the verified official service independently.'
+      ? 'Open the verified official service independently. No evidence comparison was made.'
       : 'Use the official destination shown below; ChallanSakshi does not submit the case.',
   };
 }

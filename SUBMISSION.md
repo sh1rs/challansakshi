@@ -4,21 +4,19 @@
 
 ## Polished summary (under 250 words)
 
-Asha owns a blue scooter ending `3317`. Her fictional helmet e-Challan records that scooter—but the supplied image appears to show a white motorcycle ending `3817`.
+ChallanSakshi adds an evidence-understanding layer around official e-Challan services; it does not replace them.
 
-ChallanSakshi asks whether the notice is safe to act on, whether its own evidence matches, what was supplied or remains unclear, and whether the vehicle-relationship timeline agrees with the alleged event. It adds this evidence-understanding layer around existing official services; it does not replace them.
+The real `/review` journey is a short, answer-only flow. In **Check your challan**, a citizen records where the notice came from, whether a readable independent vehicle record is available, and what the official photograph visibly shows. A common three-answer path—official source, readable record, different plate—reaches **Your next step** with a carefully worded possible-mismatch finding. Message-only sources stop safely. Unclear evidence remains inconclusive, and matching evidence never manufactures a dispute. The citizen chooses whether to prepare a deeper checklist or open a currently verified official destination. Nothing is uploaded, fetched from government, filed, paid, or decided on the citizen’s behalf.
 
-Every extracted fact remains source-linked and citizen-reviewed. Deterministic TypeScript—not AI—classifies the comparison, evaluates event-time intervals, records packet completeness, calculates indicative clocks, and decides which neutral artifact is permitted. A Local Evidence Passport freezes identity, time, completeness, limitations, and revision linkage. Conflicts can support a factual review request; unclear material stays inconclusive; aligned records refuse to manufacture a dispute. A visually aligned case proceeds only if an independent, confirmed custody-time ground exists.
+The separate synthetic demo proves the larger evidence engine with fictional records. Source-linked observations require human confirmation before deterministic TypeScript compares them. The demo covers mismatch, consistent, and abstention cases; preserves a Local Evidence Passport; checks event-time custody and packet completeness; and can compare a fictional rejection order with the evidence supplied. AI may structure visual observations in configured development, but it never decides legality, guilt, deadlines, or the route.
 
-After a fictional rejection, the same frozen revision is compared with the supplied order. Every row must be confirmed as **mentioned**, **unclear**, or **not found in the supplied text**. “Not found” never means ignored or invalid.
-
-The compact preflight never opens suspicious destinations and stops on synthetic APK, credential, remote-access, or personal-payment requests. Text-first mode leaves the 1.6 MB evidence image unloaded until requested; the independent Simpler view adds a plain-language summary and roomier layout. The app works from typed fixtures, with optional structured OpenAI vision and fallback. No real upload, filing, payment, authentication, or government connection exists, and no result declares innocence, fraud, legal ownership, or invalidity.
+Real answers remain in page memory. Official-route freshness fails closed, and an unavailable destination never exposes a URL. No result declares innocence, fraud, legal ownership, or invalidity.
 
 ## Beyond the hero demo: public-beta release candidate
 
 The same evidence discipline now powers two isolated, end-to-end manual tools in the release-candidate build. They work without a government connection; public deployment remains gated by the operating, privacy, security, accessibility, and external-review checks documented in the repository:
 
-- **Real e-Challan self-review (`/review`)** — citizens inspect the official record themselves, record only structured masked observations, and receive a conservative local worksheet. It refuses message-only sources, uninspected images, colour-only mismatch claims, and inferred deadlines.
+- **Real e-Challan self-review (`/review`)** — a two-phase **Check → Resolve** journey asks only the questions needed for the current path. The shortest supported mismatch takes three answers: official source, readable independent vehicle record, and a different plate in the official photograph. Message-only sources safe-stop; unavailable or unclear evidence cannot be promoted into a mismatch.
 - **TollSakshi (`/fastag`)** — citizens reconcile a recorded FASTag debit against the official tag mapping, event time, plaza, two-debit pattern, alternate payment, tariff/pass, and credit observations. Its Transaction-to-Journey Map, TP1–TP14 Passport, bank-versus-NHAI-FASTag routing, current-rule issuer review, and aligned-record refusal turn the architecture into a second deep mobility vertical.
 
 Real-mode answers stay only in page memory. There is no document-upload or raw document-paste surface, AI, storage, form submission, URL data, analytics, case database, or automatic filing. The synthetic V5 demo, local persistence, API fixture allowlist, grievance simulator, and outcome simulator remain technically sealed from real mode.
@@ -40,7 +38,7 @@ The March 2026 Rajya Sabha answer reports:
 
 ChallanSakshi starts with one precise question: **does the challan’s supplied evidence match the citizen’s verified vehicle record?** It then carries the same evidence discipline through the rest of the resolution lifecycle.
 
-The journey is:
+The real journey first asks a minimal, adaptive set of citizen-observed questions, then presents a bounded next step. The separate synthetic proof journey is:
 
 1. Check three synthetic notice-message patterns without opening the supplied destination.
 2. Select one of three synthetic evidence cases.
@@ -60,7 +58,7 @@ The journey is:
 - Isolated end-to-end manual e-Challan review and TollSakshi routes with Privacy/Data Controls and Safety/Official Routes pages.
 - Memory-only real-mode state, masked identifiers, explicit device choice, shared-device in-app copy/download lock plus an approximately 10-minute inactivity exit attempt, Quick exit, and a test-enforced no-storage/no-network/no-upload/no-form boundary.
 - Domain- and UI-level artifact gates: aligned, already-credited, incomplete, Virtual Court, unknown-jurisdiction, or stale-attestation outcomes cannot expose a dispute request.
-- English-only real-case workflows until their rule explanations and downloadable artifacts complete Hindi safety review; the synthetic journey remains bilingual.
+- English and Hindi presentation across the adaptive real review, with safety-critical source and observation meanings kept aligned; the synthetic journey remains bilingual.
 - A FASTag Transaction-to-Journey Map, 14-element Toll Evidence Passport, three synthetic Toll fixtures, and conservative actual-record workflow.
 - Three materially different typed demo fixtures.
 - Editable comparison facts with source and visibility status; synthetic notice identifiers remain visibly read-only.
@@ -88,9 +86,9 @@ The journey is:
 - Optional structured OpenAI analysis in configured local development; the public production build deliberately uses the bundled precomputed fallback.
 - Mobile, tablet, desktop, keyboard, and reduced-motion support.
 
-## What is simulated in the homepage journey
+## What is simulated in the separate demo journey
 
-- In the homepage synthetic journey, every document, person, registration, image, authority, grievance number, and outcome.
+- In the separate `/demo` journey, every document, person, registration, image, authority, grievance number, and outcome.
 - Its government submission and status updates.
 - Its authority reasoning shown in the tracker.
 
@@ -115,7 +113,7 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 - Keeps state-specific process variation visible.
 - Warns against paying on both e-Challan and Virtual Courts when a case appears in both places.
 - Never requests a real OTP, Aadhaar, payment credential, engine number, or chassis number.
-- Labels every action and outcome as fictional or simulated.
+- Labels every synthetic-demo action and outcome as fictional or simulated; real review remains an isolated citizen-controlled workflow.
 - Leaves the final decision to the designated authority.
 
 ## Technical architecture
@@ -126,11 +124,21 @@ The hard input is visual and unstructured: plates, colour, vehicle category, ima
 - Separate resolution module for triage, payment reconciliation, and post-order clocks.
 - Pure case-ledger and order-evidence modules for revisions, provenance, citations, validation, artifacts, and timeline events.
 - Pure evidence-passport and notice-safety modules for custody-time intervals, completeness states, combined review grounds, revision IDs, exact-host checks, and high-risk signal precedence.
+- Pure adaptive question-plan and state modules for answeredness, dependency pruning, confirmation invalidation, and Check-to-Resolve convergence.
+- Fail-closed official-destination and handoff-controller modules that independently validate requested and fallback routes and never attach a URL to an unavailable result.
 - Dedicated accessible order-review component with bilingual source, field, mapping, and note states.
 - Vitest rule coverage.
 - Optional server-side Responses API endpoint with image input, strict JSON Schema, response validation, `store: false`, and no raw-payload logging.
 - Local storage only for demo step and verified synthetic state; no database.
 - Cloudflare Worker-compatible production output.
+
+## How Codex was used
+
+Codex was used as an implementation and review collaborator for this repository, not as an authority over a citizen’s case. It helped translate the approved adaptive-flow specification into small pure modules, write regression tests before fixes, migrate the real journey from three stages to **Check → Resolve**, and review privacy, safety, accessibility, and stale-contract boundaries.
+
+Concrete artifacts include `lib/citizen-review-question-plan.ts`, `lib/citizen-review-state.ts`, `lib/evidence-intelligence.ts`, `lib/official-destinations.ts`, `lib/citizen-review-handoff-controller.ts`, `lib/guided-journey.ts`, and `lib/citizen-review-presentation.ts`, with focused Vitest coverage and rendered/contract tests. Independent review also caught a real invalidation bug: after a manually recorded matched-photo path, changing the photo to unavailable could leave the derived `imageInspected` state inconsistent. A regression now requires the photo and image-dependent answers to be cleared and the result to return to an insufficient-review state.
+
+Codex did not supply legal conclusions, fetch live government records, submit a grievance, or validate production deployment. Final test and build evidence should cite the [adaptive-flow verification log](docs/superpowers/verification/2026-09-05-adaptive-citizen-resolution.md) for this local checkpoint, and be refreshed if the submitted build changes.
 
 ## Official sources
 

@@ -154,7 +154,7 @@ describe('synthetic Test Lab product contract', () => {
     expect(html).toContain('10 fictional cases');
     expect(html.match(/data-test-case=/g)).toHaveLength(10);
     expect(html).toContain('Run all 10 cases');
-    expect(html).toContain('English-only safety beta');
+    expect(html).toContain('This demo is currently available in English');
     expect(html).toContain('Nothing is filed, paid, authenticated, or sent to a government system');
     expect(html).toMatch(/<p class="[^"]*selectionStatus[^"]*" role="status" aria-live="polite">/);
   });

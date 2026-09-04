@@ -67,6 +67,17 @@ describe('derived photograph inspection', () => {
 });
 
 describe('public challan self-review', () => {
+  it.each(['missing', 'unclear', 'not-applicable'] as const)('requires a readable independent record even for aligned or unclear observations: %s', (ownRecordAvailable) => {
+    for (const plateObservation of ['match', 'unclear', 'different'] as const) {
+      expect(assessCitizenChallanReview({ ...complete, ownRecordAvailable, plateObservation }))
+        .toMatchObject({ finding: 'insufficient-review', canPrepareWorksheet: false,
+          missingEvidence: expect.arrayContaining(['A readable independent vehicle record you can compare against']) });
+    }
+  });
+  it('names both missing prerequisites before any comparisons', () => {
+    expect(assessCitizenChallanReview({ ...complete, ownRecordAvailable: 'missing', imageInspected: false }).missingEvidence)
+      .toEqual(['A readable independent vehicle record you can compare against', 'Officially supplied evidence image']);
+  });
   it('blocks a message-only notice before comparison', () => {
     const result = assessCitizenChallanReview({ ...complete, sourceStatus: 'message-only' });
     expect(result.finding).toBe('source-not-verified');

@@ -14,6 +14,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:browser:web": "playwright test --config playwright.config.ts",
     "extension:typecheck": "tsc -p extension/tsconfig.json --noEmit",
     "extension:test": "vitest run --config extension/vitest.config.ts",
     "extension:build:synthetic": "node extension/scripts/build.mjs synthetic-development",

@@ -47,6 +47,55 @@ const localSelections = { recordMeta, photographMeta } as const;
 void ({ answers, assessment } satisfies CitizenEvidenceViewInput);
 
 describe('citizen evidence intelligence', () => {
+  it('keeps pre-adaptive callers compatible when answered IDs are omitted', () => {
+    expect(buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed' }).observations).toHaveLength(7);
+  });
+  it('omits stale downstream facts and their conflicts from an adaptive plate discrepancy', () => {
+    const view = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true, 'own-record': true, plate: true, 'vehicle-category': true, timestamp: true } });
+    expect(view.observations.map(item => item.id)).toEqual(['observation-registration-plate', 'observation-citizen-vehicle-record']);
+    expect(view.conflicts.map(item => item.id)).toEqual(['conflict-registration']);
+  });
+  it('does not fabricate message evidence or unavailable photograph observations', () => {
+    const message = buildCitizenEvidenceView({ answers: { ...answers, sourceStatus: 'message-only' }, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true } });
+    expect(message).toEqual({ sources: [], observations: [], conflicts: [] });
+    const unavailable = buildCitizenEvidenceView({ answers: { ...answers, imageInspected: false, plateObservation: 'unclear' }, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true, 'own-record': true, plate: true } });
+    expect(unavailable.sources.map(item => item.id)).toEqual(['source-official-copy', 'source-citizen-record']);
+    expect(unavailable.observations.map(item => item.id)).toEqual(['observation-citizen-vehicle-record']);
+    expect(unavailable.conflicts).toEqual([]);
+  });
+  it('lets an explicit unavailable-photo answer suppress stale photograph metadata', () => {
+    const unavailable = buildCitizenEvidenceView({
+      answers: { ...answers, imageInspected: false, plateObservation: 'unclear' },
+      assessment,
+      confirmation: 'confirmed',
+      photographMeta,
+      answeredQuestionIds: { source: true, 'own-record': true, plate: true },
+    });
+
+    expect(unavailable.sources.map(item => item.id)).toEqual(['source-official-copy', 'source-citizen-record']);
+    expect(unavailable.observations.map(item => item.id)).toEqual(['observation-citizen-vehicle-record']);
+    expect(unavailable.conflicts).toEqual([]);
+  });
+  it('exports only reviewed fields and declared missing prerequisites', () => {
+    const summary = buildCitizenEvidenceSummary({ answers, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true, 'own-record': true, plate: true }, jurisdiction: '', vehicleSuffix: '', allegedOffence: '', eventDate: '', officialDeadline: '', timeline: [] });
+    expect(summary).toContain('Registration plate');
+    expect(summary).not.toMatch(/vehicle category|event timestamp|could not find a location|copy of the official notice/i);
+    expect(summary).toContain('Prepared by the citizen using ChallanSakshi. Not submitted, authenticated, or approved by a government authority.');
+  });
+  it('distinguishes an explicit unclear observation from an unanswered plate with a selected photo', () => {
+    const view = buildCitizenEvidenceView({ answers: { ...answers, plateObservation: 'unclear' }, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true, 'own-record': true, plate: true } });
+    expect(view.observations.find(item => item.id === 'observation-registration-plate')).toMatchObject({ value: 'unclear', confirmation: 'confirmed', confidence: 'inconclusive' });
+    const selectedOnly = buildCitizenEvidenceView({ answers, assessment, confirmation: 'confirmed', photographMeta, answeredQuestionIds: { source: true, 'own-record': true } });
+    expect(selectedOnly.sources.map(item => item.id)).toContain('source-enforcement-image');
+    expect(selectedOnly.observations.map(item => item.id)).toEqual(['observation-citizen-vehicle-record']);
+  });
+  it('includes optional record availability only when explicitly answered', () => {
+    const view = buildCitizenEvidenceView({ answers: { ...answers, noticeCopyAvailable: 'missing', custodyRecordAvailable: 'missing' }, assessment, confirmation: 'confirmed', answeredQuestionIds: { source: true, 'own-record': true, plate: true, 'notice-copy': true, 'custody-record': true } });
+    expect(view.observations.filter(item => item.id.includes('availability')).map(item => [item.id, item.value]))
+      .toEqual([['observation-notice-copy-availability', 'missing'], ['observation-custody-record-availability', 'missing']]);
+    const sourceIds = new Set(view.sources.map(item => item.id));
+    expect(view.observations.every(item => sourceIds.has(item.sourceId))).toBe(true);
+  });
   it('keeps canonical confidence and confirmation values strongly typed', () => {
     const view = buildCitizenEvidenceView({
       answers,
@@ -391,7 +440,7 @@ describe('citizen evidence intelligence', () => {
     const reviewAnswers = {
       ...answers,
       categoryObservation: 'match' as const,
-      ownRecordAvailable: 'unclear' as const,
+      ownRecordAvailable: 'present' as const,
       noticeCopyAvailable: 'missing' as const,
     };
     const reviewAssessment = assessCitizenChallanReview(reviewAnswers);
@@ -403,10 +452,10 @@ describe('citizen evidence intelligence', () => {
     expect(standard.materialSignals[0]).toBe('You recorded that the readable plate details differ.');
     expect(simple.materialSignals[0]).toBe('The number plate looks different.');
     expect(simple.cautions[0]).toBe('These are your answers. ChallanSakshi did not check the records.');
-    expect(simple.missingEvidence).toEqual(['A readable vehicle record', 'The official notice copy']);
+    expect(simple.missingEvidence).toEqual(['The official notice copy']);
     expect(simpleHindi.materialSignals[0]).toBe('नंबर प्लेट अलग दिखती है।');
     expect(simpleHindi.cautions[0]).toBe('ये आपके उत्तर हैं। ChallanSakshi ने रिकॉर्ड नहीं जाँचे।');
-    expect(simpleHindi.missingEvidence).toEqual(['पढ़ने योग्य वाहन रिकॉर्ड', 'आधिकारिक नोटिस की कॉपी']);
+    expect(simpleHindi.missingEvidence).toEqual(['आधिकारिक नोटिस की कॉपी']);
     expect(simple.materialSignals).toHaveLength(reviewAssessment.materialSignals.length);
     expect(simple.cautions).toHaveLength(reviewAssessment.cautions.length);
     expect(reviewAssessment).toEqual(unchangedAssessment);
@@ -414,6 +463,24 @@ describe('citizen evidence intelligence', () => {
     expect(citizenSituationForFinding(reviewAssessment.finding)).toBe(
       citizenSituationForFinding(unchangedAssessment.finding),
     );
+  });
+
+  it('localizes the adaptive readable-record prerequisite and optional availability fields', () => {
+    expect(localizeAssessment({
+      finding: 'insufficient-review', canPrepareWorksheet: false, materialSignals: [], cautions: [],
+      missingEvidence: ['A readable independent vehicle record you can compare against'],
+    }, 'hi').missingEvidence).toEqual(['तुलना के लिए पढ़ने योग्य स्वतंत्र वाहन रिकॉर्ड']);
+    expect(buildCitizenEvidencePresentationView({
+      sources: [],
+      observations: [
+        { id: 'notice', field: 'Official notice copy', value: 'missing', sourceId: 'notice-source', confidence: 'inconclusive', confirmation: 'confirmed' },
+        { id: 'custody', field: 'Event-time custody record', value: 'missing', sourceId: 'custody-source', confidence: 'inconclusive', confirmation: 'confirmed' },
+      ],
+      conflicts: [],
+    }, { language: 'hi', simpleMode: false }).observations.map(item => item.field)).toEqual([
+      'आधिकारिक नोटिस की कॉपी',
+      'घटना-समय अभिरक्षा रिकॉर्ड',
+    ]);
   });
 
   it('simplifies evidence limitations in both languages', () => {
@@ -432,8 +499,8 @@ describe('citizen evidence intelligence', () => {
   });
 
   it.each([
-    ['en', 'YOUR INFORMATION', 'WHAT YOU SAW', 'Please check these facts on the official service.'],
-    ['hi', 'आपकी जानकारी', 'आपने क्या देखा', 'इन तथ्यों को आधिकारिक सेवा पर जाँचें।'],
+    ['en', 'YOUR INFORMATION', 'WHAT YOU SAW', 'Please clarify my recorded observations: Registration plate'],
+    ['hi', 'आपकी जानकारी', 'आपने क्या देखा', 'कृपया मेरे दर्ज अवलोकनों पर स्पष्टीकरण दें: नंबर प्लेट'],
   ] as const)('uses a complete simple %s artifact template', (language, detailsHeading, observationsHeading, bodySentence) => {
     const summary = buildCitizenEvidenceSummary({
       jurisdiction: language === 'hi' ? 'राष्ट्रीय ई-चालान' : 'National e-Challan',

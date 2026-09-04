@@ -131,6 +131,10 @@ export const OFFICIAL_AUXILIARY_ROUTES = Object.freeze({
   }),
 } as const satisfies Record<OfficialAuxiliaryRoute['key'], OfficialAuxiliaryRoute>);
 
+export type CurrentOfficialAuxiliaryResolution =
+  | Readonly<{ status: 'current'; route: OfficialAuxiliaryRoute; usedFallback: boolean }>
+  | Readonly<{ status: 'unavailable'; reason: 'requested-and-fallback-not-current' }>;
+
 const grievanceCapabilities = Object.freeze({
   category: false,
   description: true,
@@ -204,6 +208,7 @@ const delhiCodes = new Set<string>(DELHI_JURISDICTION_CODES);
 const legacyCodes = new Set<string>(CURRENT_LEGACY_JURISDICTION_CODES);
 const DAY_MS = 86_400_000;
 const MAX_ROUTE_AGE_DAYS = 30;
+const MAX_ROUTE_FRESHNESS_DELAY_MS = DAY_MS;
 
 function parseCalendarDate(value: unknown): number | null {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -245,6 +250,79 @@ export function isVerifiedOfficialRouteCurrent(route: unknown, now: string | Dat
     }
   }
   return true;
+}
+
+const unavailableAuxiliaryResolution = (): CurrentOfficialAuxiliaryResolution => ({
+  status: 'unavailable',
+  reason: 'requested-and-fallback-not-current',
+});
+
+export function resolveCurrentOfficialAuxiliaryCandidate(
+  input: Readonly<{
+    requested: OfficialAuxiliaryRoute;
+    fallback: OfficialAuxiliaryRoute;
+    nowIso: string;
+  }>,
+): CurrentOfficialAuxiliaryResolution {
+  if (isVerifiedOfficialRouteCurrent(input.requested, input.nowIso)) {
+    return { status: 'current', route: input.requested, usedFallback: false };
+  }
+  if (isVerifiedOfficialRouteCurrent(input.fallback, input.nowIso)) {
+    return { status: 'current', route: input.fallback, usedFallback: true };
+  }
+  return unavailableAuxiliaryResolution();
+}
+
+export function resolveCurrentOfficialAuxiliaryRoute(
+  key: OfficialAuxiliaryRoute['key'],
+  nowIso: string,
+): CurrentOfficialAuxiliaryResolution {
+  if (!Object.prototype.hasOwnProperty.call(OFFICIAL_AUXILIARY_ROUTES, key)) {
+    return unavailableAuxiliaryResolution();
+  }
+  return resolveCurrentOfficialAuxiliaryCandidate({
+    requested: OFFICIAL_AUXILIARY_ROUTES[key],
+    fallback: OFFICIAL_AUXILIARY_ROUTES['national-services-directory'],
+    nowIso,
+  });
+}
+
+export function getOfficialRouteFreshnessToken(
+  requestedKey: OfficialAuxiliaryRoute['key'],
+  nowIso: string,
+): string {
+  const resolution = resolveCurrentOfficialAuxiliaryRoute(requestedKey, nowIso);
+  return JSON.stringify(resolution.status === 'current'
+    ? {
+      registryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+      requestedKey,
+      status: resolution.status,
+      resolvedKey: resolution.route.key,
+      expiresAt: resolution.route.expiresAt,
+      usedFallback: resolution.usedFallback,
+    }
+    : {
+      registryVersion: OFFICIAL_ROUTE_REGISTRY_VERSION,
+      requestedKey,
+      status: resolution.status,
+      resolvedKey: null,
+      expiresAt: null,
+      usedFallback: false,
+    });
+}
+
+export function getOfficialRouteFreshnessDelayMs(
+  requestedKey: OfficialAuxiliaryRoute['key'],
+  nowIso: string,
+): number | null {
+  const nowMs = Date.parse(nowIso);
+  if (!Number.isFinite(nowMs)) return null;
+  const resolution = resolveCurrentOfficialAuxiliaryRoute(requestedKey, nowIso);
+  if (resolution.status !== 'current') return null;
+  const expiresAt = parseCalendarDate(resolution.route.expiresAt);
+  if (expiresAt === null) return null;
+  const firstInvalidInstant = expiresAt + DAY_MS;
+  return Math.min(Math.max(firstInvalidInstant - nowMs, 0), MAX_ROUTE_FRESHNESS_DELAY_MS);
 }
 
 function isCurrentOfficialFallback(route: unknown, now: string | Date): route is OfficialFallbackRoute {

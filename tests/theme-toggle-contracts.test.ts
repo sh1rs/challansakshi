@@ -32,7 +32,7 @@ describe('theme toggle header contract', () => {
 
   it('keeps the toggle available on English-only safety-beta headers', () => {
     const html = header('en', true);
-    expect(html).toContain('English-only safety beta');
+    expect(html).toContain('FASTag check is currently available in English');
     expect(html).toContain('Dark mode');
   });
 

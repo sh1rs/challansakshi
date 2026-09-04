@@ -87,11 +87,6 @@ export type OfficialHandoffPanelProps = Readonly<{
   reviewContext: Readonly<{
     role: 'self' | 'present-helper';
     deviceMode: 'private' | 'shared';
-    safetyConsent: Readonly<{
-      manualReviewAcknowledged: boolean;
-      minimumDataAcknowledged: boolean;
-      affectedPersonPresentAcknowledged: boolean;
-    }>;
   }>;
   draft: OfficialHandoffDraft;
   confirmedPack: OfficialHandoffPack | null;
@@ -189,9 +184,8 @@ export function OfficialHandoffPanel({
   const helping = reviewContext.role === 'present-helper';
   const returnAnnouncement = helping ? copy.returnAnnouncements.helper : copy.returnAnnouncements.self;
   const eligible = draft.status === 'eligible';
-  const showOfficialAnchor = draft.status === 'manual'
-    || draft.status === 'unresolved'
-    || (eligible && confirmedPack !== null);
+  // Non-actionable routes use the parent’s single, clock-checked safe lookup.
+  const showOfficialAnchor = eligible && confirmedPack !== null;
   const returnRecorded = receiptState?.status === 'citizen-return-recorded';
   const purpose = copy.purpose[draft.destination.purpose];
   const returnReadinessMessage = returnReadiness.status === 'ready'
@@ -259,6 +253,8 @@ export function OfficialHandoffPanel({
 
   const officialAnchor = showOfficialAnchor ? (
     <a
+      data-required-action
+      data-grievance-affordance
       className={`${styles.officialAnchor} ${officialLinkStatus === 'not-activated' ? styles.primaryAction : styles.secondaryAction}`}
       href={draft.destination.canonicalUrl}
       target="_blank"
@@ -398,9 +394,7 @@ export function OfficialHandoffPanel({
           {returnDraft.selectedReturnState === 'portal-unavailable' ? (
             <aside className={styles.status}>
               <strong>{copy.fallback.heading}</strong>{' '}{copy.fallback.body}{' '}
-              <a href={draft.fallback.canonicalUrl} target="_blank" rel="noreferrer">
-                {copy.fallback.openPrefix}: {draft.fallback.serviceName}
-              </a>
+              <p>{language === 'hi' ? 'ऊपर दिया गया वर्तमान आधिकारिक खोज विकल्प उपयोग करें।' : 'Use the current official lookup above.'}</p>
             </aside>
           ) : null}
           {privateDevice && returnDraft.selectedReturnState === 'acknowledgement-seen' ? (

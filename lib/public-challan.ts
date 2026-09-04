@@ -158,6 +158,19 @@ export function assessCitizenChallanReview(answers: CitizenChallanAnswers): Citi
     };
   }
 
+  if (answers.ownRecordAvailable !== 'present') {
+    return {
+      finding: 'insufficient-review',
+      canPrepareWorksheet: false,
+      materialSignals: [],
+      cautions: ['A readable vehicle record is required before treating a plate or category observation as a comparison.'],
+      missingEvidence: [
+        'A readable independent vehicle record you can compare against',
+        ...(!answers.imageInspected ? ['Officially supplied evidence image'] : []),
+      ],
+    };
+  }
+
   if (!answers.imageInspected) {
     return {
       finding: 'insufficient-review',
@@ -177,7 +190,6 @@ export function assessCitizenChallanReview(answers: CitizenChallanAnswers): Citi
   if (answers.locationStatus === 'not-found') materialSignals.push('You could not find a location in the supplied evidence.');
 
   const missingEvidence: string[] = [];
-  if (answers.ownRecordAvailable !== 'present') missingEvidence.push('A vehicle record you can compare against');
   if (answers.noticeCopyAvailable !== 'present') missingEvidence.push('A copy of the official notice');
   if (answers.custodyRecordAvailable === 'missing') missingEvidence.push('Any available event-time custody record (context only)');
 
@@ -190,21 +202,8 @@ export function assessCitizenChallanReview(answers: CitizenChallanAnswers): Citi
   const hasVehicleConflict = answers.plateObservation === 'different'
     || answers.categoryObservation === 'different';
 
-  if (hasVehicleConflict && answers.ownRecordAvailable === 'present') {
-    return { finding: 'citizen-recorded-inconsistency', canPrepareWorksheet: true, materialSignals, cautions, missingEvidence };
-  }
-
   if (hasVehicleConflict) {
-    return {
-      finding: 'insufficient-review',
-      canPrepareWorksheet: false,
-      materialSignals,
-      cautions: [
-        ...cautions,
-        'A readable vehicle record is required before treating a plate or category observation as a comparison.',
-      ],
-      missingEvidence,
-    };
+    return { finding: 'citizen-recorded-inconsistency', canPrepareWorksheet: true, materialSignals, cautions, missingEvidence };
   }
 
   const imageUnclear = answers.plateObservation === 'unclear'

@@ -149,6 +149,18 @@ describe('real citizen handoff route and action-ready projection', () => {
     expect(nextgen.destination.canonicalUrl).not.toContain('KA');
   });
 
+  it('removes the auxiliary lookup route when the clock is invalid or all candidates have expired', () => {
+    const initial = createCitizenReviewHandoffController({
+      resultRevisionId: RESULT_REVISION,
+      packRevisionId: PACK_REVISION,
+    });
+
+    expect(buildCitizenReviewHandoffView(initial, viewInput({ nowIso: 'not-an-instant' })).lookupRoute).toBeNull();
+    expect(buildCitizenReviewHandoffView(initial, viewInput({
+      nowIso: '2026-10-03T00:00:00.000Z',
+    })).lookupRoute).toBeNull();
+  });
+
   it('projects only the directly established readable-plate conflict from the current UI', () => {
     const initial = createCitizenReviewHandoffController({
       resultRevisionId: RESULT_REVISION,

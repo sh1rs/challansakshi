@@ -1,5 +1,6 @@
 import type { LocalRecordFileMeta } from './local-record-intake';
 import type { Language } from './domain';
+import { reconcileCitizenReviewAdaptiveState, type CitizenReviewAnsweredQuestionIds, type CitizenReviewInputId } from './citizen-review-question-plan';
 import {
   CITIZEN_DISCLAIMER_EN,
   CITIZEN_DISCLAIMER_HI,
@@ -83,6 +84,8 @@ export type CitizenEvidencePresentationView = {
 
 export type CitizenEvidenceViewInput = {
   answers: CitizenChallanAnswers;
+  /** Omission preserves pre-adaptive callers; adaptive callers always supply current IDs. */
+  answeredQuestionIds?: CitizenReviewAnsweredQuestionIds;
   /** Task 4 supplies this only after its citizen confirmation gate. */
   assessment: CitizenReviewAssessment;
   /** The evidence builders accept only facts confirmed by the citizen after that gate. */
@@ -223,6 +226,13 @@ function limitationFor(field: 'plate' | 'category' | 'colour' | 'offence' | 'tim
  * This function does not inspect source bytes or authenticate a record. It reuses the deterministic conservative classifier for materiality and makes no independent or legal classification.
  */
 export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): CitizenEvidenceView {
+  if (input.answeredQuestionIds) {
+    const reconciled = reconcileCitizenReviewAdaptiveState({
+      answers: input.answers, answeredQuestionIds: input.answeredQuestionIds,
+      hasSelectedPhotograph: input.photographMeta?.role === 'photograph',
+    });
+    input = { ...input, answers: reconciled.answers, answeredQuestionIds: reconciled.answeredQuestionIds };
+  }
   const currentAssessment = assessCitizenChallanReview(input.answers);
   const hasLocalRecord = input.recordMeta?.role === 'official-record';
   const hasLocalPhotograph = input.photographMeta?.role === 'photograph';
@@ -308,7 +318,37 @@ export function buildCitizenEvidenceView(input: CitizenEvidenceViewInput): Citiz
     });
   }
 
-  return { sources, observations, conflicts };
+  if (!input.answeredQuestionIds) return { sources, observations, conflicts };
+  const answered = input.answeredQuestionIds;
+  const unavailablePhotographAnswered = answered.plate && !input.answers.imageInspected;
+  const observationQuestion: Record<string, CitizenReviewInputId> = {
+    'observation-registration-plate': 'plate', 'observation-vehicle-category': 'vehicle-category',
+    'observation-vehicle-colour': 'vehicle-colour', 'observation-alleged-offence': 'offence-visibility',
+    'observation-evidence-timestamp': 'timestamp', 'observation-evidence-location': 'location',
+    'observation-citizen-vehicle-record': 'own-record',
+  };
+  const activeObservations = observations.filter(observation => answered[observationQuestion[observation.id]]
+    && (observation.sourceId !== 'source-enforcement-image' || input.answers.imageInspected));
+  if (answered['notice-copy']) activeObservations.push({
+    id: 'observation-notice-copy-availability', field: 'Official notice copy',
+    value: displayValue(input.answers.noticeCopyAvailable), sourceId: 'source-official-copy',
+    confidence: input.answers.noticeCopyAvailable === 'present' ? 'medium' : 'inconclusive', confirmation: input.confirmation,
+  });
+  if (answered['custody-record']) activeObservations.push({
+    id: 'observation-custody-record-availability', field: 'Event-time custody record',
+    value: displayValue(input.answers.custodyRecordAvailable), sourceId: 'source-citizen-record',
+    confidence: input.answers.custodyRecordAvailable === 'present' ? 'medium' : 'inconclusive', confirmation: input.confirmation,
+  });
+  const activeSources = sources.filter(source => {
+    if (source.id === 'source-official-copy') return hasLocalRecord || (answered.source
+      && (input.answers.sourceStatus === 'official-service' || input.answers.sourceStatus === 'downloaded-official-record'));
+    if (source.id === 'source-enforcement-image') return !unavailablePhotographAnswered
+      && (hasLocalPhotograph || activeObservations.some(observation => observation.sourceId === source.id));
+    return answered['own-record'];
+  });
+  const observationIds = new Set(activeObservations.map(observation => observation.id));
+  return { sources: activeSources, observations: activeObservations,
+    conflicts: conflicts.filter(conflict => observationIds.has(conflict.leftObservationId) && observationIds.has(conflict.rightObservationId)) };
 }
 
 export function buildCitizenEvidencePresentationView(
@@ -323,14 +363,14 @@ export function buildCitizenEvidencePresentationView(
   };
   const sourceLabels: Record<string, string> = language === 'hi'
     ? {
-      'source-official-copy': view.sources[0]?.acquisition === 'local-file-preview'
+      'source-official-copy': view.sources.find(source => source.id === 'source-official-copy')?.acquisition === 'local-file-preview'
         ? 'नागरिक द्वारा चुनी स्थानीय आधिकारिक रिकॉर्ड कॉपी'
-        : officialFallbackHi[view.sources[0]?.label ?? ''] ?? 'नागरिक द्वारा दर्ज आधिकारिक रिकॉर्ड',
-      'source-enforcement-image': view.sources[1]?.acquisition === 'local-file-preview'
+        : officialFallbackHi[view.sources.find(source => source.id === 'source-official-copy')?.label ?? ''] ?? 'नागरिक द्वारा दर्ज आधिकारिक रिकॉर्ड',
+      'source-enforcement-image': view.sources.find(source => source.id === 'source-enforcement-image')?.acquisition === 'local-file-preview'
         ? 'नागरिक द्वारा चुनी स्थानीय तस्वीर'
         : 'नागरिक द्वारा वर्णित दी गई तस्वीर',
       'source-citizen-record': `नागरिक द्वारा दर्ज वाहन रिकॉर्ड: ${localizeEvidenceValue(
-        view.sources[2]?.label.split(': ').at(-1) ?? '',
+        view.sources.find(source => source.id === 'source-citizen-record')?.label.split(': ').at(-1) ?? '',
         'hi',
       )}`,
     }
@@ -400,6 +440,34 @@ function exportSourceLabel(source: EvidenceSourceRef, language: Language): strin
 export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput): string {
   const language = input.language ?? 'en';
   const canonicalView = buildCitizenEvidenceView(input);
+  if (input.answeredQuestionIds) {
+    const current = reconcileCitizenReviewAdaptiveState({ answers: input.answers,
+      answeredQuestionIds: input.answeredQuestionIds, hasSelectedPhotograph: input.photographMeta?.role === 'photograph' });
+    const assessment = assessCitizenChallanReview(current.answers);
+    const answered = current.answeredQuestionIds;
+    const allowedSignals = new Set<string>();
+    if (answered.source) {
+      allowedSignals.add('The record source has not been selected.');
+      allowedSignals.add('The notice has not yet been independently checked on an official service.');
+    }
+    if (answered.plate) {
+      allowedSignals.add('The officially supplied image has not been inspected.');
+      allowedSignals.add('You recorded that the readable plate details differ.');
+    }
+    if (answered['vehicle-category']) allowedSignals.add('You recorded that the vehicle category differs.');
+    if (answered['vehicle-colour']) allowedSignals.add('You recorded a colour difference.');
+    if (answered['offence-visibility']) allowedSignals.add('You recorded that the alleged offence is not visible in the supplied image.');
+    if (answered.timestamp) allowedSignals.add('You could not find a timestamp in the supplied evidence.');
+    if (answered.location) allowedSignals.add('You could not find a location in the supplied evidence.');
+    const missingEvidence = assessment.missingEvidence.filter(item => {
+      if (item === 'A copy of the official notice') return answered['notice-copy'];
+      if (item === 'Any available event-time custody record (context only)') return answered['custody-record'];
+      return true;
+    });
+    const materialSignals = assessment.materialSignals.filter(signal => allowedSignals.has(signal));
+    input = { ...input, answers: current.answers, answeredQuestionIds: answered,
+      assessment: { ...assessment, materialSignals, missingEvidence }, materialSignals, missingEvidence };
+  }
   const view = buildCitizenEvidencePresentationView(canonicalView, {
     language,
     simpleMode: input.simpleMode ?? false,
@@ -410,6 +478,12 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
   }));
   const materialSignals = input.materialSignals ?? input.assessment.materialSignals;
   const missingEvidence = input.missingEvidence ?? input.assessment.missingEvidence;
+  const clarificationFields = view.observations.map(observation => observation.field);
+  const clarificationRequest = language === 'hi'
+    ? [clarificationFields.length ? `कृपया मेरे दर्ज अवलोकनों पर स्पष्टीकरण दें: ${clarificationFields.join(', ')}।` : 'कृपया आधिकारिक सेवा पर रिकॉर्ड की उपलब्धता जाँचें।',
+      ...(missingEvidence.length ? [`अभी आवश्यक रिकॉर्ड: ${localizeAssessment({ ...input.assessment, missingEvidence }, 'hi').missingEvidence.map(item => sanitiseArtifactText(item, artifactFallback('hi'))).join(', ')}।`] : [])].join(' ')
+    : [clarificationFields.length ? `Please clarify my recorded observations: ${clarificationFields.join(', ')}.` : 'Please check record availability on the official service.',
+      ...(missingEvidence.length ? [`Records still needed: ${missingEvidence.map(item => sanitiseArtifactText(item)).join(', ')}.`] : [])].join(' ');
   const observationLines = view.observations.map((observation) => {
     const limitation = observation.limitation ? ` Limitation: ${observation.limitation}` : '';
     return `- ${observation.field}: ${observation.value} (confidence: ${observation.confidence}; confirmed by citizen).${limitation}`;
@@ -454,7 +528,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
         ...canonicalTimelineLines(input.timeline, 'hi'),
         '',
         'क्या पूछें',
-        'इन तथ्यों को आधिकारिक सेवा पर जाँचें। जहाँ जानकारी साफ़ नहीं है, वहाँ स्पष्टीकरण माँगें।',
+        clarificationRequest,
         '',
         'आगे क्या करें',
         'यह सारांश कहीं भेजा नहीं गया। जिम्मेदार आधिकारिक सेवा स्वयं खोलें और मौजूदा स्थिति फिर जाँचें।',
@@ -492,7 +566,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
       ...canonicalTimelineLines(input.timeline, 'en'),
       '',
       'WHAT TO ASK',
-      'Please check these facts on the official service. Ask for clarification where the information is not clear.',
+      clarificationRequest,
       '',
       'WHAT TO DO NEXT',
       'This summary was not sent anywhere. Open the responsible official service yourself and check the current status again.',
@@ -533,7 +607,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
       ...canonicalTimelineLines(input.timeline, 'hi'),
       '',
       'तटस्थ स्पष्टीकरण अनुरोध',
-      'मैं नोटिस के साथ दिए गए सबूत की समीक्षा का अनुरोध करता/करती हूँ। मेरे दर्ज अवलोकनों के आधार पर सूचीबद्ध फ़ील्ड को स्पष्टीकरण की आवश्यकता हो सकती है। कृपया वाहन पहचान, वाहन श्रेणी, आरोपित अपराध के सबूत, घटना समय, स्थान और नोटिस के आधार की जाँच करें। मैं पूरे आधिकारिक पहचान विवरण केवल जाँची हुई आधिकारिक सेवा में दर्ज करूँगा/करूँगी।',
+      clarificationRequest,
       '',
       'महत्वपूर्ण सीमाएँ और आधिकारिक हैंडऑफ',
       'किसी सरकारी प्राधिकरण को कुछ भी जमा, प्रमाणित या मंज़ूर नहीं किया गया।',
@@ -569,7 +643,7 @@ export function buildCitizenEvidenceSummary(input: CitizenEvidenceSummaryInput):
     ...canonicalTimelineLines(input.timeline, 'en'),
     '',
     'NEUTRAL CLARIFICATION REQUEST',
-    'I request review of the evidence supplied with the notice. Based on my own recorded observations, the listed fields may require clarification. Please verify the vehicle identifier, vehicle category, alleged-offence evidence, event timestamp, location, and basis of the notice. I will enter full official identifiers only inside the verified official service.',
+    clarificationRequest,
     '',
     'IMPORTANT LIMITS AND OFFICIAL HANDOFF REMINDER',
     'Nothing was submitted, authenticated, or approved by a government authority.',
