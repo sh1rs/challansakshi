@@ -248,7 +248,10 @@ const FORBIDDEN_PROPERTY_NAMES = Object.freeze(new Set(['open', 'opener', 'defau
 const LOCATION_MEMBER_NAMES = Object.freeze(new Set(['href', 'hash', 'search', 'pathname', 'host', 'hostname', 'protocol', 'port']));
 // Zero legitimate uses (verified in authored and built bytes): these names exist
 // only to launder window/document acquisition or synthesize navigation.
-const LAUNDER_PROPERTY_NAMES = Object.freeze(new Set(['ownerDocument', 'getRootNode', 'view', 'click', 'submit', 'requestSubmit']));
+const LAUNDER_PROPERTY_NAMES = Object.freeze(new Set(['ownerDocument', 'getRootNode', 'view', 'click', 'submit', 'requestSubmit', 'dispatchEvent']));
+// setAttribute may only ever name these (the popup's three literal uses); any
+// navigation-capable or computed attribute name is authority.
+const SAFE_SET_ATTRIBUTE_NAMES = Object.freeze(new Set(['lang', 'type', 'tabindex', 'id', 'class', 'aria-live', 'aria-atomic', 'aria-pressed', 'disabled']));
 const LOCATION_READ_MEMBERS = Object.freeze(new Set(['href', 'origin', 'protocol', 'host', 'hostname', 'port', 'pathname', 'search', 'hash']));
 
 // A scanner-recognized location alias must stay read-only for its whole scope:
@@ -319,6 +322,26 @@ function runAuthorityPass(file, lane) {
       fail('network-deny');
     }
     if (ts.isPropertyAccessExpression(node) && LAUNDER_PROPERTY_NAMES.has(node.name.text)) {
+      fail('javascript-authority-closure');
+    }
+    // The bare global location is the same navigation sink as window.location.
+    if (ts.isIdentifier(node) && node.text === 'location') {
+      const parent = node.parent;
+      const isPropertyNamePosition = (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || (ts.isPropertyAssignment(parent) && parent.name === node)
+        || (ts.isPropertySignature(parent) && parent.name === node)
+        || ts.isQualifiedName(parent)
+        || (ts.isBindingElement(parent) && parent.propertyName === node);
+      if (!isPropertyNamePosition) fail('network-deny');
+    }
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === 'setAttribute') {
+      const [attributeName] = node.arguments;
+      if (!attributeName || !ts.isStringLiteralLike(attributeName) || !SAFE_SET_ATTRIBUTE_NAMES.has(attributeName.text)) {
+        fail('network-deny');
+      }
+    }
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && /Event$/u.test(node.expression.text)) {
       fail('javascript-authority-closure');
     }
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)

