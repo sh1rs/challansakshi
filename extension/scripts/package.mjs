@@ -238,42 +238,128 @@ function checkDeclarativeSurfaceClosure(buffers) {
   }
 }
 
+const GLOBAL_OBJECT_ROOTS = Object.freeze(new Set(['chrome', 'window', 'self', 'globalThis', 'document', 'top', 'parent', 'frames']));
+// Authored fill-page code legitimately uses locals named parent/top (DOM walks,
+// rect fields); the minifier renames locals, so built bytes enforce the full set.
+const AUTHORED_IN_PLACE_ROOTS = Object.freeze(new Set(['chrome', 'window', 'self', 'globalThis', 'document', 'frames']));
+const FORBIDDEN_BARE_GLOBALS_ALL = Object.freeze(new Set(['eval', 'importScripts', 'opener', 'frames']));
+const FORBIDDEN_BARE_GLOBALS_BUILT = Object.freeze(new Set(['eval', 'importScripts', 'opener', 'frames', 'top', 'parent', 'Function']));
+const FORBIDDEN_PROPERTY_NAMES = Object.freeze(new Set(['open', 'opener', 'defaultView', 'contentWindow', 'postMessage']));
+const LOCATION_MEMBER_NAMES = Object.freeze(new Set(['href', 'hash', 'search', 'pathname', 'host', 'hostname', 'protocol', 'port']));
+
+function chainRootIdentifier(node) {
+  let root = node;
+  while (ts.isPropertyAccessExpression(root) || ts.isElementAccessExpression(root)
+    || ts.isParenthesizedExpression(root) || ts.isNonNullExpression(root) || ts.isAsExpression(root)) {
+    root = root.expression;
+  }
+  return ts.isIdentifier(root) ? root.text : null;
+}
+
+function isAssignmentTarget(node) {
+  const parent = node.parent;
+  return ts.isBinaryExpression(parent)
+    && parent.left === node
+    && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+    && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment;
+}
+
+function runAuthorityPass(file, lane) {
+  const bareGlobals = lane === 'built' ? FORBIDDEN_BARE_GLOBALS_BUILT : FORBIDDEN_BARE_GLOBALS_ALL;
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      fail('javascript-authority-closure');
+    }
+    if (ts.isIdentifier(node) && bareGlobals.has(node.text)) {
+      const parent = node.parent;
+      const isPropertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || (ts.isPropertyAssignment(parent) && parent.name === node)
+        || (ts.isPropertySignature(parent) && parent.name === node)
+        || ts.isQualifiedName(parent);
+      if (!isPropertyName) fail('javascript-authority-closure');
+    }
+    if (ts.isStringLiteralLike(node) && (node.text === 'eval' || node.text === 'Function' || node.text === 'importScripts')) {
+      fail('javascript-authority-closure');
+    }
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)
+      && (node.expression.text === 'Function' || node.expression.text === 'XMLHttpRequest' || node.expression.text === 'WebSocket' || node.expression.text === 'EventSource')) {
+      fail('javascript-authority-closure');
+    }
+    if (ts.isPropertyAccessExpression(node) && FORBIDDEN_PROPERTY_NAMES.has(node.name.text)) {
+      fail('network-deny');
+    }
+    if (ts.isElementAccessExpression(node)) {
+      const root = chainRootIdentifier(node.expression);
+      if (root !== null && GLOBAL_OBJECT_ROOTS.has(root)) fail('javascript-authority-closure');
+      if (ts.isStringLiteralLike(node.argumentExpression) && FORBIDDEN_PROPERTY_NAMES.has(node.argumentExpression.text)) {
+        fail('network-deny');
+      }
+    }
+    if (ts.isPropertyAccessExpression(node) && node.name.text === 'location') {
+      const base = node.expression;
+      const baseOk = ts.isIdentifier(base) && (base.text === 'self' || base.text === 'window');
+      const parent = node.parent;
+      const readOk = ts.isPropertyAccessExpression(parent)
+        && parent.expression === node
+        && !isAssignmentTarget(parent);
+      const aliasOk = ts.isVariableDeclaration(parent) && parent.initializer === node;
+      if (!baseOk || (!readOk && !aliasOk) || isAssignmentTarget(node)) fail('network-deny');
+    }
+    if (ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      const target = node.left;
+      const writtenName = ts.isPropertyAccessExpression(target)
+        ? target.name.text
+        : ts.isElementAccessExpression(target) && ts.isStringLiteralLike(target.argumentExpression)
+          ? target.argumentExpression.text
+          : null;
+      if (writtenName !== null && (writtenName === 'location' || LOCATION_MEMBER_NAMES.has(writtenName))) {
+        fail('network-deny');
+      }
+    }
+    const inPlaceRoots = lane === 'built' ? GLOBAL_OBJECT_ROOTS : AUTHORED_IN_PLACE_ROOTS;
+    if (ts.isIdentifier(node) && inPlaceRoots.has(node.text)) {
+      const parent = node.parent;
+      const isPropertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || (ts.isPropertyAssignment(parent) && parent.name === node)
+        || (ts.isPropertySignature(parent) && parent.name === node);
+      const isChainBase = (ts.isPropertyAccessExpression(parent) && parent.expression === node)
+        || ts.isQualifiedName(parent)
+        || ts.isTypeOfExpression(parent);
+      const isEqualityOperand = ts.isBinaryExpression(parent)
+        && (parent.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+          || parent.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken);
+      // The one blessed argument position: getter-safe prototype invocation,
+      // e.g. Document.prototype.querySelectorAll.call(document, selector).
+      const isPrototypeCallArgument = node.text === 'document'
+        && ts.isCallExpression(parent)
+        && parent.arguments.includes(node)
+        && ts.isPropertyAccessExpression(parent.expression)
+        && parent.expression.name.text === 'call';
+      if (!isPropertyName && !isChainBase && !isEqualityOperand && !isPrototypeCallArgument) {
+        fail('javascript-authority-closure');
+      }
+    }
+    if (node.kind === ts.SyntaxKind.WithStatement) fail('javascript-authority-closure');
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+}
+
+function parsedBundles(buffers) {
+  return ['popup.js', 'service-worker.js'].map((leaf) => ({
+    name: leaf,
+    file: parseSource(leaf, buffers.get(leaf).toString('utf8')),
+  }));
+}
+
 function checkJavascriptAuthorityClosure(buffers, sources) {
   for (const { name, text } of sources) {
-    const file = parseSource(name, text);
-    const visit = (node) => {
-      if (ts.isCallExpression(node)) {
-        const callee = node.expression;
-        if (ts.isIdentifier(callee) && (callee.text === 'eval' || callee.text === 'importScripts' || callee.text === 'Function')) {
-          fail('javascript-authority-closure');
-        }
-        if (callee.kind === ts.SyntaxKind.ImportKeyword) fail('javascript-authority-closure');
-      }
-      if (ts.isIdentifier(node) && (node.text === 'eval' || node.text === 'importScripts')) {
-        fail('javascript-authority-closure');
-      }
-      if (ts.isStringLiteralLike(node) && (node.text === 'eval' || node.text === 'Function' || node.text === 'importScripts')) {
-        fail('javascript-authority-closure');
-      }
-      if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
-        fail('javascript-authority-closure');
-      }
-      if (ts.isElementAccessExpression(node)) {
-        let root = node.expression;
-        while (ts.isPropertyAccessExpression(root) || ts.isElementAccessExpression(root)) root = root.expression;
-        if (ts.isIdentifier(root) && root.text === 'chrome') fail('javascript-authority-closure');
-      }
-      if (ts.isIdentifier(node) && node.text === 'chrome') {
-        const parent = node.parent;
-        const isChainBase = (ts.isPropertyAccessExpression(parent) && parent.expression === node)
-          || ts.isQualifiedName(parent)
-          || ts.isTypeOfExpression(parent);
-        if (!isChainBase) fail('javascript-authority-closure');
-      }
-      if (node.kind === ts.SyntaxKind.WithStatement) fail('javascript-authority-closure');
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
+    runAuthorityPass(parseSource(name, text), 'authored');
+  }
+  for (const bundle of parsedBundles(buffers)) {
+    runAuthorityPass(bundle.file, 'built');
   }
   for (const leaf of ['popup.js', 'service-worker.js']) {
     const text = buffers.get(leaf).toString('utf8');
@@ -283,34 +369,44 @@ function checkJavascriptAuthorityClosure(buffers, sources) {
   }
 }
 
-function checkChromeApiAllowlist(buffers, sources) {
-  for (const { name, text } of sources) {
-    const file = parseSource(name, text);
-    const visit = (node) => {
-      if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
-        const chain = chromeChainOf(node);
-        if (chain && chain.length < 3) fail('chrome-api-allowlist');
-        if (chain && chain.length >= 3 && !CHROME_CHAIN_ALLOWLIST.has(chain.slice(0, 3).join('.'))) {
+function runChromeAllowlistPass(file) {
+  const visit = (node) => {
+    if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
+      const chain = chromeChainOf(node);
+      if (chain && chain.length < 3) fail('chrome-api-allowlist');
+      if (chain && chain.length >= 3 && !CHROME_CHAIN_ALLOWLIST.has(chain.slice(0, 3).join('.'))) {
+        fail('chrome-api-allowlist');
+      }
+    }
+    if (ts.isElementAccessExpression(node)) {
+      const root = chainRootIdentifier(node);
+      if (root === 'chrome') fail('chrome-api-allowlist');
+    }
+    if (ts.isQualifiedName(node)) {
+      const parts = [];
+      let cursor = node;
+      while (ts.isQualifiedName(cursor)) {
+        parts.unshift(cursor.right.text);
+        cursor = cursor.left;
+      }
+      if (ts.isIdentifier(cursor) && cursor.text === 'chrome') {
+        parts.unshift('chrome');
+        if (parts.length >= 3 && !CHROME_CHAIN_ALLOWLIST.has(parts.slice(0, 3).join('.'))) {
           fail('chrome-api-allowlist');
         }
       }
-      if (ts.isQualifiedName(node)) {
-        const parts = [];
-        let cursor = node;
-        while (ts.isQualifiedName(cursor)) {
-          parts.unshift(cursor.right.text);
-          cursor = cursor.left;
-        }
-        if (ts.isIdentifier(cursor) && cursor.text === 'chrome') {
-          parts.unshift('chrome');
-          if (parts.length >= 3 && !CHROME_CHAIN_ALLOWLIST.has(parts.slice(0, 3).join('.'))) {
-            fail('chrome-api-allowlist');
-          }
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+}
+
+function checkChromeApiAllowlist(buffers, sources) {
+  for (const { name, text } of sources) {
+    runChromeAllowlistPass(parseSource(name, text));
+  }
+  for (const bundle of parsedBundles(buffers)) {
+    runChromeAllowlistPass(bundle.file);
   }
   for (const leaf of ['popup.js', 'service-worker.js']) {
     const text = buffers.get(leaf).toString('utf8');

