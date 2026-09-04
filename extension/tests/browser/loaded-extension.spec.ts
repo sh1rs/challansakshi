@@ -9,8 +9,11 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   assessChromiumLane,
+  CHROMIUM_FLOOR,
   createUserDataDirectory,
   launchArgumentsFor,
+  parseChromiumMajor,
+  removeUserDataDirectory,
   SKIP_BELOW_FLOOR,
   SKIP_NO_EXECUTABLE,
   syntheticDistDirectory,
@@ -65,12 +68,21 @@ test.describe('loaded synthetic package', () => {
     const userDataDirectory = createUserDataDirectory('loaded-package');
     const context = await launchLoadedContext(userDataDirectory);
     const externalRequests: string[] = [];
-    context.on('request', (request) => {
-      const url = request.url();
-      if (!url.startsWith('chrome-extension://') && !url.startsWith('about:') && !url.startsWith('data:') && !url.startsWith('chrome://')) {
-        externalRequests.push(url);
-      }
-    });
+    const monitorExternalRequests = (monitored: BrowserContext) => {
+      monitored.on('request', (request) => {
+        const url = request.url();
+        if (!url.startsWith('chrome-extension://') && !url.startsWith('about:') && !url.startsWith('data:') && !url.startsWith('chrome://')) {
+          externalRequests.push(url);
+        }
+      });
+    };
+    monitorExternalRequests(context);
+    const loadedBrowserVersion = context.browser()?.version() ?? null;
+    if (loadedBrowserVersion !== null) {
+      const loadedMajor = parseChromiumMajor(loadedBrowserVersion);
+      expect(loadedMajor, 'loaded-context browser major').not.toBeNull();
+      expect(loadedMajor as number, 'loaded-context browser meets the floor').toBeGreaterThanOrEqual(CHROMIUM_FLOOR);
+    }
     try {
       const worker = await serviceWorkerOf(context);
       expect(context.serviceWorkers()).toHaveLength(1);
@@ -112,12 +124,14 @@ test.describe('loaded synthetic package', () => {
     }
 
     const relaunched = await launchLoadedContext(createUserDataDirectory('loaded-package', userDataDirectory));
+    monitorExternalRequests(relaunched);
     try {
       const worker = await serviceWorkerOf(relaunched);
       expect(worker.url()).toMatch(/service-worker\.js$/u);
       expect(relaunched.serviceWorkers()).toHaveLength(1);
     } finally {
       await relaunched.close();
+      removeUserDataDirectory(userDataDirectory);
     }
 
     expect(externalRequests, 'no external network from the loaded package').toEqual([]);

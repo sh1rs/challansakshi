@@ -249,6 +249,12 @@ function checkJavascriptAuthorityClosure(buffers, sources) {
         }
         if (callee.kind === ts.SyntaxKind.ImportKeyword) fail('javascript-authority-closure');
       }
+      if (ts.isIdentifier(node) && (node.text === 'eval' || node.text === 'importScripts')) {
+        fail('javascript-authority-closure');
+      }
+      if (ts.isStringLiteralLike(node) && (node.text === 'eval' || node.text === 'Function' || node.text === 'importScripts')) {
+        fail('javascript-authority-closure');
+      }
       if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
         fail('javascript-authority-closure');
       }
@@ -271,7 +277,7 @@ function checkJavascriptAuthorityClosure(buffers, sources) {
   }
   for (const leaf of ['popup.js', 'service-worker.js']) {
     const text = buffers.get(leaf).toString('utf8');
-    if (/\beval\s*\(|new\s+Function\b|\bimportScripts\b|\bimport\s*\(/u.test(text)) {
+    if (/\beval\b|new\s+Function\b|\bFunction\s*\(|\bimportScripts\b|\bimport\s*\(/u.test(text)) {
       fail('javascript-authority-closure');
     }
   }
@@ -283,6 +289,7 @@ function checkChromeApiAllowlist(buffers, sources) {
     const visit = (node) => {
       if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
         const chain = chromeChainOf(node);
+        if (chain && chain.length < 3) fail('chrome-api-allowlist');
         if (chain && chain.length >= 3 && !CHROME_CHAIN_ALLOWLIST.has(chain.slice(0, 3).join('.'))) {
           fail('chrome-api-allowlist');
         }
@@ -310,6 +317,7 @@ function checkChromeApiAllowlist(buffers, sources) {
     for (const match of text.matchAll(/chrome\.[A-Za-z]+\.[A-Za-z]+/gu)) {
       if (!CHROME_CHAIN_ALLOWLIST.has(match[0])) fail('chrome-api-allowlist');
     }
+    if (/\bchrome\.[A-Za-z_$]+(?![.A-Za-z_$])/u.test(text)) fail('chrome-api-allowlist');
   }
 }
 
@@ -415,13 +423,25 @@ function checkCallbackMessageContract(sources) {
   if (listeners !== 1) fail('callback-message-contract');
 }
 
+const NETWORK_FORBIDDEN = /\bfetch\b|XMLHttpRequest|\bWebSocket\b|EventSource|sendBeacon|\bImage\b|window\.open|self\.open|globalThis\.open|[^A-Za-z_$.]open(?!\s+[a-z])\b|document\.cookie|\blocalStorage\b|\bsessionStorage\b|indexedDB|location\.assign|location\.replace|location\.href\s*=[^=]|navigator\.|serviceWorker\.register/u;
+const SYNTHETIC_URL_PREFIX = 'http://127.0.0.1:3000';
+
+function assertUrlIdentityClosure(text, allowedPrefixes, label) {
+  for (const match of text.matchAll(/https?:\/\/[^\s"'<>\\]+/gu)) {
+    if (!allowedPrefixes.some((prefix) => match[0].startsWith(prefix))) fail(label);
+  }
+}
+
 function checkNetworkDeny(buffers, sources) {
-  const forbidden = /\bfetch\s*\(|XMLHttpRequest|\bWebSocket\b|EventSource|sendBeacon|document\.cookie|\blocalStorage\b|\bsessionStorage\b|indexedDB|location\.assign|location\.replace|location\.href\s*=[^=]|navigator\.clipboard|serviceWorker\.register/u;
-  for (const { text } of sources) {
-    if (forbidden.test(text)) fail('network-deny');
+  for (const { name, text } of sources) {
+    if (NETWORK_FORBIDDEN.test(text)) fail('network-deny');
+    void name;
+    assertUrlIdentityClosure(text, [SYNTHETIC_URL_PREFIX], 'network-deny');
   }
   for (const leaf of ['popup.js', 'service-worker.js']) {
-    if (forbidden.test(buffers.get(leaf).toString('utf8'))) fail('network-deny');
+    const text = buffers.get(leaf).toString('utf8');
+    if (NETWORK_FORBIDDEN.test(text)) fail('network-deny');
+    assertUrlIdentityClosure(text, [], 'network-deny');
   }
 }
 
@@ -447,6 +467,8 @@ function checkBidirectionalProfileIsolation(buffers) {
     .join('\n');
   if (!syntheticText.includes('127.0.0.1')) fail('bidirectional-profile-isolation');
   if (!syntheticText.includes('synthetic-fixture')) fail('bidirectional-profile-isolation');
+  // The SVG XML namespace is an identifier, not a fetchable network identity.
+  assertUrlIdentityClosure(syntheticText, [SYNTHETIC_URL_PREFIX, 'http://www.w3.org/2000/svg'], 'bidirectional-profile-isolation');
   if (syntheticText.includes('challansakshi.sh1rs.com')) fail('bidirectional-profile-isolation');
   if (syntheticText.includes('echallan.parivahan.gov.in')) fail('bidirectional-profile-isolation');
 }

@@ -9,6 +9,7 @@ import {
   DIAGNOSTIC_PROJECT,
   launchArgumentsFor,
   parseChromiumMajor,
+  removeUserDataDirectory,
   SKIP_BELOW_FLOOR,
   SKIP_NO_EXECUTABLE,
   STRICT_PROJECT,
@@ -85,15 +86,24 @@ describe('loaded-package harness contract', () => {
     ]);
   });
 
-  it('creates fresh ignored extension-only user-data directories and reuses one only on request', () => {
+  it('creates fresh ignored extension-only user-data directories, reuses one only on request, and removes them afterwards', () => {
     const first = createUserDataDirectory('contract-check');
     const second = createUserDataDirectory('contract-check');
-    expect(first).not.toBe(second);
-    expect(first).toContain(`${sep}.playwright${sep}profiles${sep}`);
-    expect(existsSync(first)).toBe(true);
-    expect(existsSync(second)).toBe(true);
-    const reused = createUserDataDirectory('contract-check', first);
-    expect(reused).toBe(first);
+    try {
+      expect(first).not.toBe(second);
+      expect(first).toContain(`${sep}.playwright${sep}profiles${sep}`);
+      expect(existsSync(first)).toBe(true);
+      expect(existsSync(second)).toBe(true);
+      const reused = createUserDataDirectory('contract-check', first);
+      expect(reused).toBe(first);
+    } finally {
+      removeUserDataDirectory(first);
+      removeUserDataDirectory(second);
+    }
+    expect(existsSync(first)).toBe(false);
+    expect(existsSync(second)).toBe(false);
+    removeUserDataDirectory('/etc');
+    expect(existsSync('/etc'), 'removal refuses paths outside the profile root').toBe(true);
   });
 
   it('keeps the spec honest about what the automated lane cannot prove', () => {
@@ -103,5 +113,7 @@ describe('loaded-package harness contract', () => {
     expect(specSource).toContain('SKIP_NO_EXECUTABLE');
     expect(specSource).not.toMatch(/test\.only|describe\.only|\.skip\(true\s*\)\s*;?\s*$/mu);
     expect(specSource).toContain('never claims action-icon invocation, temporary activeTab, or fixture mutation');
+    expect(specSource).toContain('removeUserDataDirectory(userDataDirectory)');
+    expect(specSource).toContain('monitorExternalRequests(relaunched)');
   });
 });

