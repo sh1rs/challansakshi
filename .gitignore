@@ -48,3 +48,7 @@ next-env.d.ts
 /extension/test-results/
 /extension/playwright-report/
 /extension/.playwright/
+
+# codex scratch build dirs (local only)
+/.codex-build/
+/.codex-finalizer/

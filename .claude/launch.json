@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/Users/shars/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "runtimeArgs": [
+        "node_modules/vinext/dist/cli.js",
+        "dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
