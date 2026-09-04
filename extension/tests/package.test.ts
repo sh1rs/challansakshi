@@ -366,6 +366,15 @@ describe('deterministic production-disabled candidate pipeline', () => {
       ['const g=globalThis;', 'javascript-authority-closure'],
       ['const w=window;w["op"+"en"]("x");', 'javascript-authority-closure'],
       ['const p=parent;p.open("x");', 'javascript-authority-closure'],
+      ['var el=document.querySelector("main");el.ownerDocument["default"+"View"]["op"+"en"]("htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
+      ['var {defaultView:win}=el.ownerDocument;', 'javascript-authority-closure'],
+      ['win["loca"+"tion"].assign("htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
+      ['win["loca"+"tion"]["hr"+"ef"]="htt"+"ps://attacker.example/";', 'javascript-authority-closure'],
+      ['var a=document.createElement("a");a.setAttribute("hr"+"ef","htt"+"ps://attacker.example/");a.click();', 'javascript-authority-closure'],
+      ['Reflect.get(win,"op"+"en").call(win,"htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
+      ['var {location:loc}=w;', 'javascript-authority-closure'],
+      ['var f=document.createElement("form");f.submit();', 'javascript-authority-closure'],
+      ['var k="op"+"en";leak()[k]("htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
     ];
     try {
       for (const [payload, expectedCheck] of payloads) {

@@ -246,6 +246,9 @@ const FORBIDDEN_BARE_GLOBALS_ALL = Object.freeze(new Set(['eval', 'importScripts
 const FORBIDDEN_BARE_GLOBALS_BUILT = Object.freeze(new Set(['eval', 'importScripts', 'opener', 'frames', 'top', 'parent', 'Function']));
 const FORBIDDEN_PROPERTY_NAMES = Object.freeze(new Set(['open', 'opener', 'defaultView', 'contentWindow', 'postMessage']));
 const LOCATION_MEMBER_NAMES = Object.freeze(new Set(['href', 'hash', 'search', 'pathname', 'host', 'hostname', 'protocol', 'port']));
+// Zero legitimate uses (verified in authored and built bytes): these names exist
+// only to launder window/document acquisition or synthesize navigation.
+const LAUNDER_PROPERTY_NAMES = Object.freeze(new Set(['ownerDocument', 'getRootNode', 'view', 'click', 'submit', 'requestSubmit']));
 
 function chainRootIdentifier(node) {
   let root = node;
@@ -288,11 +291,58 @@ function runAuthorityPass(file, lane) {
     if (ts.isPropertyAccessExpression(node) && FORBIDDEN_PROPERTY_NAMES.has(node.name.text)) {
       fail('network-deny');
     }
+    if (ts.isPropertyAccessExpression(node) && LAUNDER_PROPERTY_NAMES.has(node.name.text)) {
+      fail('javascript-authority-closure');
+    }
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)
+      && node.expression.text === 'Reflect' && node.name.text !== 'ownKeys') {
+      fail('javascript-authority-closure');
+    }
+    if (ts.isBindingElement(node)) {
+      const boundNames = [];
+      if (node.propertyName && (ts.isIdentifier(node.propertyName) || ts.isStringLiteralLike(node.propertyName))) {
+        boundNames.push(node.propertyName.text);
+      }
+      if (!node.propertyName && ts.isIdentifier(node.name)) boundNames.push(node.name.text);
+      for (const bound of boundNames) {
+        if (FORBIDDEN_PROPERTY_NAMES.has(bound) || LAUNDER_PROPERTY_NAMES.has(bound) || bound === 'location') {
+          fail('javascript-authority-closure');
+        }
+      }
+    }
     if (ts.isElementAccessExpression(node)) {
       const root = chainRootIdentifier(node.expression);
-      if (root !== null && GLOBAL_OBJECT_ROOTS.has(root)) fail('javascript-authority-closure');
-      if (ts.isStringLiteralLike(node.argumentExpression) && FORBIDDEN_PROPERTY_NAMES.has(node.argumentExpression.text)) {
+      if (root !== null && (GLOBAL_OBJECT_ROOTS.has(root) || root === 'Reflect')) {
+        fail('javascript-authority-closure');
+      }
+      const argument = node.argumentExpression;
+      if (ts.isStringLiteralLike(argument) && FORBIDDEN_PROPERTY_NAMES.has(argument.text)) {
         fail('network-deny');
+      }
+      if (!ts.isStringLiteralLike(argument) && !ts.isNumericLiteral(argument)) {
+        let containsString = false;
+        const scanArgument = (inner) => {
+          if (ts.isStringLiteralLike(inner) || ts.isTemplateExpression(inner)) containsString = true;
+          ts.forEachChild(inner, scanArgument);
+        };
+        scanArgument(argument);
+        if (containsString) fail('javascript-authority-closure');
+        let base = node.expression;
+        let callInterposed = false;
+        while (true) {
+          if (ts.isCallExpression(base) || ts.isNewExpression(base)) {
+            callInterposed = true;
+            base = base.expression;
+            continue;
+          }
+          if (ts.isPropertyAccessExpression(base) || ts.isElementAccessExpression(base)
+            || ts.isParenthesizedExpression(base) || ts.isNonNullExpression(base) || ts.isAsExpression(base)) {
+            base = base.expression;
+            continue;
+          }
+          break;
+        }
+        if (callInterposed) fail('javascript-authority-closure');
       }
     }
     if (ts.isPropertyAccessExpression(node) && node.name.text === 'location') {
