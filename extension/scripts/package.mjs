@@ -249,6 +249,33 @@ const LOCATION_MEMBER_NAMES = Object.freeze(new Set(['href', 'hash', 'search', '
 // Zero legitimate uses (verified in authored and built bytes): these names exist
 // only to launder window/document acquisition or synthesize navigation.
 const LAUNDER_PROPERTY_NAMES = Object.freeze(new Set(['ownerDocument', 'getRootNode', 'view', 'click', 'submit', 'requestSubmit']));
+const LOCATION_READ_MEMBERS = Object.freeze(new Set(['href', 'origin', 'protocol', 'host', 'hostname', 'port', 'pathname', 'search', 'hash']));
+
+// A scanner-recognized location alias must stay read-only for its whole scope:
+// the legitimate source probes only compare members. Any call, write, element
+// access, or escape through the alias is navigation authority.
+function enforceReadOnlyLocationAlias(declaration, checkId) {
+  if (!ts.isIdentifier(declaration.name)) fail(checkId);
+  const aliasName = declaration.name.text;
+  let scope = declaration;
+  while (scope.parent && !ts.isFunctionLike(scope) && !ts.isSourceFile(scope)) scope = scope.parent;
+  const inspect = (node) => {
+    if (ts.isIdentifier(node) && node.text === aliasName && node !== declaration.name) {
+      const parent = node.parent;
+      const isPropertyNamePosition = ts.isPropertyAccessExpression(parent) && parent.name === node;
+      if (!isPropertyNamePosition) {
+        const readAccess = ts.isPropertyAccessExpression(parent)
+          && parent.expression === node
+          && LOCATION_READ_MEMBERS.has(parent.name.text)
+          && !isAssignmentTarget(parent)
+          && !(ts.isCallExpression(parent.parent) && parent.parent.expression === parent);
+        if (!readAccess) fail(checkId);
+      }
+    }
+    ts.forEachChild(node, inspect);
+  };
+  inspect(scope);
+}
 
 function chainRootIdentifier(node) {
   let root = node;
@@ -354,6 +381,7 @@ function runAuthorityPass(file, lane) {
         && !isAssignmentTarget(parent);
       const aliasOk = ts.isVariableDeclaration(parent) && parent.initializer === node;
       if (!baseOk || (!readOk && !aliasOk) || isAssignmentTarget(node)) fail('network-deny');
+      if (aliasOk) enforceReadOnlyLocationAlias(parent, 'network-deny');
     }
     if (ts.isBinaryExpression(node)
       && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
@@ -569,7 +597,7 @@ function checkCallbackMessageContract(sources) {
   if (listeners !== 1) fail('callback-message-contract');
 }
 
-const NETWORK_FORBIDDEN = /\bfetch\b|XMLHttpRequest|\bWebSocket\b|EventSource|sendBeacon|\bImage\b|window\.open|self\.open|globalThis\.open|[^A-Za-z_$.]open(?!\s+[a-z])\b|document\.cookie|\blocalStorage\b|\bsessionStorage\b|indexedDB|location\.assign|location\.replace|location\.href\s*=[^=]|navigator\.|serviceWorker\.register/u;
+const NETWORK_FORBIDDEN = /\bfetch\b|XMLHttpRequest|\bWebSocket\b|EventSource|sendBeacon|\bImage\b|window\.open|self\.open|globalThis\.open|[^A-Za-z_$.]open(?!\s+[a-z])\b|document\.cookie|\blocalStorage\b|\bsessionStorage\b|indexedDB|location\.assign|location\.replace|location\.href\s*=[^=]|navigator\.|serviceWorker\.register|["'`]\/\//u;
 const SYNTHETIC_URL_PREFIX = 'http://127.0.0.1:3000';
 
 function assertUrlIdentityClosure(text, allowedPrefixes, label) {

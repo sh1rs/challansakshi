@@ -375,6 +375,12 @@ describe('deterministic production-disabled candidate pipeline', () => {
       ['var {location:loc}=w;', 'javascript-authority-closure'],
       ['var f=document.createElement("form");f.submit();', 'javascript-authority-closure'],
       ['var k="op"+"en";leak()[k]("htt"+"ps://attacker.example/");', 'javascript-authority-closure'],
+      ['const loc=window.location;loc.assign("x");', 'network-deny'],
+      ['const loc=window.location;loc.replace("x");', 'network-deny'],
+      ['const loc=self.location;loc.reload();', 'network-deny'],
+      ['var kk=k();const loc=window.location;loc[kk]="x";', 'network-deny'],
+      ['const loc=window.location;leak(loc);', 'network-deny'],
+      ['"//attacker.example/x";', 'network-deny'],
     ];
     try {
       for (const [payload, expectedCheck] of payloads) {
