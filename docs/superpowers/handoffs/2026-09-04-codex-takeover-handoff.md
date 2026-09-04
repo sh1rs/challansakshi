@@ -131,12 +131,13 @@ sh scripts/codex-deploy.sh             # real deploy
 
 The script handles the compatibility-date swap and restores `wrangler.jsonc` afterwards through a trap. It deploys the web Worker only; the extension never deploys through it.
 
-**Before a deploy, check these four things.** None of them blocks a technically successful deploy, but each one ships a visible flaw.
+A dry run on 2026-09-04 passed and confirmed the Worker bindings: `NEXT_PUBLIC_SITE_URL` is `https://challansakshi.sh1rs.com`, both analysis switches are `false`, and the custom domain route is bound. The localhost default in `.env.example` applies only to local dev, not to the deploy.
 
-1. `NEXT_PUBLIC_SITE_URL` defaults to `http://localhost:3000`. Until it is set to the deployed origin, every Open Graph and Twitter card link advertises localhost.
-2. `public/og.png` is 1.17 MB and `public/evidence-contact-sheet.png` is 1.5 MB. That is the single largest performance problem in the product and it lands on a first visit over Indian mobile data.
-3. The route registry expires **2026-10-02**. Re-verify the nine records with dated evidence in `docs/superpowers/verification/` before then, or the app correctly degrades to the directory fallback.
-4. `app/layout.tsx` hard-codes `<html lang="en">` even when the citizen chooses Hindi. Content inside the shell is tagged correctly, but the document is not.
+**Before a deploy, check these three things.** None blocks a technically successful deploy, but each ships a visible flaw.
+
+1. `public/og.png` is 1.17 MB and `public/evidence-contact-sheet.png` is 1.5 MB. That is the single largest performance problem in the product and it lands on a first visit over Indian mobile data.
+2. The route registry expires **2026-10-02**. Re-verify the nine records with dated evidence in `docs/superpowers/verification/` before then, or the app correctly degrades to the directory fallback.
+3. `app/layout.tsx` hard-codes `<html lang="en">` even when the citizen chooses Hindi. Content inside the shell is tagged correctly, but the document is not.
 
 "Production ready" here means the non-public prototype is deployable and honest about itself. It does not mean public-release eligible; the README lists the operating, privacy, security, accessibility, and external-review checks that still gate that, and none of them have been closed.
 

@@ -230,7 +230,7 @@ These are the numbers that decide whether a citizen on a 4G phone in a queue act
 ### T4.4 Fix the language attribute and per-page metadata
 
 - `app/layout.tsx:27` hard-codes `<html lang="en">` even when the citizen chooses Hindi. Only an inner `<div>` gets `lang="hi"`. Screen readers pick the wrong voice and search engines the wrong language. Move the language choice up, or set `lang` on the inner wrapper for *all* content including chrome (it currently is on the shell — verify the footer and header are inside it).
-- Give every route its own `title`, `description`, and canonical URL. Add `alternates.languages` for `en`/`hi`. Absolute Open Graph URLs need `NEXT_PUBLIC_SITE_URL` set to the deployed origin (`challansakshi.sh1rs.com`); it currently defaults to `http://localhost:3000`, so every shared link today advertises localhost.
+- Give every route its own `title`, `description`, and canonical URL. Add `alternates.languages` for `en`/`hi`. Open Graph URLs are already absolute in production: `wrangler.jsonc` binds `NEXT_PUBLIC_SITE_URL` to `https://challansakshi.sh1rs.com`. The `http://localhost:3000` default in `.env.example` applies to local dev only.
 - Add `public/robots.txt` and a generated `sitemap.xml` covering `/`, `/services`, the nine service routes, `/privacy`, `/safety`, `/extension`.
 - Add JSON-LD `WebApplication` + `FAQPage` on `/services` — safe, no personal data, and it is how a citizen searching "challan photo wrong vehicle" finds this.
 
