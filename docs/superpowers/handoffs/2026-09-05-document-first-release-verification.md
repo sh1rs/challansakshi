@@ -8,17 +8,24 @@ White/navy/teal/amber tokens, serif headings, sans-serif actions, visible langua
 
 ## Verified gates
 
-- Root Vitest: 49 files, 860 tests passed.
+- Final root Vitest after response-policy and correction-state fixes: 50 files, 878 tests passed.
 - TypeScript: `tsc --noEmit` passed.
 - Scoped web lint: `eslint app components lib tests scripts next.config.ts worker.ts --ignore-pattern dist --ignore-pattern .next` passed without warnings.
 - Full Chromium suite: 34 tests passed. Includes real PDF parsing and actual image OCR using fabricated documents, comparison/correction, duplicate-source abstention, malformed-file recovery, private downloads, shared-device printing, navigation cleanup, no document upload/storage, manual fallback, keyboard/scroll, mobile English/Hindi geometry, shared route styling and dark mode.
 - Official-route clock: additional runs just before expiry (`2026-10-02T23:59:59Z`) and at expiry (`2026-10-03T00:00:00Z`) each passed.
 - Independent bounded review: no outstanding actionable findings. The reviewer also reran 32 evidence/interaction tests and checked the release-probe script syntax.
+- The final visual pass found an obsolete correction demand after a valid OCR correction. That resolved field-specific demand is now removed while partial-document, duplicate-source and other unresolved-field limitations remain; three added regressions pass.
 - `git diff --check` passed before release staging.
 - Staged authored-source whitespace check passed with `git diff --cached --check -- ':!public/document-assets'`. Unmodified upstream licence notices contain two trailing-space lines and one final blank line; these vendor-only warnings are retained rather than editing the original notices.
 - Vinext production web build passed (all five build stages).
 
-Live deployment results will be appended after that operation completes. Passing local tests and build is not proof of deployment.
+## Production findings and deployment
+
+The initial product commit `8665ed7` deployed successfully as Cloudflare version `f0ca379d-ed5c-4a46-ab6a-5887019b245e` (100% traffic confirmed). Actual production OCR, PDF extraction, correction, neutral-note preparation and independent registration comparison succeeded with fabricated documents. All eight requested public routes returned 200.
+
+The stricter network probe then rejected automatic Cloudflare analytics script injection. All nine unexpected script attempts were GETs without bodies and had Playwright failure `csp`: the existing Content Security Policy blocked them. No document data transmission was observed. The probe was not weakened to allow these requests.
+
+A follow-up response policy appends `no-transform` to HTML cache headers without replacing existing `no-store`/security directives. Fifteen new Worker-boundary tests cover streaming, immutable headers, cache/security preservation, duplicate handling and unchanged API/non-HTML behavior. Cloudflare documents this directive as preventing automatic beacon injection: [Web Analytics setup](https://developers.cloudflare.com/web-analytics/get-started/). Final deployment and live probe results will be recorded below after verification.
 
 ## Privacy and capability limits
 
@@ -26,7 +33,7 @@ Live deployment results will be appended after that operation completes. Passing
 - Limits: 12 MiB per file, three pages per document, bounded decoded pixels/text and a 90-second reading timeout. First use downloads reader/language assets. The generated vendor directory totals about 49 MiB across alternatives; that is not the initial home-page payload. No slow-phone or population-wide OCR accuracy claim is made.
 - OCR reads labelled text, not the vehicle in an enforcement photograph or whether an offence occurred. It does not authenticate a record or decide legal validity. Low-confidence and invalid registration candidates stay uncertain; citizens can supply explicitly recorded corrections.
 - The document note is not yet integrated into the deeper manual grievance-pack/receipt controller. Government login, OTP, CAPTCHA, payment and submission remain user-controlled on official services.
-- User authorized opt-in cloud vision, but it is **not implemented/enabled for real-document use on this release**. Read-only secret inventory returned `[]`; there is no production model key or enforceable spend/abuse setup. Follow-up requires secure key configuration, an explicit spending limit, strict observations-only handling, selected-file consent, accurate recipient/retention wording and server-side failure/security tests. Do not simply flip the synthetic analysis flags.
+- User authorized opt-in cloud vision with a **maximum INR 500 per month** budget, but it is **not implemented/enabled for real-document use on this release**. Read-only secret inventory returned `[]`; there is no production model key or enforceable spend/abuse setup. Follow-up requires secure key configuration, conservative INR-aware spending enforcement, strict observations-only handling, selected-file consent, accurate recipient/retention wording and server-side failure/security tests. Do not simply flip the synthetic analysis flags or assume a provider dashboard warning is a hard cap.
 - Shared/unknown-device downloads and printing remain off. Private-device exports contain extracted identifiers; Quick Exit cannot erase a downloaded file or a separately opened PDF tab.
 
 ## Reproducible release check
@@ -37,7 +44,7 @@ With the project's bundled Node runtime on PATH:
 DOCUMENT_RELEASE_BASE=https://challansakshi.sh1rs.com node scripts/verify-document-release.mjs
 ```
 
-This checks eight public routes and performs actual OCR, an explicit correction and note preparation using a fabricated image. It checks same-origin GET-only asset requests, empty document storage and page errors for that journey, without opening or acting in any government service. Screenshots go to `/tmp/challansakshi-release-{start,reading,prepared}.png`.
+This checks eight public routes and performs actual OCR, an explicit correction and note preparation using a fabricated image, then independent notice/RC PDF extraction and mismatch comparison. It checks same-origin GET-only asset requests, absent fixture identifiers in URLs, empty document storage and page errors, without opening or acting in any government service. Screenshots go to `/tmp/challansakshi-release-{start,reading,prepared,pdf-comparison}.png`.
 
 ## Workspace boundaries
 

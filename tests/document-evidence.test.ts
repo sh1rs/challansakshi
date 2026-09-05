@@ -200,6 +200,52 @@ describe('document corrections and notes', () => {
     expect(correctDocumentField(evidence, evidence.fields[0].id, 'KA01AB3817').comparison).toBe('different');
   });
 
+  it('removes the resolved correction demand from the note after an explicit valid correction', () => {
+    const readings = pair('KAO1AB1234', 'KA01AB1234').map((item, index) => ({ ...item, fingerprint: String(index + 1).repeat(64) }));
+    readings[0].pages[0] = { ...readings[0].pages[0], method: 'local-ocr', confidence: 91 };
+    const evidence = extractDocumentEvidence(readings);
+    const original = evidence.fields.find(field => field.role === 'notice')!;
+    const corrected = correctDocumentField(evidence, original.id, 'KA01AB1234');
+    expect(corrected.comparison).toBe('match');
+    expect(corrected.limitations).not.toContain('Challan: conflicting registration readings require a correction against the source.');
+    expect(buildDocumentEvidenceNote(corrected, 'en')).not.toContain('require a correction against the source');
+    expect(corrected.fields.find(field => field.id === original.id)).toMatchObject({
+      sourceId: original.sourceId, sourceFingerprint: '1'.repeat(64), page: 1,
+      method: 'citizen-correction', value: 'KA01AB1234', confidence: 'readable',
+    });
+    expect(original.method).toBe('local-ocr');
+    expect(evidence.limitations).toContain('Challan: conflicting registration readings require a correction against the source.');
+  });
+
+  it('retains a shared role-and-key demand while another source field still needs correction', () => {
+    const evidence = extractDocumentEvidence([
+      ...pair('KAO1AB1234', 'KA01AB1234'),
+      reading('notice-2', 'notice', 'Registration No: MHO2AB5678'),
+    ]);
+    const first = evidence.fields.find(field => field.sourceId === 'notice-1')!;
+    const second = evidence.fields.find(field => field.sourceId === 'notice-2')!;
+    const corrected = correctDocumentField(evidence, first.id, 'KA01AB1234');
+    expect(corrected.limitations).toContain('Challan: conflicting registration readings require a correction against the source.');
+    expect(corrected.fields.find(field => field.id === second.id)?.confidence).toBe('needs-review');
+    const bothCorrected = correctDocumentField(corrected, second.id, 'MH02AB5678');
+    expect(bothCorrected.limitations).not.toContain('Challan: conflicting registration readings require a correction against the source.');
+    expect(bothCorrected.comparison).toBe('inconclusive');
+  });
+
+  it('keeps partial, duplicate-document, other-field and other-source uncertainties after correction', () => {
+    const readings = pair('KAO1AB1234', 'KAO1AB5678').map(item => ({ ...item, fingerprint: 'a'.repeat(64) }));
+    readings[0].limited = true;
+    readings[0].pages[0].text += '\nAmount: 500\nAmount: 1000';
+    const evidence = extractDocumentEvidence(readings);
+    const corrected = correctDocumentField(evidence, evidence.fields.find(field => field.sourceId === 'notice-1' && field.key === 'registration')!.id, 'KA01AB1234');
+    expect(corrected.limitations).not.toContain('Challan: conflicting registration readings require a correction against the source.');
+    expect(corrected.limitations).toContain('Challan: only part of the document was read; review the source.');
+    expect(corrected.limitations).toContain('The same document was selected for different sources. Add an independent vehicle record.');
+    expect(corrected.limitations).toContain('Challan: conflicting amount readings require a correction against the source.');
+    expect(corrected.limitations).toContain('Vehicle record: conflicting registration readings require a correction against the source.');
+    expect(corrected.comparison).toBe('inconclusive');
+  });
+
   it('builds a neutral source-linked English note distinguishing a registration match from an offence finding', () => {
     const note = buildDocumentEvidenceNote(extractDocumentEvidence(pair('KA01AB3817', 'KA01AB3817')), 'en');
     expect(note).toContain('KA01AB3817');

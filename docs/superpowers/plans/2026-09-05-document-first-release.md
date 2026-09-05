@@ -21,6 +21,8 @@ The reference governs typography, palette, dividers, icons and action treatment,
 
 ## Cloud dependency discovered
 
+The user subsequently approved a maximum cloud API spend of **INR 500 per month**. Treat this as a ceiling, not a target or authorization for unlimited provider usage. Before enablement, enforce a conservative provider-currency budget with room for exchange-rate/tax variation so the configured ceiling cannot silently exceed INR 500. No paid requests have been enabled by this approval alone.
+
 Read-only `wrangler secret list` returned `[]` on 5 September. Production has no API key. Cloud analysis is authorized in principle but cannot be enabled in this release until a server-side key, explicit spend budget and enforceable abuse controls are configured. Keep cloud unavailable and explain that truthfully; do not silently send files or claim a working cloud model. Local release is not blocked by this operational dependency. A future enablement must include per-selection consent, recipient/retention wording, limited payloads, strict observations-only schema, no stored responses, global budget and request rate controls, and server-side failure tests.
 
 ## Verification and operating constraints

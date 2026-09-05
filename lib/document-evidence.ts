@@ -195,7 +195,14 @@ export function correctDocumentField(evidence: DocumentEvidence, id: string, val
     ...item, value: normalized, method: 'citizen-correction' as const,
     confidence: 'readable' as const, excerpt: fieldExcerpt(item.key, normalized),
   } : item);
-  return { ...evidence, fields, comparison: compare(fields) };
+  // Human-readable demands are deduplicated by role/key, so another source of
+  // that role must be checked before removing the now-resolved field demand.
+  const sameRoleFieldStillUncertain = fields.some(item => item.role === field.role
+    && item.key === field.key && item.confidence === 'needs-review');
+  const resolvedDemand = `${sourceRoleLabel(field.role, 'en')}: conflicting ${field.key} readings require a correction against the source.`;
+  const limitations = sameRoleFieldStillUncertain ? evidence.limitations
+    : evidence.limitations.filter(limitation => limitation !== resolvedDemand);
+  return { ...evidence, fields, limitations, comparison: compare(fields) };
 }
 
 /** A local preparation note, not a grievance, authentication result or legal decision. */
