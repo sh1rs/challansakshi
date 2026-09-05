@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { ChevronRight, FileSearch, MessageSquareWarning, ReceiptText } from 'lucide-react';
 import { HOME_ACTIONS } from '../../lib/citizen-home';
 import { CitizenFooter, CitizenHeader } from '../shared/CitizenChrome';
 import styles from './CitizenHome.module.css';
@@ -26,7 +27,7 @@ const copy = {
   },
 } as const;
 
-function Arrow() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>; }
+const actionIcons = [FileSearch, MessageSquareWarning, ReceiptText];
 
 export default function CitizenHome({ initialLanguage = 'en' }: { initialLanguage?: Language }) {
   const [language, setLanguage] = useState<Language>(initialLanguage);
@@ -39,11 +40,14 @@ export default function CitizenHome({ initialLanguage = 'en' }: { initialLanguag
         <h1 id="citizen-home-heading">{text.heading}</h1>
         <p className={styles.supporting}>{text.supporting}</p>
         <div className={styles.actionList}>
-          {HOME_ACTIONS.map((action, index) => <a className={styles.actionRow} href={action.href} key={action.href}>
-            <span className={styles.number} aria-hidden="true">0{index + 1}</span>
+          {HOME_ACTIONS.map((action, index) => {
+            const ActionIcon = actionIcons[index];
+            return <a className={styles.actionRow} href={action.href} key={action.href}>
+            <span className={styles.icon} data-tone={index === 1 ? 'amber' : 'teal'} aria-hidden="true"><ActionIcon size={25} strokeWidth={1.6} /></span>
             <span className={styles.actionCopy}><h2>{text.actions[index][0]}</h2><p>{text.actions[index][1]}</p></span>
-            <span className={styles.arrow}><Arrow /></span>
-          </a>)}
+            <span className={styles.arrow} aria-hidden="true"><ChevronRight size={24} strokeWidth={1.8} /></span>
+          </a>;
+          })}
         </div>
       </section>
     </main>

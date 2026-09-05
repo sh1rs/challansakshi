@@ -5,14 +5,15 @@
 ChallanSakshi is an independent, evidence-first citizen project built around one discipline: **inspect the official record, separate observation from conclusion, refuse unsupported claims, and hand the citizen a conservative next-step checklist.** The flagship synthetic journey asks whether a challan’s own evidence, timestamp, vehicle-relationship record, and case state agree. The public routes keep the real citizen tools separate from that synthetic walkthrough:
 
 - `/` — the clean citizen homepage and bounded goal chooser;
-- `/review` — a tab-memory-only e-Challan review with deliberate local record preview, citizen-confirmed structured facts, conservative findings, and exact official handoff;
+- `/review` — document-first e-Challan reading in tab memory: local PDF text/OCR, labelled fields, notice-versus-independent-vehicle-record registration comparison, corrections, and a neutral review note;
+- `/manual/challan` — the two-phase adaptive **Check → Resolve** fallback, including its separately gated deeper preparation and official handoff;
 - `/fastag` — TollSakshi, a structured FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport;
 - `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures;
 - `/demo/test-lab` — a ten-case synthetic evidence laboratory that recomputes every result from editable record and observation fields.
 
 Synthetic state remains sealed inside the demo routes. The flagship walkthrough carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. The Test Lab proves that the comparison engine is not a blue-scooter/white-motorcycle script: ten different vectors and citizen edits pass through the same normalization, comparison, confirmation, and routing functions.
 
-> Independent non-public prototype. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` can preview citizen-selected files browser-locally, but it does not upload them to a ChallanSakshi server or AI model. Opening a selected PDF creates a separate browser-local tab that the citizen must close.
+> Independent non-public prototype. Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate, give legal advice, or guarantee an outcome. `/review` reads selected documents on this device and does not upload them to a server or AI provider. Opening a selected PDF creates a separate browser-local tab that the citizen must close. Real-document cloud analysis is not available in this build.
 
 ## Release posture
 
@@ -26,7 +27,7 @@ Do not describe this repository or product as a launched beta, generally availab
 
 A citizen disputing an e-Challan lacks one evidence-backed way to understand the supplied record, preserve what was submitted, and determine whether the supplied response addresses those same evidence points. The flagship case begins with a blurry plate, a visibly different vehicle, or a photograph that does not support reliable assessment of the allegation; the same evidence trail remains useful after submission and a reasoned response.
 
-The official e-Challan and Virtual Courts services already support status, payment, grievance, verification, and court workflows. ChallanSakshi does not replace or imitate those functions. It adds the missing evidence-understanding and next-route layer before a citizen acts:
+The official e-Challan and Virtual Courts services already support status, payment, grievance, verification, and court workflows. ChallanSakshi does not replace or imitate those functions. The following full-lifecycle sequence is demonstrated with fictional material in `/demo`; the real document-first release currently covers the narrower reading-to-neutral-note workflow described below:
 
 1. Read the challan and supplied records.
 2. Compare image observations with a citizen-verified vehicle record.
@@ -44,8 +45,8 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 ## What is working
 
-- **Refined citizen flow (4 September 2026).** `/review` is three steps (get the official record → check the evidence → decide and resolve) instead of four: reviewer and device default to "my own case" on a private device with two opt-in switches (present helper, shared device), the two generic acknowledgement checkboxes are gone, manual fact entry is implicit when no challan copy is added, the issuing state is optional (default "I am not sure"), photo inspection is derived from the citizen's own entries instead of a separate question, and the official-handoff confirmation is one checkbox (self) or two (present helper) that set the same controller keys as before. Every real page carries exactly one product boundary statement, in the footer; step changes land on the compact guide header instantly without smooth-scroll animation.
-- A hard-separated **real e-Challan manual review** that accepts deliberate local selection of one official record and one supplied image, requires citizen-confirmed structured observations, refuses a message-only comparison, treats colour alone as non-action-ready, uses only a deadline copied from an official service, generates a local citizen evidence summary, and ends in a registry-resolved official-service handoff only when the current facts permit it.
+- **Document-first citizen flow (5 September 2026).** `/review` reads a selected challan PDF/image on this device, optionally compares its labelled registration with a separate vehicle record, supports targeted corrections, and prepares a neutral note after the citizen confirms the records, permission and readings. Device choice starts unknown; saving requires an explicit private-device choice. The same navy, white, teal and amber visual language is used across the citizen routes.
+- A hard-separated **real e-Challan manual fallback** at `/manual/challan` uses the adaptive two-phase **Check → Resolve** flow with no inferred role, source, confirmation or private device. It accepts optional local previews, requires citizen-confirmed structured observations, refuses a message-only comparison, treats colour alone as non-action-ready, uses only a deadline copied from an official service, generates a local citizen evidence summary, and ends in a registry-resolved official-service handoff only when the current facts permit it. The `/review?goal=message` safe stop continues to use this manual engine.
 - **TollSakshi**, a recorded-FASTag-transaction self-review for unrecognised crossings, citizen-reported two-debit patterns, alternate payment, fare/class, pass/discount, and aligned-record checks. It distinguishes reader-read, debit-post, and SMS times; separates bank-issued from bank-neutral NHAI FASTag routes; applies no definitive duplicate-time threshold; and withholds an action note unless the final same-transaction attestation still matches every compared field. Tag-not-working and plaza/road incidents without a recorded debit are deliberately routed to the separate Safety page rather than forced through this transaction workflow.
 - A 14-element **Toll Evidence Passport** and **Transaction-to-Journey Map** covering vehicle identity, event time, plaza/direction, crossings, amount/class, alternate payment/pass, and credit adjustment.
 - Real-mode state is held only in React memory. It never enters localStorage, sessionStorage, cookies, URLs, forms, `/api/analyze`, analytics, or a case database. Shared-device mode disables the app’s copy/download controls, provides Quick exit & clear, and attempts to leave after about 10 minutes without pointer, keyboard, input, or touch activity; the UI does not claim a background browser timer is infallible.
@@ -84,10 +85,26 @@ The official e-Challan and Virtual Courts services already support status, payme
 - A separate **ten-case Evidence Test Lab** covering consistent evidence, an explicit challan-versus-vehicle-record conflict, image registration/category/time/location conflicts, unreadable and partial plates, formatting normalization, and an allegation that cannot be assessed from the supplied photograph. Every displayed outcome is recalculated at runtime from the selected vector.
 - A reusable, versioned synthetic extraction contract with field-level source, visibility, evidence reference, limitation, and confidence; deterministic comparison states; a mandatory citizen-confirmation gate; immediate result invalidation after any edit; and a filename-free Citizen Action Pack.
 - A local custom-evidence workbench for synthetic testing: a citizen can preview a JPEG or PNG in the current tab and manually record what is visible, but the public app never sends those bytes to a server or model. This intentionally demonstrates the safe human-verification workflow without opening an unauthenticated vision endpoint.
-- No real-document server-upload or raw-paste surface. `/review` permits only deliberate local preview and says “your observation”; it performs no OCR and never masquerades as model extraction. The flagship demo remains visibly synthetic.
+- No real-document server-upload or raw-document-paste surface. `/review` runs local PDF text extraction or English/Hindi OCR and identifies the reading method; `/manual/challan` remains citizen-observed. The flagship demo remains visibly synthetic.
 - Accessible labels, visible focus states, reduced-motion support, 360 px layout support, and large touch targets.
 
-## End-to-end official handoff boundary
+## Document-first reading workflow
+
+1. Choose a challan PDF, PNG, JPEG or WebP. Reading starts on this device; no case details need to be retyped before extraction.
+2. Optionally choose an independent vehicle record, such as an RC. The reader extracts labelled registration, challan number, event date, amount, offence and location; the vehicle record contributes only its labelled registration.
+3. Review source-linked fields by document and page. Correct only a wrong reading. Unreadable, conflicting, incomplete or unsupported fields do not become a decisive comparison, and identical document bytes cannot count as two independent sources.
+4. Confirm that these are the right records, that you have permission to use them and that you checked the readings. This prepares a neutral review note and a current national official-services directory link. It does not submit or populate an official form.
+5. Read the note in the tab, or explicitly choose a private device to save it. The note contains the extracted registration and challan identifiers. Shared/unknown-device printing is suppressed; downloaded copies and separately opened PDF tabs remain outside Quick Exit’s control.
+
+The comparison is **notice registration versus independent vehicle-record registration only**. Generic OCR text is not an enforcement-photo plate crop, and a registration match does not establish photograph consistency, offence visibility, authenticity or legal validity. No legal deadline is inferred. This first document-reader release does **not** feed extracted fields into the manual flow’s compatible grievance pack, receipt/return controller, or synthetic lifecycle. A citizen choosing manual review starts that separate flow without silently transferring document facts.
+
+`lib/local-document-reader.ts` lazy-loads same-origin PDF.js/Tesseract code and English/Hindi language assets after file selection. Document bytes and extracted fields stay in memory; OCR content caching is disabled. Reading is bounded by file size, raster dimensions, page count and time, with manual review available if the device cannot complete it. Up to three pages are read; partial work stays labelled limited.
+
+Cloud analysis may be a later, separately consented option, but it is **unavailable in this build**: no configured real-document provider key or production abuse/spend controls exist. The synthetic adapter below is not a real-document fallback, and its public flags remain false.
+
+## Manual-flow end-to-end official handoff boundary
+
+This section describes `/manual/challan`, not the new document reader’s neutral note.
 
 The complete installation-free path is the in-tab field pack plus the normal official-service anchor. It works without detecting, installing, or using an extension. Private devices receive explicit copy actions; shared devices keep reviewed values visible for manual transcription and expose no app copy, download, lookup bridge, or acknowledgement-reference retention.
 
@@ -137,7 +154,8 @@ tests/evidence-passport.test.ts             timeline, Passport, combined-gate, p
 public/evidence-contact-sheet.png           synthetic evidence photography
 public/og.png                               social preview
 
-app/review/page.tsx                        real e-Challan manual self-review
+app/review/page.tsx                        document-first review; SMS safe-stop exception
+app/manual/challan/page.tsx                adaptive manual Check → Resolve fallback
 app/fastag/page.tsx                        TollSakshi FASTag transaction review
 app/privacy/page.tsx                       implementation-matched data controls
 app/safety/page.tsx                        verified official-route registry
@@ -145,9 +163,12 @@ app/extension/page.tsx                     closed optional-desktop-helper inform
 app/demo/extension-fixture/source/         fictional source capsule fixture
 app/demo/extension-fixture/destination/    fictional blank-form and instrumentation fixture
 components/public-beta/                    isolated real-mode shell and workflows
+components/public-beta/CitizenDocumentReview.tsx local document reading, correction and neutral note
 components/public-beta/LocalRecordIntake.tsx deliberate local PDF/image intake
 components/public-beta/OfficialHandoffPanel.tsx field pack, official anchor, return, and closed helper UI
 lib/local-record-intake.ts                 MIME and 12 MiB local-file validation
+lib/local-document-reader.ts               memory-only bounded PDF text/OCR runtime
+lib/document-evidence.ts                   labelled extraction, provenance, corrections and conservative comparison
 lib/evidence-intelligence.ts               citizen evidence view, timeline, and summary
 lib/public-challan.ts                      conservative citizen-observation rules and artifact
 lib/official-destinations.ts               compile-time official route registry and resolver
@@ -164,7 +185,8 @@ tests/official-handoff.test.ts              pack eligibility, source, descriptio
 tests/official-handoff-receipt.test.ts      citizen-return states, binding, invalidation, redaction
 tests/citizen-review-handoff-controller.test.ts orchestration and effect-intent invalidation
 tests/toll-domain.test.ts                  toll reconciliation and refusal rules
-tests/public-mode-privacy.test.ts          static network/storage/upload/form isolation gate
+tests/public-mode-privacy.test.ts          case-data isolation and bounded local-reader capability gate
+tests/document-evidence.test.ts            parser, independent-source, correction and note contracts
 tests/synthetic-evidence-pipeline.test.ts  reusable comparator and ten-case evaluation corpus
 tests/synthetic-lab-state.test.ts          confirmation, invalidation, and recomputation rules
 tests/synthetic-lab-file.test.ts           local-preview file boundary
@@ -178,7 +200,7 @@ The application uses React 19, TypeScript, Vinext/Vite, Tailwind CSS runtime, an
 
 > **AI reads and explains evidence. Deterministic rules control dates, completeness, and case states.**
 
-AI is limited to source-linked observations such as visible plate characters, category, colour, image clarity, and whether a visual fact is assessable. It is explicitly instructed not to decide guilt, innocence, legality, deadlines, strategy, or outcome.
+In the separately configured synthetic vision adapter, AI is limited to source-linked observations such as visible plate characters, category, colour, image clarity, and whether a visual fact is assessable. It is explicitly instructed not to decide guilt, innocence, legality, deadlines, strategy, or outcome. The real document reader uses local OCR/PDF text, not this adapter; its deterministic comparator checks only notice-versus-vehicle-record registration.
 
 Normal TypeScript code handles:
 
@@ -230,21 +252,21 @@ This is **not a zero-retention claim**. OpenAI states that API data is not used 
 
 ## Real-mode and synthetic-data privacy policy
 
-- Real-mode answers exist only in the current page’s in-memory React state. Reload, close, or Quick exit clears them from the app.
-- `/review` accepts PDF, JPEG, PNG, and WebP files up to 12 MiB each: at most one official record and one supplied image at a time. Validation uses the browser-provided MIME type rather than trusting the filename extension.
-- A valid selection receives a temporary object URL for browser-local preview and is not sent through `fetch`, XHR, beacon, a server form, `/api/analyze`, or an AI model. This release performs no OCR. An image preview stays inside the review page; opening a selected PDF creates a separate browser-local tab that Quick Exit cannot close, so the citizen must close that PDF tab. Replacing, removing, resetting, Quick Exit, and unmounting release the app's relevant object URL.
-- File selection does not authenticate origin. Source and confidence labels remain citizen-provided observations, never government verification.
-- Real-mode components contain no client case storage, cookies, case identifiers in URLs, raw evidence text area, analytics, or real-case `/api/analyze` path. The only free-text control is the single controlled description textarea inside an eligible reviewed handoff; it is revision-bound, safety-checked, length-bounded, and never submitted by ChallanSakshi. Automated privacy tests lock this boundary while permitting the dedicated local file input.
+- Real-mode answers, selected document bytes and extracted fields exist only in current page memory. Reload, close, or Quick exit clears the in-app copy; it cannot erase files or copies outside the tab.
+- `/review` accepts PDF, JPEG, PNG, and WebP files up to 12 MiB each: one challan copy and one optional vehicle record. The reader checks supported file signatures, pixel limits, at most three pages and a 90-second reading budget. `/manual/challan` retains separate optional record/photo previews.
+- A selection receives a temporary object URL for local preview. The document reader extracts PDF text or runs OCR locally; only same-origin reader code/language assets are downloaded. No selected bytes or extracted fields are sent through a server form, `/api/analyze`, or an AI provider. An image preview stays inside the review page; opening a selected PDF creates a separate browser-local tab that Quick Exit cannot close. Replacing, removing, resetting, Quick Exit and leaving the reader release its relevant object URLs and reading work.
+- File selection and successful extraction do not authenticate origin. Document fields show source, page, method and reading quality, not government verification. OCR quality scores are not accuracy probabilities.
+- Real-mode components contain no client case storage, cookies, case identifiers in URLs, raw-document text area, analytics, or real-case `/api/analyze` path. The document reader accepts bounded field-specific corrections; the manual compatible handoff retains its single controlled description textarea, revision-bound and safety-checked. Neither is submitted by ChallanSakshi. Automated privacy tests permit bounded local reading capabilities while preventing case-data transmission or persistence.
 - Real-mode inputs never request CAPTCHA, OTP, Aadhaar/VID, a government/bank/FASTag password, or card/payment credentials. Any official login, identity check, CAPTCHA, OTP, or payment belongs only on the independently opened official service.
 - The app’s copy/download/formatted-print controls are disabled in shared-device mode, which attempts to leave the review after about 10 minutes of inactivity. Browser-native print is reduced to a non-sensitive warning, but screenshots, manual selection, browser history, browser extensions, and device backups remain outside the app's control. Browser timer throttling can delay the exit attempt, so Quick Exit remains the required clear action when finished. On a private device, the citizen is warned that clipboard, Downloads, screenshots, print-to-PDF files, browser history, and backups sit outside the app’s clear action.
 - Hosting infrastructure necessarily handles technical request data such as IP address, path, browser/device information, timestamps, and security logs to deliver and protect the site. Exact host log retention is not controlled or promised by this project.
 - In the bundled synthetic demo and ten bundled Test Lab cases, every name, registration, challan, authority, grievance, date context, image, and outcome is fictional. A custom Test Lab selection is user-supplied; the product instructs the user to choose synthetic material but cannot verify its provenance.
-- Evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**.
+- Bundled demo evidence previews are visibly watermarked **SYNTHETIC DEMO DATA**; user-selected real documents are not relabelled synthetic.
 - The generic vehicle data card is intentionally not a replica of an official RC.
 - The synthetic prototype warns against entering real identity or vehicle records.
-- No public route accepts a real server upload. Source records for `/demo` remain preloaded fictional fixtures; `/review` previews deliberate local selections in tab memory; and the public `/demo/test-lab` custom-image workbench is browser-local and manual. A feature-flagged, policy-limited model adapter exists in code, but both enabling flags are false in public production and it must never be used with real citizen material.
+- No public route accepts a real server upload. Source records for `/demo` remain preloaded fictional fixtures; `/review` reads selected documents locally; and the public `/demo/test-lab` custom-image workbench is browser-local and manual. A feature-flagged, policy-limited synthetic model adapter exists in code, but both enabling flags are false in public production and it must never be used with real citizen material.
 - No demo submission reaches a government system.
-- No full registration, driving-licence, transaction, or acknowledgement reference is requested. The private-device challan-number copy aid was removed in the 4 September 2026 refinement; the citizen now types the identifier directly on the official service. An optional last-four acknowledgement fragment is still recorded on a private device only, and only after the citizen reports seeing an official acknowledgement; it never enters comparison, URLs, exports, the field pack, the extension envelope, or the receipt, and is cleared after successful copy, official-link activation, reset, Quick Exit, inactivity, or unmount. The citizen-recorded acknowledgement field accepts only a final-four fragment. OTP, Aadhaar/VID, engine numbers, chassis numbers, credentials, and payment details are never requested.
+- Document review displays the registration and challan number needed to compare the selected records; its saved note includes these identifiers. Names, addresses, contact details, chassis/engine numbers and credentials are not extracted as fields. The manual and FASTag forms retain masked/minimum identifiers. In the manual handoff, an optional acknowledgement reference remains final-four only on a private device; it never enters comparison, URLs, exports, the field pack, the extension envelope or receipt and is cleared after its controlled action, reset, Quick Exit, inactivity or unmount. CAPTCHA, OTP, Aadhaar/VID and payment credentials are never requested by the app.
 - Reset clears local case state and restores the fictional fixtures while keeping the citizen’s Simpler view and text-first preferences.
 - Suspicious synthetic text is displayed as inert text; the prototype never fetches or makes its supplied destination clickable.
 - Text-first mode prevents the evidence contact sheet from being requested until explicit reveal. Choosing “I could not inspect this image” creates an inconclusive evidence state instead of silently confirming visual facts.
@@ -288,7 +310,7 @@ For another common host, install dependencies, configure the optional environmen
 ## Known limitations
 
 - The real-mode tools remain a non-public prototype, not a government-ready production service. No secure incident/feedback inbox or external privacy/legal review has been completed; the UI says so rather than hiding the gap.
-- Real mode does not authenticate, upload to a ChallanSakshi server, save as a case, or submit the record. `/review` locally previews a deliberate file selection but performs no OCR; every result is based only on citizen-confirmed structured answers and may be wrong if those answers are incomplete or mistaken.
+- Real mode does not authenticate, upload to a ChallanSakshi server, save as a case, or submit the record. `/review` extracts labelled text locally and may misread it; unsupported layouts, blurry text and partial documents require correction or manual fallback. Its neutral note is not the manual flow’s form-compatible grievance pack. `/manual/challan` continues to rely on citizen-confirmed structured answers.
 - TollSakshi does not access a bank or NETC system, raise a chargeback, prove fraud/cloning, promise a refund, or treat a current tag status as historical event-time status.
 - The October 2025 NETC evidence circular is source-labelled; a newer 2026 duplicate-validation circular appears in the current index, so the product deliberately avoids asserting a definitive duplicate time threshold.
 - 1033 is shown only for NHAI FASTag support or a recorded National Highway/NHAI plaza route, never as the universal bank-issued chargeback channel.
@@ -328,3 +350,5 @@ The parliamentary answer describes the 45-day action window, supporting-document
 ## How Codex was used meaningfully
 
 Codex helped turn a tightly scoped civic problem into a working product: it separated AI observations from deterministic clocks and routes; built the bilingual evidence, Passport, custody-timeline, case-ledger, and order-review journey; typed and tested correction provenance, stable submission revisions, warning-signal precedence, citation validation, and refusal states; generated wholly synthetic visual assets; verified official-source wording; and exercised the complete flow through desktop and 360 px browser QA. Human verification remains intentional: no model observation, notice keyword, custody interval, order mapping, or route match silently becomes a legal conclusion or official action.
+
+For the document-first update, Codex implemented the local PDF/OCR runtime, pure labelled-field parser, independent-source comparison and targeted correction flow. Test-first adversarial review caught unsafe inference from duplicate document bytes and uncertainty handling; source fingerprints now prevent a notice from serving as its own independent vehicle record, even after corrections. This implementation record is not a claim that the current tree has been deployed or that final browser acceptance has passed; release evidence must identify the exact tested and deployed revision.

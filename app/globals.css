@@ -2,30 +2,37 @@
 
 :root {
   color-scheme: light;
-  --ink: #10253e;
-  --muted: #5b6877;
-  --paper: #f7f4ec;
-  --card: #fffefb;
-  --line: #d9d8d0;
-  --teal: #087a74;
-  --teal-dark: #075b58;
-  --teal-soft: #dff2ed;
-  --amber: #e2a23b;
-  --amber-soft: #fff2d7;
-  --navy: #102c47;
+  --ink: #091638;
+  --muted: #4d586b;
+  --paper: #ffffff;
+  --card: #ffffff;
+  --line: #d8dce3;
+  --teal: #087e79;
+  --teal-dark: #08655f;
+  --teal-soft: #eef8f6;
+  --amber: #d79811;
+  --amber-soft: #fff9e8;
+  --navy: #061942;
+  --action-bg: #061942;
+  --action-hover: #102c5b;
+  --action-ink: #ffffff;
+  --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: Georgia, "Times New Roman", serif;
+  --radius-control: 8px;
+  --radius-panel: 10px;
   --app-ground: #ffffff;
-  --card-warm: #fffef9;
-  --panel: #f8faf7;
-  --strip: #f0f3ee;
-  --label: #435650;
+  --card-warm: #ffffff;
+  --panel: #f8fafc;
+  --strip: #f5f7f9;
+  --label: #26334b;
   --on-navy: #e7f2f3;
-  --accent-text: #075b58;
-  --teal-border: #aebfb8;
-  --border: #cbd3d1;
-  --border-soft: #d4d6ce;
-  --hairline: #e5e5df;
-  --amber-text: #7a4f00;
-  --amber-border: #e0bd7d;
+  --accent-text: #08655f;
+  --teal-border: #a2d0cb;
+  --border: #aab2c0;
+  --border-soft: #d8dce3;
+  --hairline: #e7eaf0;
+  --amber-text: #895900;
+  --amber-border: #eed392;
   --danger: #a7463e;
   --danger-soft: #fdf3f1;
   --danger-border: #ddb3aa;
@@ -38,9 +45,10 @@
   --focus: #075650;
   --inset: rgb(255 255 255 / 55%);
   --inset-strong: rgb(255 255 255 / 75%);
-  --bar: rgb(255 254 249 / 94%);
-  --shadow: rgb(0 0 0 / 8%);
+  --bar: rgb(255 255 255 / 96%);
+  --shadow: rgb(6 25 66 / 6%);
 }
+
 
 /* dark theme (opt-in via data-theme) */
 :root[data-theme='dark'] {
@@ -56,6 +64,9 @@
   --amber: #e6ad52;
   --amber-soft: #332711;
   --navy: #0a1826;
+  --action-bg: #bbcbf4;
+  --action-hover: #d3defa;
+  --action-ink: #091638;
   --app-ground: #0e151c;
   --card-warm: #141d26;
   --panel: #121a22;
@@ -90,7 +101,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   text-rendering: optimizeLegibility;
 }
 button, a { font: inherit; }
@@ -116,7 +127,7 @@ a { color: inherit; }
 .brand-button { padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .brand-mark { width: 42px; height: 46px; display: grid; place-items: center; color: white; font-family: Georgia, serif; font-weight: 700; font-size: 19px; background: var(--teal); border-radius: 13px 13px 19px 19px; box-shadow: inset 0 -5px 0 var(--shadow); }
 .brand strong, .brand small { display: block; }
-.brand strong { font: 700 18px/1.1 Georgia, serif; letter-spacing: -.02em; }
+.brand strong { font: 750 18px/1.1 var(--font-body); letter-spacing: -.03em; }
 .brand small { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 650; }
 nav { display: flex; align-items: center; gap: 28px; }
 nav a { font-size: 14px; font-weight: 650; text-decoration: none; }
@@ -130,9 +141,9 @@ h1 em { color: var(--teal); font-weight: inherit; }
 .hero-lede { max-width: 580px; margin: 25px 0 0; color: var(--muted); font-size: clamp(17px, 2vw, 20px); line-height: 1.65; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
 .button { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 18px; padding: 0 23px; border: 1px solid transparent; border-radius: 10px; font-weight: 760; text-decoration: none; cursor: pointer; }
-.button-primary { background: var(--teal); color: white; box-shadow: 0 9px 22px var(--shadow); }
-.button-primary:hover { background: var(--teal-dark); }
-.button-secondary { border-color: var(--border); background: transparent; color: var(--ink); }
+.button-primary { background: var(--action-bg); color: var(--action-ink); box-shadow: none; }
+.button-primary:hover { background: var(--action-hover); }
+.button-secondary { border-color: var(--ink); background: var(--card); color: var(--ink); }
 .microcopy { display: flex; align-items: center; gap: 7px; margin: 17px 0 0; color: var(--muted); font-size: 12px; }
 .microcopy span { color: var(--teal); }
 .evidence-scene { position: relative; padding: 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); box-shadow: 0 26px 70px var(--shadow); transform: rotate(1deg); }
@@ -1564,3 +1575,17 @@ main:focus { outline: none; }
   .order-note > header h2 { color: #10253e; }
   .order-note > header p, .order-note > header span { color: #4f655d; }
 }
+
+/* Shared visual language for the retained synthetic demo and its evidence tools. */
+.app-root .button, .app-root .back-button, .app-root select, .app-root input:not([type='radio']):not([type='checkbox']), .app-root textarea { min-height: 48px; font-size: 16px; border-radius: var(--radius-control); }
+.app-root .button-primary { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-ink); box-shadow: none; }
+.app-root .button-primary:hover { background: var(--action-hover); }
+.app-root .button-secondary { border-color: var(--ink); color: var(--ink); background: var(--card); }
+.app-root .hero { min-height: 0; padding-block: 40px; }
+.app-root .hero h1 { font-size: clamp(30px, 4.5vw, 48px); line-height: 1.1; }
+.app-root .hero-lede { margin-top: 16px; font-size: 17px; line-height: 1.5; }
+.app-root .evidence-scene, .app-root .evidence-card, .app-root .real-help-band, .app-root .source-preview, .app-root .finding-card { border-radius: var(--radius-panel); box-shadow: none; }
+.app-root .evidence-scene { transform: none; }
+.app-root .evidence-scene::before { display: none; }
+.app-root .screen-shell { padding-block: 24px 48px; }
+@media (max-width: 700px) { .app-root .hero { padding-block: 24px; } .app-root .hero h1 { font-size: 26px; } .app-root .hero-copy { text-align: left; } .app-root .eyebrow, .app-root .hero-actions, .app-root .microcopy { justify-content: flex-start; } }

@@ -55,6 +55,9 @@ describe('real-mode privacy isolation', () => {
       'components/guided/GuidedStepHeader.tsx',
       'lib/citizen-home.ts',
       'lib/citizen-review-presentation.ts',
+      'components/public-beta/CitizenDocumentReview.tsx',
+      'lib/local-document-reader.ts',
+      'lib/document-evidence.ts',
       'lib/domain.ts',
       'lib/guided-journey.ts',
       'lib/shared-device-inactivity.ts',
@@ -102,9 +105,9 @@ describe('real-mode privacy isolation', () => {
     expect(new Set(queryKeys)).toEqual(new Set(['goal']));
   });
 
-  it('allows the native file input only inside controlled LocalRecordIntake', () => {
+  it('allows native file inputs only inside the two controlled local intake components', () => {
     for (const { path, source } of publicModeFiles) {
-      if (path === 'components/public-beta/LocalRecordIntake.tsx') {
+      if (path === 'components/public-beta/LocalRecordIntake.tsx' || path === 'components/public-beta/CitizenDocumentReview.tsx') {
         expect(source, path).toMatch(/type=["']file["']/);
       } else {
         expect(source, path).not.toMatch(/type=["']file["']/);
@@ -117,6 +120,7 @@ describe('real-mode privacy isolation', () => {
       'components/public-beta/CitizenReviewApp.tsx',
       'components/public-beta/LocalRecordIntake.tsx',
       'components/public-beta/TollSakshiApp.tsx',
+      'components/public-beta/CitizenDocumentReview.tsx',
     ]);
     for (const { path, source } of publicModeFiles) {
       if (!allowed.has(path)) expect(source, path).not.toMatch(/URL\.(?:create|revoke)ObjectURL/);
@@ -136,6 +140,19 @@ describe('real-mode privacy isolation', () => {
 
   it('uses no HTML form that could fall back to a URL or server submission', () => {
     for (const { path, source } of publicModeFiles) expect(source, path).not.toMatch(/<form\b/);
+  });
+
+  it('loads OCR locally with persistence off and versioned same-origin workers', () => {
+    const reader = publicModeFiles.find(file => file.path === 'lib/local-document-reader.ts')!.source;
+    expect(reader).toContain("cacheMethod: 'none'");
+    expect(reader).toContain('workerBlobURL: false');
+    expect(reader).toContain('window.location.origin');
+    expect(reader).toContain('/document-assets/tesseract-7.0.0');
+    expect(reader).toContain('/document-assets/pdfjs-6.3.289');
+    expect(reader).not.toMatch(/https?:\/\//);
+    expect(reader).toContain('options.signal');
+    expect(reader).toContain('.terminate()');
+    expect(reader).toContain('disableAutoFetch: true');
   });
 
   it('keeps the no-inspection boundary in both citizen artifacts', () => {

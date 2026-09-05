@@ -21,7 +21,7 @@ for (const width of [320, 375, 390]) for (const hi of [false, true]) {
   test(`required mobile controls and typography ${width}px ${hi ? 'Hindi' : 'English'}`, async ({ page }) => {
     await page.clock.install({ time: new Date('2026-09-05T10:00:00.000Z') });
     await page.setViewportSize({ width, height: width === 375 ? 812 : 844 });
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await page.locator('main:not([inert])').waitFor();
     if (hi) {
       await page.getByRole('button', { name: 'Menu', exact: true }).click();

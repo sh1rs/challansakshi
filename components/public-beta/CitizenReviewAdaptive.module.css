@@ -13,3 +13,13 @@
 .result>h2{font-size:20px}
 .main{overflow-anchor:none}.main input[type="radio"]{min-height:20px;height:20px}
 @media print{.main{max-width:none;padding:0}.main>.heading{display:none!important}.main[data-device-context="private"] [data-print-preparation]{display:block!important}.main[data-device-context="private"] [data-print-preparation]>*{display:none!important}.main[data-device-context="private"] [data-print-preparation]>[data-print-artifact],.main[data-device-context="private"] [data-print-preparation]>[data-print-evidence]{display:block!important}.main [data-print-artifact]>p,.main [data-print-artifact]>.actions{display:none!important}.main [data-print-artifact] details>pre{display:block!important}.main [data-print-artifact] details>summary{display:none!important}.main [data-print-evidence]>summary{display:none!important}}
+
+/* Shared reference system: white surface, navy action, quiet evidence accents. */
+.main { font-family: var(--font-body); }
+.heading h1 { font-family: var(--font-heading); }
+.panel, .result, .device { border-radius: var(--radius-panel); box-shadow: none; }
+.primary, .secondary, .option, .fieldGrid input, .fieldGrid select, .fieldGrid textarea { border-radius: var(--radius-control); }
+.primary { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-ink); }
+.primary:hover:not(:disabled) { background: var(--action-hover); }
+.secondary { border-color: var(--ink); background: var(--card); color: var(--ink); }
+.progress { color: var(--accent-text); }

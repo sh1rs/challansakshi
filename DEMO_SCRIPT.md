@@ -1,76 +1,76 @@
 # ChallanSakshi judge demo — 2 minutes
 
-The recording shows the real citizen journey first, then uses the separate synthetic Test Lab to prove that reviewed evidence—not a case ID—controls the result.
+Show the working document-first product using clearly fabricated notice/vehicle-record files, then the separately labelled synthetic Test Lab. The real reader must perform the reading in the recorded take; do not substitute a predetermined result or imply the files came from government.
 
 ## 0:00–0:10 · The citizen question
 
-**Screen:** Home, then open the real e-Challan review.
+**Screen:** Home, then `/review`, **Start with your challan**.
 
-> “A citizen receives a challan but cannot tell whether the supplied evidence is about their vehicle. ChallanSakshi helps them check what they can see and choose a bounded next step—never a legal verdict.”
+> “A citizen has a challan but should not have to retype it or answer a long questionnaire. ChallanSakshi reads the available records and shows what needs attention.”
 
-## 0:10–0:40 · Real Check: the three-answer path
+## 0:10–0:40 · Read the documents locally
 
-**Screen:** `/review`, **Check your challan**, **1 of 2**. Do not select or upload files.
+**Action:** Choose a fabricated challan PDF/image with labelled registration `KA01AB3817`, then a different fabricated vehicle-record file with labelled registration `KA01AB3317`. Keep names, addresses and all real personal details out of both files. Show the reading state and extracted fields.
 
-**Action:** Answer: official service or downloaded record; readable independent vehicle record present; plate in the official photograph is different. Press **I checked these answers — see my next step**.
+> “These are fabricated demonstration documents going through the actual local reader. It extracts PDF text or runs English and Hindi OCR on this device. Each supported field keeps its document and page reference. No document is uploaded.”
 
-> “The real flow is answer-only. It asks only the next dependency: where the notice came from, whether I have a readable independent record, and what the official photograph visibly shows. These three answers are enough to identify a possible mismatch without guessing the rest.”
+**Screen:** Hold on **The registrations differ** and both source-labelled registration fields. If OCR needs correction, visibly correct the reading; never pretend it was extracted accurately.
 
-## 0:40–0:58 · Real Resolve: bounded action
+> “Here the challan and independent vehicle record show different registrations. That is a record comparison—not a claim about the photograph, offence or legal validity.”
 
-**Screen:** **Your next step**, **2 of 2**. Hold on the possible-mismatch wording and official destination status.
+## 0:40–1:02 · Review once, prepare a neutral note
 
-> “This is a possible evidence mismatch, not a declaration that the challan is invalid. The citizen can prepare a deeper checklist or continue to a currently verified official service. If that route cannot be validated, the handoff fails closed and exposes no URL.”
+**Action:** Briefly expand **See the source documents**, check the two readings, then press **I checked these readings — prepare my note**. Hold on the note and official-service action. Do not enter or submit anything on an official portal.
 
-Briefly point to **Prepare my checklist**, but keep the timed path short.
+> “I confirm these are the right records, that I have permission and that I checked the readings. The app prepares a neutral review note and a current official-service link. It does not file, pay or decide the case.”
 
-## 0:58–1:10 · The real boundary
+## 1:02–1:18 · Honest boundaries and fallback
 
-> “No real document was uploaded. There is no government fetch, login, OTP, payment, filing, or automatic submission. Real answers stay in page memory.”
+**Screen:** Show the private/shared-device choice and the manual fallback link without restarting the timed journey.
 
-## 1:10–1:35 · Synthetic engine proof
+> “Saving requires a private-device choice because the note contains identifiers. Shared-device printing is blocked. Without usable documents, the separate adaptive manual review remains available. Cloud vision is not enabled.”
 
-**Screen:** `/demo/test-lab`. Clearly show the **fictional/synthetic** label. Press **Run all 10 cases** and hold on the reproduced outcomes.
+## 1:18–1:42 · Separate synthetic engine proof
 
-> “The Test Lab is separate from the real answer-only journey. One deterministic TypeScript engine recomputes ten fictional relationships across discrepancy, consistent, and honest-abstention cases. Expected and runtime actual results are shown side by side.”
+**Screen:** `/demo/test-lab`, with the synthetic label visible. Press **Run all 10 cases**, then briefly show the unclear-photo case.
 
-Open the unclear-photo case briefly.
+> “The separate Test Lab proves the broader evidence engine with fictional cases. Deterministic code recalculates discrepancy, consistency and abstention. It does not invent unreadable characters. These demo results are not government activity or outputs of the real document reader.”
 
-> “When a photograph cannot support a reading, the result stays inconclusive. The engine does not invent plate characters or manufacture a dispute.”
+## 1:42–1:55 · Codex and one concrete regression
 
-## 1:35–1:52 · Codex and regression evidence
+**Screen:** Prepared code/test evidence, with no secrets or environment variables visible.
 
-**Screen:** A prepared code/test proof view; keep terminal secrets and environment variables out of frame.
+> “Codex helped implement the local reader, source-linked parser, adaptive fallback and regression tests. Review caught a false-independence risk: the same file selected twice. Document fingerprints now keep that comparison inconclusive, even after corrections.”
 
-> “Codex helped implement and test the adaptive question plan, state transitions, evidence rules, and fail-closed official handoff. Independent regression review caught a manual matched-photo invalidation bug: making that photo unavailable now clears `imageInspected`, clears dependent evidence, and returns to insufficient review.”
+## 1:55–2:00 · Close
 
-If showing verification output, use the [adaptive-flow verification log](docs/superpowers/verification/2026-09-05-adaptive-citizen-resolution.md) for this checkpoint and rerun it if the final build changes. Do not narrate an older hardcoded test count.
+**Screen:** Return to the prepared note or product mark.
 
-## 1:52–2:00 · Close
-
-**Screen:** Return to the real Resolve screen or product mark.
-
-> “The real tool prepares a citizen for an official service. The synthetic demo proves the engine. Neither decides the case or acts for the government.”
+> “Read the evidence. Correct what needs attention. Keep the final action with the citizen.”
 
 ## Recording setup
 
-- Use English, 100% browser zoom, and an edited take with no waiting.
-- Pre-stage the real three-answer path and the synthetic Test Lab; never imply that fictional demo data came from the real review.
-- Press **Run all 10 cases** visibly; do not substitute a screenshot.
-- Keep the console, environment variables, and API keys out of frame.
-- Never upload real data. Do not claim a live AI analysis, government fetch, filing, or production deployment.
-- Do not claim a new public video URL until a video has actually been uploaded and checked.
-- Hold each result for at least two seconds and verify the final video is two minutes or shorter on a phone-size player.
+- Use fabricated files visibly identified as demonstration records. Never record a real challan, RC, personal identifier, credential or payment detail.
+- Rehearse against the exact build to be submitted. If recording the public website, verify that the new revision is actually deployed first; local implementation is not deployment evidence.
+- First use downloads reader code/language assets. Pre-warming is acceptable for the short demonstration, but do not claim this is a cold-start speed test. Clearly label any sped-up waiting segment; retain an uncut reading proof separately.
+- Confirm the fabricated files use supported labels and are distinct files. A notice selected twice must remain inconclusive.
+- Show the actual reading state, source-labelled fields and confirmation. Do not substitute static screenshots for working output.
+- Keep browser zoom at 100%, hold important findings for at least two seconds, and verify the final export is at most two minutes and legible at phone size.
+- Do not claim real image-plate recognition, offence detection, legal-deadline inference, government retrieval, form autofill, filing or payment.
+- The document reader’s neutral note does not feed the manual route’s compatible grievance pack or receipt/return controller. Do not imply these are one fully integrated live workflow.
+- Keep both synthetic analysis switches off. No live real-document cloud-analysis capability is available in this deployment.
+- Show only fresh test/build/browser evidence for the recorded revision. The earlier adaptive-flow log is a prior checkpoint, not proof of the new reader’s final acceptance.
+- Do not claim a public video URL until the upload and its public accessibility are verified.
 
 ## Judge questions
 
-- **“Is this hardcoded?”** — Run the synthetic cases and show Expected versus runtime Actual. In Q&A, edit a source, show invalidation, and reconfirm the changed result.
-- **“Does AI decide the challan?”** — No. The real flow uses citizen answers. In configured development, AI may return bounded observations for the synthetic evidence workflow; deterministic code compares human-confirmed facts and selects a safe workflow.
-- **“Why is public image AI off?”** — The current flag-gated adapter is not authentication and sends original bytes. Public enablement needs server-verified access, abuse/cost controls, metadata removal, and external privacy/security review.
-- **“What happens with a blurry plate?”** — The field and overall result remain inconclusive; unreadable characters are never guessed.
-- **“Does it submit to government?”** — No. It prepares a citizen-controlled checklist and, only when available, offers a verified official-service handoff.
-- **“How was Codex used?”** — To implement and review the adaptive domain modules, write focused regression and contract tests, and identify the `imageInspected` invalidation bug. Codex did not provide legal conclusions or verify a government record.
+- **“Is this hardcoded?”** — Select different fabricated document bytes in the real reader. The labelled parser and comparator recompute the result. Then run the separate synthetic Test Lab and show expected versus actual outcomes.
+- **“Does AI decide the challan?”** — No. Local OCR reads text; deterministic rules compare supported registrations. Neither establishes guilt, authenticity or legal validity. The optional synthetic vision adapter is disabled publicly.
+- **“What happens with a blurry plate?”** — Generic document OCR does not establish an enforcement-photo plate crop. Uncertain text stays uncertain; the citizen can correct it against the source or use manual review. No characters are silently invented.
+- **“Why is cloud vision unavailable?”** — A real-document provider key and production access, privacy and abuse/spend controls are not configured. Any later transfer needs an explicit file/provider choice and accurate retention disclosures; `store:false` is not zero retention.
+- **“Does it submit to government?”** — No. The document reader produces a neutral note and a current national official-service link. The separate manual flow has deeper, independently gated preparation, not automatic filing.
+- **“How was Codex used?”** — To implement and test the local PDF/OCR runtime, parser, source identity, correction flow, adaptive state and official-route boundaries. Independent review caught duplicate-document and evidence-invalidation risks. Codex did not authenticate a government record or provide legal conclusions.
 
 ## Optional Q&A follow-up
 
-Open `/demo` to show the deeper Local Evidence Passport, custody timeline, case ledger, fictional authority response, and Order-to-Evidence Map. Present these as synthetic extensions of the same evidence discipline—not as real government activity or part of the two-minute core proof.
+Open `/manual/challan` to show the adaptive **Check → Resolve** fallback and its separately gated deeper preparation. Open `/demo` to show the Local Evidence Passport, custody timeline, case ledger, fictional authority response and Order-to-Evidence Map. Clearly distinguish these from the new real document reader and from actual government actions.

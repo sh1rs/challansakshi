@@ -8,6 +8,7 @@
   box-shadow: 0 6px 18px var(--shadow);
 }
 
+
 .guideTopline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .guideTopline p, .guideTopline span { margin: 0; color: var(--accent-text); font-size: 11px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .primaryInstruction { margin-top: 4px; }
@@ -59,3 +60,10 @@
   .detailsContent p,
   .stepList li { font-size: 15px; }
 }
+
+/* Compact source/status guidance, without a separate visual language. */
+.guide { background: var(--card); border-color: var(--line); border-radius: var(--radius-panel); box-shadow: none; }
+.primaryInstruction h2 { font-family: var(--font-heading); font-size: 20px; }
+.guideTopline p, .guideTopline span, .primaryInstruction > span, .status, .status > span, .guideDisclosure summary, .detailLabel, .detailsContent p, .stepList li, .stepList small { font-size: 16px; line-height: 1.4; letter-spacing: normal; text-transform: none; }
+.guideDisclosure, .status { border-radius: var(--radius-control); }
+.stepList li { color: var(--muted); }

@@ -12,6 +12,7 @@
   color: var(--pb-ink);
 }
 
+
 .publicBar {
   min-height: 36px;
   display: flex;
@@ -361,4 +362,23 @@
   .artifact pre { max-height: none; overflow: visible; border: 0; padding: 0; color: #000; font-size: 11pt; }
   [data-device-context='shared'] [data-print-result] { display: none !important; }
   [data-device-context='shared'] [data-shared-print-warning] { display: block !important; padding: 24pt; color: #000; }
+}
+
+/* The same citizen design system covers FASTag, information pages and preparation. */
+.app { font-family: var(--font-body); }
+.panel, .heroCard, .resultHero, .recordSection, .serviceGrid article, .listPanel, .infoSection { border-radius: var(--radius-panel); box-shadow: none; }
+.button, .buttonSecondary, .buttonQuiet, .choice, .fixtureChoice, .field input, .field select, .observationCard select, .localPdfOpen a { min-height: 48px; font-size: 16px; border-radius: var(--radius-control); }
+.button { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-ink); box-shadow: none; }
+.button:hover:not(:disabled) { background: var(--action-hover); }
+.buttonSecondary { border-color: var(--ink); background: var(--card); color: var(--ink); }
+.choice strong, .fixtureChoice strong, .choiceLegend, .field label, .field legend, .observationCard label, .serviceGrid button { font-family: var(--font-body); font-size: 16px; }
+.check, .fieldHint, .stepIntro, .sectionTitle p, .choice small, .fixtureChoice small, .field small, .observationCard select, .inlineStatus, .inlineError, .resultHero p, .resultMeta small, .listPanel li, .timeline li, .recordSectionNote, .recordSectionHeading p, .recordDisclosure > summary small, .disclosure summary { font-size: 16px; line-height: 1.45; }
+.heroCompact h1, .sectionTitle h1, .infoPage h1 { font-family: var(--font-heading); font-size: clamp(28px, 3vw, 40px); }
+.heroCompact .lede { font-size: 16px; }
+.infoSection h2, .sectionTitle h2 { font-family: var(--font-heading); font-size: 22px; }
+@media (max-width: 700px) {
+  .main { width: calc(100% - 32px); }
+  .hero h1, .heroCompact h1, .sectionTitle h1, .infoPage h1 { font-size: 26px; line-height: 1.15; }
+  .panel { padding: 14px; }
+  .infoSection h2, .sectionTitle h2 { font-size: 20px; }
 }

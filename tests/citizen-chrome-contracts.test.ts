@@ -26,16 +26,16 @@ describe('citizen chrome contracts', () => {
     const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/g)];
     const links = [...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
     expect(paragraphs).toHaveLength(1);
-    expect(paragraphs[0][1].replace(/<[^>]+>/g, '')).toBe('Independent—not a government, bank, court or toll service. Files and answers stay on this device; nothing is uploaded, filed, paid, authenticated or submitted. No legal advice or guaranteed outcome. Never enter passwords, OTPs, Aadhaar, CAPTCHA or payment details.');
+    expect(paragraphs[0][1].replace(/<[^>]+>/g, '')).toBe('Independent—not a government service. Documents are read on this device unless you choose cloud analysis for selected files. Nothing is filed, paid or submitted for you. No legal advice or guaranteed outcome.');
     expect(links.map((match) => [match[1], match[2]])).toEqual([['/safety', 'Safety &amp; privacy']]);
   });
 
   it('renders a faithful standalone Hindi boundary', () => {
     const html = renderToStaticMarkup(createElement(CitizenFooter, { language: 'hi' }));
-    expect(html).toContain('स्वतंत्र—यह सरकारी, बैंक, अदालत या टोल सेवा नहीं है।');
-    expect(html).toContain('कुछ भी अपलोड, फाइल, भुगतान, प्रमाणित या जमा नहीं किया जाता।');
+    expect(html).toContain('स्वतंत्र—यह सरकारी सेवा नहीं है।');
+    expect(html).toContain('जब तक आप चुनी फ़ाइलों के लिए क्लाउड विश्लेषण नहीं चुनते, दस्तावेज़ इसी डिवाइस पर पढ़े जाते हैं।');
+    expect(html).toContain('आपके लिए कुछ भी फाइल, भुगतान या जमा नहीं किया जाता।');
     expect(html).toContain('कानूनी सलाह या नतीजे की गारंटी नहीं।');
-    expect(html).toContain('पासवर्ड, OTP, Aadhaar, CAPTCHA या भुगतान की जानकारी कभी दर्ज न करें।');
     expect(html).not.toContain('Independent—not');
   });
 
@@ -68,10 +68,25 @@ describe('citizen chrome contracts', () => {
     expect(menu.textContent).not.toContain('Exit');
   });
 
+  it('allows language selection directly from the closed header menu', () => {
+    let selected = 'en';
+    const host = mountHeader({ setLanguage: (language) => { selected = language; } });
+    const selector = host.querySelector('select');
+    expect(selector).not.toBeNull();
+    expect(selector?.closest('#citizen-navigation-menu')).toBeNull();
+    expect([...selector!.options].map((option) => [option.value, option.textContent])).toEqual([['en', 'EN'], ['hi', 'हिं']]);
+    act(() => {
+      selector!.value = 'hi';
+      selector!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(selected).toBe('hi');
+  });
+
   it('states FASTag English availability once inside Menu', () => {
     const host = mountHeader({ englishOnly: true });
     const menu = host.querySelector('#citizen-navigation-menu')!;
     expect(menu.textContent?.match(/FASTag check is currently available in English/g)).toHaveLength(1);
     expect(host.textContent).not.toContain('English-only safety beta');
+    expect(host.querySelector('select[aria-label="Display language"]')).toBeNull();
   });
 });

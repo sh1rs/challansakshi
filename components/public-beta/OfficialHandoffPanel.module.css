@@ -9,6 +9,7 @@
   border-radius: 22px;
 }
 
+
 .panel h2,
 .panel h3,
 .panel p,
@@ -207,3 +208,14 @@
     padding: 16px;
   }
 }
+
+/* Explicit foreground roles also preserve contrast in the opt-in dark theme. */
+.panel { background: var(--card); border-radius: var(--radius-panel); font-family: var(--font-body); font-size: 16px; }
+.purpose, .domain { color: var(--ink); }
+.action, .copyButton, .officialAnchor { font-size: 16px; border-radius: var(--radius-control); border-color: var(--ink); }
+.primaryAction, .officialAnchor { background: var(--action-bg); color: var(--action-ink); border-color: var(--action-bg); }
+.primaryAction:hover, .officialAnchor:hover { background: var(--action-hover); }
+.copyButton, .secondaryAction { background: var(--card); color: var(--ink); }
+.verified, .fieldHelp { font-size: 16px; }
+.action:focus-visible, .copyButton:focus-visible, .officialAnchor:focus-visible, .confirmation input:focus-visible, .returnChoice input:focus-visible, .fieldGroup textarea:focus-visible, .referenceField input:focus-visible { outline-color: var(--focus); }
+.error { color: var(--danger); }

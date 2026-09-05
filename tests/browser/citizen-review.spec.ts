@@ -41,7 +41,7 @@ async function choose(page: Page, name: string) {
 
 async function beginOfficial(page: Page, language: Language = 'en') {
   const text = labels[language];
-  await page.goto('/review');
+  await page.goto('/manual/challan');
   await chooseLanguage(page, language);
   await choose(page, text.official);
   await choose(page, text.recordPresent);
@@ -153,7 +153,7 @@ test.describe('compact home and product chrome', () => {
 test.describe('review entry and short resolution paths', () => {
   test('direct entry has native unselected radios and validation does not select a source', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await expect(page.getByRole('group', { name: labels.en.source })).toBeVisible();
     await expect(page.locator('input[type=radio]:checked')).toHaveCount(0);
     await page.getByRole('button', { name: labels.en.continue, exact: true }).click();
@@ -164,7 +164,7 @@ test.describe('review entry and short resolution paths', () => {
 
   test('keyboard radio choices retain focus and Change reopens the selected native control', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await page.locator('main:not([inert])').waitFor();
     const source = page.getByRole('radio', { name: labels.en.official });
     await source.focus();
@@ -223,7 +223,7 @@ test.describe('review entry and short resolution paths', () => {
 
   test('missing RC and unavailable photo resolve conservatively', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await choose(page, labels.en.official);
     await choose(page, labels.en.recordMissing);
     await page.getByRole('button', { name: labels.en.confirm }).click();
@@ -244,7 +244,7 @@ test.describe('review entry and short resolution paths', () => {
     await page.getByRole('button', { name: labels.en.confirm }).click();
     await expect(page.getByRole('heading', { name: 'The photo is not clear enough' })).toBeVisible();
 
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await choose(page, labels.en.official);
     await choose(page, labels.en.recordPresent);
     await choose(page, labels.en.plateMatch);
@@ -258,7 +258,7 @@ test.describe('review entry and short resolution paths', () => {
 
   test('category-only mismatch stays bounded without an actionable grievance destination', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/review');
+    await page.goto('/manual/challan');
     await page.locator('main:not([inert])').waitFor();
     await page.locator('#review-source-official-service').check();
     await page.locator('#review-own-record-present').check();
@@ -336,7 +336,7 @@ test.describe('review entry and short resolution paths', () => {
 
 test('case actions create no storage record or application network request', async ({ page }) => {
   const applicationRequests: string[] = [];
-  await page.goto('/review');
+  await page.goto('/manual/challan');
   await expect(page.getByRole('group', { name: labels.en.source })).toBeVisible();
   page.on('request', (request) => {
     if (['fetch', 'xhr', 'websocket'].includes(request.resourceType())) applicationRequests.push(request.url());

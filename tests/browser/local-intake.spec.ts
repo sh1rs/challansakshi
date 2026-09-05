@@ -7,7 +7,7 @@ const fabricatedPng = Buffer.from(
 
 test('a private local photo remains bounded by explicit answers, invalidation, and Quick Exit', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/review');
+  await page.goto('/manual/challan');
   await page.locator('main:not([inert])').waitFor();
 
   const caseRequests: string[] = [];
@@ -67,7 +67,7 @@ test('a private local photo remains bounded by explicit answers, invalidation, a
   await expect(page).toHaveURL(/\/$/);
   page.off('request', recordCaseRequest);
   expect(caseRequests).toEqual([]);
-  await page.goto('/review');
+  await page.goto('/manual/challan');
   await page.locator('main:not([inert])').waitFor();
   await expect(page.locator('input[type="radio"]:checked')).toHaveCount(0);
   await expect(page.getByAltText('Citizen-selected evidence preview')).toHaveCount(0);

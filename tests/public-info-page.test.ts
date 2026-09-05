@@ -43,9 +43,17 @@ describe('public privacy and safety pages', () => {
   it('explains the deliberate local-file boundary without claiming government authentication', () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
 
-    expect(html).toContain('deliberately select');
-    expect(html).toContain('stays browser-local');
-    expect(html).toContain('not uploaded to the ChallanSakshi server or sent to an AI model');
+    expect(html).toContain('PDF text or runs English/Hindi OCR locally after you choose a file');
+    expect(html).toContain('downloads code and language files from this site');
+    expect(html).toContain('document bytes and extracted fields are not uploaded');
+    expect(html).toContain('unclear or incomplete readings remain limited');
+    expect(html).toContain('OCR caches for selected content are disabled');
+    expect(html).toContain('Cloud vision is not enabled on this deployment');
+    expect(html).toContain('explicit choice identifying the selected files and provider before anything is sent');
+    expect(html).toContain('a no-storage API setting is not a zero-retention guarantee');
+    expect(html).toContain('Names, addresses, contact details, chassis/engine numbers and payment credentials are not requested or extracted as fields');
+    expect(html).toContain('a saved review note includes those fields');
+    expect(html).not.toContain('This release does not run OCR');
     expect(html).toContain('Opening a selected PDF creates a separate browser-local tab');
     expect(html).toContain('Quick exit cannot close or erase that tab');
     expect(html).toContain('does not authenticate its origin');
@@ -325,8 +333,16 @@ describe('public privacy and safety pages', () => {
 
   it('keeps complete Hindi counterparts for the critical privacy and safety boundaries', () => {
     expectBilingualPair(
-      'Each selected record or supplied image stays browser-local and is not uploaded to the ChallanSakshi server or sent to an AI model. This release does not run OCR on it.',
-      'हर चुना गया रिकॉर्ड या दी गई तस्वीर ब्राउज़र में स्थानीय रहती है और ChallanSakshi सर्वर पर अपलोड या AI मॉडल को नहीं भेजी जाती। यह रिलीज़ उस पर OCR नहीं चलाती।',
+      'Document-first review extracts PDF text or runs English/Hindi OCR locally after you choose a file. The reader downloads code and language files from this site; document bytes and extracted fields are not uploaded. Up to three pages are read, and unclear or incomplete readings remain limited. OCR caches for selected content are disabled.',
+      'फ़ाइल चुनने पर दस्तावेज़ समीक्षा PDF पाठ निकालती है या अंग्रेज़ी/हिंदी OCR स्थानीय रूप से चलाती है। रीडर इस साइट से कोड और भाषा फ़ाइलें डाउनलोड करता है; दस्तावेज़ बाइट्स और निकाली जानकारी अपलोड नहीं होती। अधिकतम तीन पृष्ठ पढ़े जाते हैं; अस्पष्ट या अधूरी जानकारी सीमित रहती है। चुनी सामग्री का OCR कैश बंद है।',
+    );
+    expectBilingualPair(
+      'Cloud vision is not enabled on this deployment: no server-side AI key or production usage controls are configured. If enabled in a future release, it will require an explicit choice identifying the selected files and provider before anything is sent. Cloud providers may retain data under their policies; a no-storage API setting is not a zero-retention guarantee.',
+      'इस डिप्लॉयमेंट में क्लाउड विज़न चालू नहीं है: सर्वर AI कुंजी और प्रोडक्शन उपयोग नियंत्रण कॉन्फ़िगर नहीं हैं। भविष्य में चालू होने पर भेजने से पहले चुनी फ़ाइलों और प्रदाता की जानकारी देकर स्पष्ट सहमति ली जाएगी। क्लाउड प्रदाता अपनी नीति के अनुसार डेटा रख सकते हैं; API में स्टोरेज बंद होना शून्य प्रतिधारण की गारंटी नहीं है।',
+    );
+    expectBilingualPair(
+      'Document review displays the registration and challan identifiers needed to check the selected record; a saved review note includes those fields. Correct only the requested field. Names, addresses, contact details, chassis/engine numbers and payment credentials are not requested or extracted as fields. Manual and FASTag forms continue to request masked or minimum values.',
+      'दस्तावेज़ समीक्षा चुने रिकॉर्ड की जाँच के लिए आवश्यक पंजीकरण और चालान नंबर दिखाती है; सहेजे नोट में ये फ़ील्ड शामिल होते हैं। केवल माँगा फ़ील्ड सुधारें। नाम, पता, संपर्क, चेसिस/इंजन नंबर और भुगतान क्रेडेंशियल फ़ील्ड के रूप में न माँगे जाते हैं न निकाले जाते हैं। मैन्युअल और FASTag फ़ॉर्म मास्क या न्यूनतम मान ही माँगते हैं।',
     );
     expectBilingualPair(
       'Opening a selected PDF creates a separate browser-local tab. Quick exit cannot close or erase that tab; close the PDF tab yourself, especially on a shared device.',

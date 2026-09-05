@@ -7,6 +7,7 @@
   color: var(--ink);
 }
 
+
 .rows { display: grid; gap: 8px; }
 .intakeRow { display: grid; grid-template-columns: minmax(180px, .9fr) minmax(220px, 1.1fr); gap: 8px 20px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 .rowCopy h3, .rowCopy p { margin: 0; }
@@ -51,3 +52,12 @@
   .remove,
   .pdfOpen a { min-height: 48px; font-size: 16px; }
 }
+
+/* File controls match the outlined actions used everywhere else. */
+.intake { font-family: var(--font-body); }
+.intakeRow, .preview { border-radius: var(--radius-panel); background: var(--card); }
+.choose, .pdfOpen a { border-color: var(--ink); color: var(--ink); border-radius: var(--radius-control); font-size: 16px; }
+.choose:hover { background: var(--panel); }
+.remove { font-size: 16px; border-radius: var(--radius-control); }
+.rowCopy h3 { font: 700 16px/1.3 var(--font-body); }
+.rowCopy p:last-child, .metadata strong, .metadata span, .preview p, .error { font-size: 16px; line-height: 1.45; }

@@ -6,11 +6,11 @@ const expiresAtMs = Date.parse('2026-10-03T00:00:00.000Z');
 test('server HTML and mounted lookup obey the configured clock and expiry boundary', async ({ page, request }) => {
   await page.clock.install({ time: new Date(nowIso) });
   const current = Date.parse(nowIso) < expiresAtMs;
-  const response = await request.get('/review');
+  const response = await request.get('/manual/challan');
   expect(response.status()).toBe(200);
   const html = await response.text();
   expect(html.includes('data-official-lookup')).toBe(current);
-  await page.goto('/review');
+  await page.goto('/manual/challan');
   await page.locator('main:not([inert])').waitFor();
   await expect(page.locator('[data-official-lookup]')).toHaveCount(current ? 1 : 0);
   const untilExpiry = expiresAtMs - Date.parse(nowIso);

@@ -28,6 +28,7 @@ const eslintConfig = defineConfig([
     },
   },
   globalIgnores([
+    'public/document-assets/**',
     '.next/**',
     'out/**',
     'build/**',

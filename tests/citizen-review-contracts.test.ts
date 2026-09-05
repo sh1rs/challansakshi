@@ -59,8 +59,12 @@ describe('adaptive citizen review contracts', () => {
     expect(html).toContain('Check your challan</h1>');
     expect(html).toContain('Where did you open this challan?');
     expect(html).not.toContain('I understand this is manual self-review');
-    expect(footer).toContain('Independent—not a government, bank, court or toll service.');
-    expect(footer).toContain('Never enter passwords, OTPs, Aadhaar, CAPTCHA or payment details.');
+    expect(footer).toContain('Independent—not a government service.');
+    expect(footer).toContain('Documents are read on this device');
+    expect(footer).toContain('Nothing is filed, paid or submitted for you.');
+    expect(footer).toContain('No legal advice or guaranteed outcome.');
+    expect(footer.match(/<p\b/g)).toHaveLength(1);
+    expect(html.match(/data-product-boundary=/g)).toHaveLength(1);
     expect(footer.match(/href="\/safety"/g)).toHaveLength(1);
   });
 
