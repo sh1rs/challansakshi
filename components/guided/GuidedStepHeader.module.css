@@ -13,8 +13,8 @@
 .guideTopline p, .guideTopline span { margin: 0; color: var(--accent-text); font-size: 11px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .primaryInstruction { margin-top: 4px; }
 .primaryInstruction > span, .detailLabel { display: block; color: var(--muted); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-.primaryInstruction h2 { max-width: 880px; margin: 0; color: var(--ink); font: 700 clamp(18px, 2.1vw, 22px)/1.25 Georgia, serif; letter-spacing: -.015em; outline: none; }
-.primaryInstruction h2:focus-visible { border-radius: 5px; outline: 3px solid var(--focus); outline-offset: 4px; }
+.primaryInstruction :is(h1, h2) { max-width: 880px; margin: 0; color: var(--ink); font: 700 clamp(18px, 2.1vw, 22px)/1.25 Georgia, serif; letter-spacing: -.015em; outline: none; }
+.primaryInstruction :is(h1, h2):focus-visible { border-radius: 5px; outline: 3px solid var(--focus); outline-offset: 4px; }
 .status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; padding: 6px 9px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--inset-strong); color: var(--label); font-size: 12px; line-height: 1.4; }
 .status > span { color: var(--muted); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
 .status strong { color: inherit; font-size: inherit; }
@@ -46,7 +46,7 @@
 
 @media (max-width: 700px) {
   .guide { margin-top: 6px; padding: 10px 12px; }
-  .primaryInstruction h2 { font-size: 18px; }
+  .primaryInstruction :is(h1, h2) { font-size: 18px; }
   .stepList { grid-template-columns: 1fr; }
 }
 
@@ -63,7 +63,30 @@
 
 /* Compact source/status guidance, without a separate visual language. */
 .guide { background: var(--card); border-color: var(--line); border-radius: var(--radius-panel); box-shadow: none; }
-.primaryInstruction h2 { font-family: var(--font-heading); font-size: 20px; }
+.primaryInstruction :is(h1, h2) { font-family: var(--font-heading); font-size: 20px; }
 .guideTopline p, .guideTopline span, .primaryInstruction > span, .status, .status > span, .guideDisclosure summary, .detailLabel, .detailsContent p, .stepList li, .stepList small { font-size: 16px; line-height: 1.4; letter-spacing: normal; text-transform: none; }
 .guideDisclosure, .status { border-radius: var(--radius-control); }
 .stepList li { color: var(--muted); }
+
+/* The longer synthetic journey uses a richer orientation card; real flows stay compact. */
+@media screen {
+  :global(.app-root) .guide {
+    border-color: var(--teal-border);
+    border-radius: 14px;
+    background: linear-gradient(115deg, var(--teal-soft), var(--card) 72%);
+    box-shadow: inset 3px 0 0 var(--teal), var(--demo-card-shadow, 0 6px 18px var(--shadow));
+  }
+  :global(.app-root) .guideTopline p { font-weight: 750; }
+  :global(.app-root) .primaryInstruction :is(h1, h2) { font-size: clamp(20px, 2.4vw, 26px); line-height: 1.25; }
+  :global(.app-root) .status { background: var(--card); }
+  :global(.app-root) .status[data-tone='needs-action'] { background: var(--amber-soft); }
+  :global(.app-root) .status[data-tone='safe-stop'] { background: var(--danger-soft); }
+  :global(.app-root) .status[data-tone='ready'],
+  :global(.app-root) .status[data-tone='complete'] { background: var(--teal-soft); }
+  :global(.app-root) .guideDisclosure { background: var(--inset-strong); }
+  :global(.app-root) .guideDisclosure[open] { background: var(--card); }
+  :global(.app-root) .guideDisclosure[open] > summary { border-bottom: 1px solid var(--hairline); }
+  :global(.app-root) .detailsContent { padding-top: 12px; }
+  :global(.app-root) .stepList li[data-state='current'] > span { box-shadow: 0 0 0 3px var(--teal-soft); }
+  :global(.app-root.mode-text-first) .guide { background: var(--card); box-shadow: none; }
+}

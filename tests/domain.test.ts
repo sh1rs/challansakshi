@@ -100,8 +100,14 @@ describe('evidence readiness', () => {
     const result = evaluateEvidenceReadiness(fixtures.inconclusive.readiness);
     expect(result.complete).toBe(false);
     expect(result.requiredPresent).toBeLessThan(result.requiredTotal);
-    expect(result.items.find((item) => item.id === 'current-photo')?.status).toBe('present');
-    expect(result.items.filter((item) => item.status === 'missing').map((item) => item.id)).toEqual(['clearer-image']);
+    expect(result.items.find((item) => item.id === 'current-photo')?.status).toBe('missing');
+    expect(result.items.filter((item) => item.status === 'missing').map((item) => item.id)).toEqual(['current-photo', 'clearer-image']);
+  });
+
+  it('does not count a reused enforcement illustration as a separate current vehicle photo', () => {
+    const result = evaluateEvidenceReadiness(fixtures.consistent.readiness);
+    expect(result.items.find((item) => item.id === 'current-photo')?.status).toBe('missing');
+    expect(result.complete).toBe(false);
   });
 });
 

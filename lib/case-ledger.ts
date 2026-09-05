@@ -78,6 +78,7 @@ export interface BuildCaseLedgerInput {
   passportRevisionId?: string | null;
   custodyEvidenceId?: CustodyEvidenceItemId | null;
   canPreparePack?: boolean;
+  citizenPhotoStatus?: 'supplied' | 'not-supplied' | 'reused';
 }
 
 export interface CaseLedgerSnapshot {
@@ -112,13 +113,26 @@ export function buildEvidenceIndex(input: {
   registeredPlate: string;
   observedPlate: string;
   submittedRevisionId: string | null;
+  citizenPhotoStatus?: 'supplied' | 'not-supplied' | 'reused';
   custody?: { id: CustodyEvidenceItemId; label: LocalizedText; summary: string } | null;
 }): EvidenceIndexItem[] {
   const items: EvidenceIndexItem[] = [
     { id: 'A1', sourceId: 'challan', label: { en: 'Synthetic e-Challan', hi: 'सिंथेटिक ई-चालान' }, summary: input.challanNumber },
     { id: 'A2', sourceId: 'vehicle-record', label: { en: 'Synthetic vehicle record', hi: 'सिंथेटिक वाहन रिकॉर्ड' }, summary: input.registeredPlate || 'Unavailable' },
     { id: 'A3', sourceId: 'enforcement', label: { en: 'Enforcement image and observations', hi: 'प्रवर्तन फ़ोटो और अवलोकन' }, summary: input.observedPlate || 'Unavailable / unclear' },
-    { id: 'A4', sourceId: 'citizen-photo', label: { en: 'Citizen demo photograph', hi: 'नागरिक की डेमो फ़ोटो' }, summary: 'Synthetic' },
+    {
+      id: 'A4', sourceId: 'citizen-photo',
+      label: input.citizenPhotoStatus === 'not-supplied'
+        ? { en: 'Citizen photo not supplied', hi: 'नागरिक की फ़ोटो नहीं दी गई' }
+        : input.citizenPhotoStatus === 'reused'
+          ? { en: 'Reused demo reference', hi: 'दोबारा इस्तेमाल किया गया डेमो संदर्भ' }
+          : { en: 'Citizen demo photograph', hi: 'नागरिक की डेमो फ़ोटो' },
+      summary: input.citizenPhotoStatus === 'not-supplied'
+        ? 'Not supplied; no independent citizen photograph.'
+        : input.citizenPhotoStatus === 'reused'
+          ? 'Same synthetic illustration as A3; not independent evidence.'
+          : 'Synthetic citizen-side illustration',
+    },
     { id: 'A5', sourceId: 'citizen-comparison', label: { en: 'Citizen-confirmed comparison and request', hi: 'नागरिक द्वारा पक्की तुलना और अनुरोध' }, summary: input.submittedRevisionId ?? 'Not submitted' },
   ];
   if (input.custody) items.push({ id: input.custody.id, sourceId: 'custody-record', label: input.custody.label, summary: input.custody.summary });
@@ -181,17 +195,23 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   const revisionId = input.submittedRevisionId;
   const canPreparePack = input.canPreparePack ?? input.finding !== 'consistent';
   const custodyEvidenceIds: EvidenceItemId[] = input.custodyEvidenceId ? [input.custodyEvidenceId] : [];
+  const suppliedEvidenceIds: EvidenceItemId[] = ['A1', 'A2', 'A3'];
+  if (!input.citizenPhotoStatus || input.citizenPhotoStatus === 'supplied') suppliedEvidenceIds.push('A4');
 
   add({
     id: `${input.fixtureId}-records-loaded`, type: 'records-loaded', recordedOn: input.issueDate,
-    actor: 'supplied-record', evidenceIds: ['A1', 'A2', 'A3', 'A4'], revisionId: null,
+    actor: 'supplied-record', evidenceIds: suppliedEvidenceIds, revisionId: null,
     label: { en: 'Synthetic records loaded', hi: 'सिंथेटिक रिकॉर्ड लोड हुए' },
-    detail: { en: 'Challan, vehicle record, enforcement image, and citizen photo entered this local demo.', hi: 'चालान, वाहन रिकॉर्ड, प्रवर्तन फ़ोटो और नागरिक की फ़ोटो इस स्थानीय डेमो में जोड़ी गईं।' },
+    detail: input.citizenPhotoStatus === 'not-supplied'
+      ? { en: 'Challan, vehicle record, and enforcement image entered this local demo. A citizen photograph was not supplied.', hi: 'चालान, वाहन रिकॉर्ड और प्रवर्तन फ़ोटो इस स्थानीय डेमो में जोड़े गए। नागरिक की फ़ोटो नहीं दी गई।' }
+      : input.citizenPhotoStatus === 'reused'
+        ? { en: 'Challan, vehicle record, and enforcement image entered this local demo. The reused illustration is not an independent citizen photograph.', hi: 'चालान, वाहन रिकॉर्ड और प्रवर्तन फ़ोटो इस स्थानीय डेमो में जोड़े गए। दोबारा इस्तेमाल किया चित्र अलग नागरिक फ़ोटो नहीं है।' }
+        : { en: 'Challan, vehicle record, enforcement image, and citizen photo entered this local demo.', hi: 'चालान, वाहन रिकॉर्ड, प्रवर्तन फ़ोटो और नागरिक की फ़ोटो इस स्थानीय डेमो में जोड़ी गईं।' },
   });
 
   add({
     id: `${input.fixtureId}-analysis-recorded`, type: 'analysis-recorded', recordedOn: demoDates.review,
-    actor: 'analysis', evidenceIds: ['A1', 'A2', 'A3', 'A4'], revisionId: null,
+    actor: 'analysis', evidenceIds: suppliedEvidenceIds, revisionId: null,
     label: { en: 'Source-linked observations recorded', hi: 'स्रोत से जुड़े अवलोकन दर्ज हुए' },
     detail: input.analysisMode === 'live'
       ? { en: 'A live model run produced observations for citizen review.', hi: 'लाइव मॉडल ने नागरिक समीक्षा के लिए अवलोकन बनाए।' }
@@ -239,7 +259,7 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   if (input.packPrepared && canPreparePack && revisionId) {
     add({
       id: `${input.fixtureId}-pack-prepared`, type: 'pack-prepared', recordedOn: demoDates.review,
-      actor: 'rules', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
+      actor: 'rules', evidenceIds: [...suppliedEvidenceIds, 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Evidence pack prepared', hi: 'सबूत पैक तैयार हुआ' },
       detail: { en: `The active pack is tied to revision ${revisionId}.`, hi: `मौजूदा पैक रिविज़न ${revisionId} से जुड़ा है।` },
     });
@@ -248,7 +268,7 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   if (input.submitted && canPreparePack && revisionId) {
     add({
       id: `${input.fixtureId}-submission-acknowledged`, type: 'submission-acknowledged', recordedOn: demoDates.review,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
+      actor: 'simulated-authority', evidenceIds: [...suppliedEvidenceIds, 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Simulated submission acknowledged', hi: 'काल्पनिक जमा की पावती मिली' },
       detail: { en: 'No government system was contacted.', hi: 'किसी सरकारी सिस्टम से संपर्क नहीं हुआ।' },
     });
@@ -257,7 +277,7 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   if (input.submitted && canPreparePack && input.trackingStage >= 3 && revisionId) {
     add({
       id: `${input.fixtureId}-authority-review`, type: 'authority-review-recorded', recordedOn: demoDates.authorityReview,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
+      actor: 'simulated-authority', evidenceIds: [...suppliedEvidenceIds, 'A5', ...custodyEvidenceIds], revisionId,
       label: { en: 'Fictional review status recorded', hi: 'काल्पनिक समीक्षा स्थिति दर्ज हुई' },
       detail: { en: 'This is a simulated status branch, not an official event.', hi: 'यह काल्पनिक स्थिति शाखा है, आधिकारिक घटना नहीं।' },
     });
@@ -266,7 +286,7 @@ export function buildCaseLedger(input: BuildCaseLedgerInput): CaseLedgerEvent[] 
   if (input.submitted && canPreparePack && input.trackingStage >= 4 && revisionId && (input.outcome === 'quashed' || input.outcome === 'rejected')) {
     add({
       id: `${input.fixtureId}-authority-order-${input.outcome}`, type: 'authority-order-recorded', recordedOn: demoDates.outcome,
-      actor: 'simulated-authority', evidenceIds: ['A1', 'A2', 'A3', 'A4', 'A5', ...custodyEvidenceIds], revisionId,
+      actor: 'simulated-authority', evidenceIds: [...suppliedEvidenceIds, 'A5', ...custodyEvidenceIds], revisionId,
       label: input.outcome === 'rejected'
         ? { en: 'Fictional rejection order recorded', hi: 'काल्पनिक अस्वीकृति आदेश दर्ज हुआ' }
         : { en: 'Fictional quashing order recorded', hi: 'काल्पनिक निरस्तीकरण आदेश दर्ज हुआ' },

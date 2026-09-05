@@ -341,7 +341,8 @@ h1 em { color: var(--teal); font-weight: inherit; }
   background-color: #aab3b6;
   background-image: linear-gradient(rgb(16 44 71 / 5%), rgb(16 44 71 / 5%)), url('/evidence-contact-sheet.png');
   background-repeat: no-repeat;
-  background-size: 300% 100%;
+  /* Crop the three-panel photograph without stretching vehicle proportions. */
+  background-size: 100% 100%, 300% auto;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 28%);
 }
 .photo-panel-left { background-position: left center; }
@@ -1589,3 +1590,147 @@ main:focus { outline: none; }
 .app-root .evidence-scene::before { display: none; }
 .app-root .screen-shell { padding-block: 24px 48px; }
 @media (max-width: 700px) { .app-root .hero { padding-block: 24px; } .app-root .hero h1 { font-size: 26px; } .app-root .hero-copy { text-align: left; } .app-root .eyebrow, .app-root .hero-actions, .app-root .microcopy { justify-content: flex-start; } }
+
+/* Screen-only polish for the retained demo. Source documents keep their paper treatment. */
+@media screen {
+  .app-root {
+    --demo-card-shadow: 0 2px 5px var(--shadow), 0 16px 38px var(--shadow);
+    --demo-raised-shadow: 0 6px 14px var(--shadow), 0 24px 58px var(--shadow);
+    background: radial-gradient(ellipse 70% 520px at 95% 0, var(--teal-soft), transparent 80%),
+      linear-gradient(180deg, var(--app-ground), var(--panel));
+  }
+
+  .app-root .hero { gap: clamp(32px, 6vw, 80px); padding-block: 48px; }
+  .app-root .hero h1 { max-width: 680px; font-size: clamp(36px, 4.8vw, 62px); line-height: 1.06; }
+  .app-root .hero-lede { font-size: 18px; line-height: 1.6; }
+  .app-root :is(.screen-heading h1, .tracking-heading h1, .order-review-hero h1) { letter-spacing: -.04em; line-height: 1.1; }
+  .app-root :is(.order-review-screen, .order-map-screen) { margin-inline: auto; }
+  .app-root :is(.section-heading h2, .passport-section-heading h2, .card-title h2, .triage-copy h2) { letter-spacing: -.025em; }
+  .app-root .eyebrow > span { width: 28px; height: 3px; border-radius: 2px; }
+  .app-root .trust-line { background: linear-gradient(110deg, var(--teal-soft), var(--strip)); }
+
+  .app-root :is(.evidence-scene, .evidence-card, .source-preview, .review-source-sticky,
+    .fact-group, .readiness-columns > section, .timeline-card, .track-summary,
+    .passport-section, .order-fact-review, .mapping-card, .ledger-panel,
+    .payment-demo, .court-handoff, .route-next-card, .route-record-card) {
+    border-radius: 16px;
+    box-shadow: var(--demo-card-shadow);
+  }
+  .app-root .evidence-scene { padding: 18px; border-color: var(--teal-border); box-shadow: var(--demo-raised-shadow); }
+  .app-root :is(.evidence-card, .source-preview, .fact-group, .timeline-card, .track-summary,
+    .passport-section, .order-fact-review, .ledger-panel) { background: var(--card); }
+  .app-root .evidence-card-head { padding-bottom: 8px; }
+  .app-root .evidence-card-head h3 { font-size: 18px; }
+  .app-root .photo-provenance { margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  .app-root .evidence-card > .photo-provenance { margin-inline: 18px; }
+  .app-root .evidence-scene .photo-provenance + .finding-card { margin-top: 12px; }
+  .app-root .photo-plate { font-size: 11px; }
+  .app-root .fact-group-heading { background: linear-gradient(110deg, var(--teal-soft), var(--panel)); }
+  .app-root :is(.source-number, .card-title > span, .passport-section-heading > span) { box-shadow: inset 0 1px 0 var(--inset-strong); }
+  .app-root :is(.finding-card, .finding-hero, .route-hero, .outcome-card, .readiness-meter) { box-shadow: var(--demo-card-shadow); }
+  .app-root :is(.finding-hero, .route-hero) { border-radius: 18px; }
+  .app-root :is(.finding-big-icon, .route-hero-icon) { box-shadow: 0 4px 12px var(--shadow); }
+  .app-root :is(.limitations-panel, .privacy-warning, .critical-caveat, .order-safety-banner) { border-radius: 12px; }
+
+  .app-root :is(.fixture-option, .route-card, .breadth-grid > button, .public-service-grid > a) {
+    border-radius: 16px;
+    background: linear-gradient(145deg, var(--card), var(--panel));
+    box-shadow: var(--demo-card-shadow);
+  }
+  .app-root .fixture-option.active {
+    border-color: var(--teal);
+    background: linear-gradient(145deg, var(--card), var(--teal-soft));
+    box-shadow: inset 0 3px 0 var(--teal), var(--demo-card-shadow);
+  }
+  .app-root .fixture-option.finding-inconclusive.active {
+    border-color: var(--amber);
+    background: linear-gradient(145deg, var(--card), var(--amber-soft));
+    box-shadow: inset 0 3px 0 var(--amber), var(--demo-card-shadow);
+  }
+  .app-root .fixture-option > strong { font-size: 22px; }
+  .app-root :is(.fixture-option > small, .evidence-why p, .review-source-sticky p,
+    .privacy-warning p, .analysis-row > span, .no-invention-note p,
+    .passport-section-heading p, .passport-confirmation span, .custody-finding p,
+    .route-card > p, .triage-copy p, .route-boundaries p) { font-size: 16px; line-height: 1.55; }
+  .app-root :is(.how article, .meaning-grid article) { border-radius: 0 0 14px 14px; box-shadow: var(--demo-card-shadow); }
+  .app-root .real-help-band { border-color: var(--teal-border); background: var(--card); box-shadow: var(--demo-card-shadow); }
+  .app-root .triage-card { border-radius: 18px; background: linear-gradient(120deg, var(--teal-soft), var(--card)); box-shadow: var(--demo-card-shadow); }
+  .app-root :is(.desk-scope-card, .fictional-reference, .order-stepper, .passport-strip) {
+    border-color: var(--teal-border);
+    background: linear-gradient(120deg, var(--card), var(--teal-soft));
+    box-shadow: var(--demo-card-shadow);
+  }
+
+  .app-root :is(.passport-hero, .official-handoff, .order-note > header) {
+    background: radial-gradient(ellipse at 100% 0, #144d59, transparent 75%), var(--navy);
+    box-shadow: var(--demo-raised-shadow);
+  }
+  .app-root .passport-hero { border: 1px solid var(--teal-border); }
+  .app-root .passport-id { background: rgb(255 255 255 / 8%); }
+  .app-root .passport-questions article { background: linear-gradient(145deg, var(--card), var(--panel)); box-shadow: var(--demo-card-shadow); }
+  .app-root :is(.passport-counts article, .custody-timeline > dl div, .case-ledger.compact li,
+    .evidence-registry article, .journey-map > span) { border-radius: 10px; }
+  .app-root .outcome-buttons button.active { background: linear-gradient(140deg, var(--card), var(--teal-soft)); box-shadow: inset 0 3px 0 var(--teal), var(--demo-card-shadow); }
+  .app-root .print-pack { --muted: #53646b; --border-soft: #d8dce3; color: #183048; border-color: #cbd4d6; border-radius: 16px; box-shadow: var(--demo-raised-shadow); }
+  .app-root .print-pack > header { border-radius: 16px 16px 0 0; background: #f7fafb; }
+  .app-root .print-pack > footer { border-radius: 0 0 16px 16px; }
+  /* A readable on-screen document, without altering the compact printed pack. */
+  .app-root :is(.pack-section pre, .pack-section > p, .pack-two-col p,
+    .pack-summary p, .evidence-index li > span) { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+  .app-root :is(.pack-brand span, .pack-meta span, .pack-meta b, .pack-summary small,
+    .pack-clock span, .pack-section h3, .pack-two-col h3, .evidence-index li > b,
+    .evidence-index li > small, .signature-line, .print-pack > footer,
+    .pack-passport-snapshot dt) { font-size: 12px; line-height: 1.5; }
+  .app-root :is(.pack-passport-snapshot dd, .pack-section > ol:not(.evidence-index) b,
+    .pack-section > ol:not(.evidence-index) span) { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+  .app-root .evidence-index li > small { color: #53646b; overflow-wrap: anywhere; }
+  .app-root :is(.order-source-card, .map-order-source) { color: #183048; box-shadow: var(--demo-card-shadow); }
+  .app-root :is(.sticky-action, .passport-action-bar, .create-note-bar) { border-color: var(--teal-border); box-shadow: var(--demo-raised-shadow); }
+
+  .app-root .button { border-radius: 10px; }
+  .app-root .button-primary {
+    background: linear-gradient(135deg, var(--action-hover), var(--action-bg));
+    box-shadow: 0 4px 10px var(--shadow), inset 0 1px 0 var(--inset);
+  }
+  .app-root .button-primary:hover { background: var(--action-hover); }
+  .app-root .button-secondary { border-color: var(--border); background: var(--card); box-shadow: 0 2px 5px var(--shadow); }
+  .app-root :is(.example-chips button, .scenario-switch button, .official-link-stack a,
+    .track-summary > button, .source-return, .row-confirmation, .order-completeness label,
+    .status-choice label, .paragraph-option, .paragraph-choice button,
+    .plain-note summary, .mapping-card summary) { min-height: 48px; }
+  .app-root .paragraph-choice button { min-width: 48px; }
+  .app-root :is(.example-chips button, .scenario-switch button, .official-link-stack a,
+    .track-summary > button, .source-return, .plain-note summary) { font-size: 16px; }
+
+  /* Text-first mode keeps the low-distraction presentation alongside all records. */
+  .app-root.mode-text-first { --demo-card-shadow: none; --demo-raised-shadow: none; background: var(--app-ground); }
+  .app-root.mode-text-first :is(.button-primary, .button-secondary, .fixture-option.active,
+    .outcome-buttons button.active) { box-shadow: none; }
+}
+
+@media screen and (max-width: 700px) {
+  .app-root .hero { gap: 28px; padding-block: 28px; }
+  .app-root .hero h1 { font-size: 32px; }
+  .app-root .hero-lede { font-size: 16px; }
+  .app-root .evidence-scene { padding: 14px; }
+  .app-root .pack-section > ol:not(.evidence-index) li { align-items: flex-start; flex-direction: column; gap: 5px; }
+}
+
+@media screen and (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .app-root :is(.button, .fixture-option, .route-card, .breadth-grid > button, .passport-strip,
+    .outcome-buttons button, .public-service-grid > a) {
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  }
+  .app-root :is(.fixture-option, .route-card, .breadth-grid > button, .passport-strip,
+    .outcome-buttons button, .public-service-grid > a):hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--teal);
+    box-shadow: var(--demo-raised-shadow);
+  }
+  .app-root .button:not(:disabled):active { transform: translateY(0); }
+}
+
+@media screen and (prefers-reduced-motion: reduce) {
+  .app-root :is(.button, .fixture-option, .route-card, .breadth-grid > button, .passport-strip,
+    .outcome-buttons button, .public-service-grid > a) { transform: none; transition: none; }
+}

@@ -109,6 +109,19 @@ describe('synthetic analysis endpoint', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('uses the physical-plate atlas within the unchanged two MiB image bound', async () => {
+    const imageBytes = Uint8Array.from(readFileSync(new URL('../public/evidence-contact-sheet-plates-v2.png', import.meta.url)));
+    expect(imageBytes.byteLength).toBeLessThanOrEqual(2 * 1024 * 1024);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(imageBytes, { status: 200, headers: { 'content-type': 'image/png', 'content-length': String(imageBytes.byteLength) } }))
+      .mockResolvedValueOnce(completedModelResponse());
+
+    const response = await POST(fixtureRequest());
+
+    expect(response.status).toBe(200);
+    expect(String(fetchSpy.mock.calls[0][0])).toBe('https://example.test/evidence-contact-sheet-plates-v2.png');
+  });
+
   it('rejects a cross-origin request before any model call', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const request = validRequest();

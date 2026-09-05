@@ -4,8 +4,10 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CitizenFooter, CitizenHeader } from '../components/shared/CitizenChrome';
+import { PublicBetaShell } from '../components/public-beta/PublicBetaShell';
 
 const roots: Array<{ unmount: () => void }> = [];
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   document.body.replaceChildren();
@@ -21,19 +23,53 @@ function mountHeader(props: Partial<Parameters<typeof CitizenHeader>[0]> = {}) {
 }
 
 describe('citizen chrome contracts', () => {
+  it('keeps Demo directly in the top bar without opening the menu', () => {
+    const host = mountHeader();
+    const demo = host.querySelector<HTMLAnchorElement>('header > a[data-demo-entry]');
+    expect(demo?.textContent).toBe('Demo');
+    expect(demo?.getAttribute('href')).toBe('/demo');
+    expect(demo?.closest('[hidden]')).toBeNull();
+    expect(host.querySelector('#citizen-navigation-menu')?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('keeps the Hindi Demo entry separate from the real-service navigation', () => {
+    const host = mountHeader({ language: 'hi' });
+    expect(host.querySelector('[data-demo-entry]')?.textContent).toBe('डेमो');
+    expect(host.querySelector('[data-demo-entry]')?.closest('nav')).toBeNull();
+  });
+
+  it('labels an explicitly synthetic shell without turning a real shell into a demo', () => {
+    const props = { language: 'en' as const, setLanguage: () => undefined, service: 'FASTag check', serviceHindi: 'FASTag जाँच', children: createElement('main', null, 'Record review') };
+    const real = renderToStaticMarkup(createElement(PublicBetaShell, props));
+    const demo = renderToStaticMarkup(createElement(PublicBetaShell, { ...props, demo: true }));
+    expect(real).toContain('data-product-mode="real"');
+    expect(real).not.toContain('Use fictional or synthetic test data only.');
+    expect(demo).toContain('data-product-mode="demo"');
+    expect(demo).toContain('Use fictional or synthetic test data only.');
+  });
+
+  it('offers every demo area inside the demo boundary, never inside real navigation', () => {
+    const host = mountHeader({ boundary: 'demo' });
+    const demoNav = host.querySelector('nav[aria-label="Demo cases"]');
+    expect(demoNav).not.toBeNull();
+    expect([...demoNav!.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/demo', '/demo/test-lab#case-suite', '/demo/fastag']);
+    expect(demoNav!.querySelector('a[href="/demo/test-lab#case-suite"]')?.textContent).toBe('10-case Test Lab');
+    const real = mountHeader();
+    expect(real.querySelector('nav[aria-label="Demo cases"]')).toBeNull();
+  });
   it('uses one boundary paragraph followed by one Safety & privacy link', () => {
     const html = renderToStaticMarkup(createElement(CitizenFooter, { language: 'en' }));
     const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/g)];
     const links = [...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
     expect(paragraphs).toHaveLength(1);
-    expect(paragraphs[0][1].replace(/<[^>]+>/g, '')).toBe('Independent—not a government service. Documents are read on this device unless you choose cloud analysis for selected files. Nothing is filed, paid or submitted for you. No legal advice or guaranteed outcome.');
+    expect(paragraphs[0][1].replace(/<[^>]+>/g, '')).toBe('Independent—not a government service. Documents are read on this device. Nothing is filed, paid or submitted for you. No legal advice or guaranteed outcome.');
     expect(links.map((match) => [match[1], match[2]])).toEqual([['/safety', 'Safety &amp; privacy']]);
   });
 
   it('renders a faithful standalone Hindi boundary', () => {
     const html = renderToStaticMarkup(createElement(CitizenFooter, { language: 'hi' }));
     expect(html).toContain('स्वतंत्र—यह सरकारी सेवा नहीं है।');
-    expect(html).toContain('जब तक आप चुनी फ़ाइलों के लिए क्लाउड विश्लेषण नहीं चुनते, दस्तावेज़ इसी डिवाइस पर पढ़े जाते हैं।');
+    expect(html).toContain('दस्तावेज़ इसी डिवाइस पर पढ़े जाते हैं।');
     expect(html).toContain('आपके लिए कुछ भी फाइल, भुगतान या जमा नहीं किया जाता।');
     expect(html).toContain('कानूनी सलाह या नतीजे की गारंटी नहीं।');
     expect(html).not.toContain('Independent—not');
@@ -48,7 +84,7 @@ describe('citizen chrome contracts', () => {
     expect(trigger?.getAttribute('aria-expanded')).toBe('true');
     const menu = host.querySelector<HTMLElement>('#citizen-navigation-menu');
     expect(menu?.hidden).toBe(false);
-    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/safety']);
+    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/dashboard', '/message-check', '/reply-review', '/sources', '/safety']);
     expect(menu?.querySelector('[role="group"][aria-label="Language"]')).not.toBeNull();
     expect(menu?.textContent).toContain('Dark mode');
     act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

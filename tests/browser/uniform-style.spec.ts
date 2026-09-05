@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const citizenRoutes = ['/', '/review', '/fastag', '/privacy', '/safety', '/demo', '/demo/test-lab', '/manual/challan', '/toll'];
+const citizenRoutes = ['/', '/review', '/fastag', '/privacy', '/safety', '/demo', '/demo/test-lab', '/demo/fastag', '/manual/challan', '/toll'];
 
 test('all public routes share the reference palette, compact chrome and one footer boundary', async ({ page }) => {
   test.setTimeout(120_000);
@@ -9,6 +9,7 @@ test('all public routes share the reference palette, compact chrome and one foot
   for (const route of citizenRoutes) {
     await page.goto(route);
     await expect(page.locator('main').first()).toBeVisible();
+    await expect(page.locator('header > [data-demo-entry]')).toBeVisible();
     await expect(page.locator('[data-mobile-header]')).toHaveCSS('height', '64px');
     await expect(page.locator('[data-mobile-header]')).toHaveCSS('color', 'rgb(9, 22, 56)');
     await expect(page.locator('footer [data-product-boundary]')).toHaveCount(1);

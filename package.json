@@ -14,6 +14,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:official-routes": "node scripts/check-official-routes.mjs",
     "test:browser:web": "playwright test --config playwright.config.ts",
     "extension:typecheck": "tsc -p extension/tsconfig.json --noEmit",
     "extension:test": "vitest run --config extension/vitest.config.ts",

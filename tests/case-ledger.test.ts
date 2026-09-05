@@ -44,6 +44,22 @@ function heroContext() {
 }
 
 describe('citizen review provenance', () => {
+  it.each([
+    ['not-supplied', /not supplied/i, /no independent citizen photograph/i],
+    ['reused', /reused demo reference/i, /same.*A3.*not independent/i],
+  ] as const)('keeps %s citizen photographs explicit in the prepared evidence index', (citizenPhotoStatus, label, summary) => {
+    const index = buildEvidenceIndex({
+      challanNumber: 'CS-DEMO-260820-B',
+      registeredPlate: 'TEST-26-SC-4412',
+      observedPlate: '',
+      submittedRevisionId: null,
+      citizenPhotoStatus,
+    });
+    const photo = index.find(item => item.id === 'A4');
+    expect(photo?.label.en).toMatch(label);
+    expect(photo?.summary).toMatch(summary);
+  });
+
   it('creates a stable submitted revision for the same ordered fact set', () => {
     const { fixture, facts } = heroContext();
     const reversed = [...facts].reverse();
@@ -296,6 +312,20 @@ describe('order-to-evidence engine', () => {
 });
 
 describe('derived case ledger', () => {
+  it.each([
+    ['not-supplied', /citizen photograph was not supplied/i],
+    ['reused', /reused.*not an independent citizen photograph/i],
+  ] as const)('does not record a %s photograph as separately loaded or analyzed', (citizenPhotoStatus, detail) => {
+    const events = buildCaseLedger({
+      fixtureId: 'inconclusive', issueDate: '2026-08-20', analysisMode: 'precomputed', confirmed: false,
+      corrections: [], finding: 'inconclusive', packPrepared: false, submitted: false,
+      submittedRevisionId: null, trackingStage: 2, outcome: 'none', orderFactsConfirmed: false,
+      orderMapConfirmed: false, citizenPhotoStatus,
+    });
+    expect(events[0].detail.en).toMatch(detail);
+    expect(events.some(event => event.evidenceIds.includes('A4'))).toBe(false);
+  });
+
   it('records one coherent rejected branch in chronological sequence', () => {
     const { fixture, facts, classification, revisionId } = heroContext();
     const events = buildCaseLedger({

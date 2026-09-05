@@ -20,6 +20,7 @@ export function PublicBetaShell({
   simpleMode,
   onSimpleModeChange,
   preserveScroll = false,
+  demo = false,
 }: {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -31,6 +32,7 @@ export function PublicBetaShell({
   simpleMode?: boolean;
   onSimpleModeChange?: (value: boolean) => void;
   preserveScroll?: boolean;
+  demo?: boolean;
 }) {
   return (
     <div
@@ -45,13 +47,14 @@ export function PublicBetaShell({
         service={service}
         serviceHindi={serviceHindi}
         englishOnly={englishOnly}
+        boundary={demo ? 'demo' : 'real'}
         utilities={<>
           {simpleMode !== undefined && onSimpleModeChange ? <CitizenHeaderButton type="button" aria-pressed={simpleMode} onClick={() => onSimpleModeChange(!simpleMode)}>{t(language, 'Simple mode', 'सरल भाषा')}</CitizenHeaderButton> : null}
         </>}
         quickExit={onQuickExit ? <CitizenHeaderButton type="button" tone="danger" aria-label={t(language, 'Quick exit and clear this review', 'तुरंत बाहर निकलें और यह समीक्षा साफ़ करें')} onClick={onQuickExit}>{t(language, 'Exit', 'बाहर')}</CitizenHeaderButton> : undefined}
       />
       {children}
-      <CitizenFooter language={language} service={service} />
+      <CitizenFooter language={language} service={service} boundary={demo ? 'demo' : 'real'} />
     </div>
   );
 }

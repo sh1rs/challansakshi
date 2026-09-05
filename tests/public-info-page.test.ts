@@ -89,18 +89,18 @@ describe('public privacy and safety pages', () => {
     expect(readmeSource).toContain('app/demo/page.tsx\n  └─ components/ChallanSakshiApp.tsx');
   });
 
-  it('labels the people-facing real product as a non-public prototype', () => {
+  it('distinguishes the deployed prototype from verified operational readiness', () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
 
-    expect(html).toContain('this release remains a non-public prototype');
-    expect(publicInfoSource).toContain('यह रिलीज़ एक गैर-सार्वजनिक प्रोटोटाइप बनी हुई है।');
+    expect(html).toContain('this release is a publicly reachable prototype');
+    expect(publicInfoSource).toContain('संचालन की वे शर्तें अभी सत्यापित नहीं हैं।');
     expect(html).not.toMatch(/early access|public beta/i);
     expect(publicInfoSource).not.toMatch(/early access|अर्ली एक्सेस|public beta/i);
   });
 
   it('documents the complete installation-free handoff without blurring real and synthetic authority', () => {
-    expect(readmeSource).toContain('**Code status:** public-beta candidate.');
-    expect(readmeSource).toContain('**People-facing status:** non-public prototype.');
+    expect(readmeSource).toContain('**Code status:** public source publication authorized;');
+    expect(readmeSource).toContain('deployment is not evidence of government integration');
     expect(readmeSource).toContain('The complete installation-free path is the in-tab field pack plus the normal official-service anchor.');
     expect(readmeSource).toContain('The field pack is a user-reviewed factual preparation aid, not an official form, filing, legal conclusion, or proof of submission.');
     expect(readmeSource).toContain('single controlled description textarea');

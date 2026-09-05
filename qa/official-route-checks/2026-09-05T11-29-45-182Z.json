@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "challansakshi.route-reachability-report/v1",
+  "checkedAt": "2026-09-05T11:29:45.182Z",
+  "purposeVerification": "not-performed",
+  "registryMutated": false,
+  "limitations": "Network observations only. A maintainer must review official page purpose, issuing-jurisdiction scope and evidence before changing registry dates. No citizen data was used.",
+  "results": [
+    {
+      "url": "https://echallan.parivahan.gov.in/index/accused-challan",
+      "domain": "echallan.parivahan.gov.in",
+      "purpose": "official-record-lookup",
+      "evidenceRef": "public-launch-route-review-2026-09-02#national-record-lookup",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "reachable",
+      "purposeVerification": "not-performed",
+      "httpStatus": 200,
+      "redirects": [],
+      "observation": "HTTP response received. Purpose, service behavior and jurisdiction coverage have not been reverified."
+    },
+    {
+      "url": "https://echallan.parivahan.nic.in/challan/challan-services",
+      "domain": "echallan.parivahan.nic.in",
+      "purpose": "official-service-landing",
+      "evidenceRef": "public-launch-route-review-2026-09-02#nextgen-service-landing",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "unavailable",
+      "purposeVerification": "not-performed",
+      "httpStatus": null,
+      "redirects": [],
+      "observation": "Network check failed from this environment; citizen availability is unknown."
+    },
+    {
+      "url": "https://echallan.parivahan.gov.in/index/challan-services",
+      "domain": "echallan.parivahan.gov.in",
+      "purpose": "official-service",
+      "evidenceRef": "public-launch-route-review-2026-09-02#national-services-directory",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "reachable",
+      "purposeVerification": "not-performed",
+      "httpStatus": 200,
+      "redirects": [],
+      "observation": "HTTP response received. Purpose, service behavior and jurisdiction coverage have not been reverified."
+    },
+    {
+      "url": "https://vcourts.gov.in/virtualcourt/index.php",
+      "domain": "vcourts.gov.in",
+      "purpose": "official-court-service",
+      "evidenceRef": "public-launch-route-review-2026-09-02#virtual-courts",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "reachable",
+      "purposeVerification": "not-performed",
+      "httpStatus": 200,
+      "redirects": [],
+      "observation": "HTTP response received. Purpose, service behavior and jurisdiction coverage have not been reverified."
+    },
+    {
+      "url": "https://echallan.parivahan.gov.in/gsticket",
+      "domain": "echallan.parivahan.gov.in",
+      "purpose": "official-grievance-service",
+      "evidenceRef": "public-launch-route-review-2026-09-02#legacy-grievance",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "reachable",
+      "purposeVerification": "not-performed",
+      "httpStatus": 200,
+      "redirects": [],
+      "observation": "HTTP response received. Purpose, service behavior and jurisdiction coverage have not been reverified."
+    },
+    {
+      "url": "https://echallan.parivahan.nic.in/grievance",
+      "domain": "echallan.parivahan.nic.in",
+      "purpose": "official-grievance-service",
+      "evidenceRef": "public-launch-route-review-2026-09-02#nextgen-grievance",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "unavailable",
+      "purposeVerification": "not-performed",
+      "httpStatus": null,
+      "redirects": [],
+      "observation": "Network check failed from this environment; citizen availability is unknown."
+    },
+    {
+      "url": "https://traffic.delhipolice.gov.in/",
+      "domain": "traffic.delhipolice.gov.in",
+      "purpose": "official-service",
+      "evidenceRef": "public-launch-route-review-2026-09-02#delhi-official-landing",
+      "lastReviewedOn": "2026-09-02",
+      "reviewExpiresOn": "2026-10-02",
+      "reachability": "unavailable",
+      "purposeVerification": "not-performed",
+      "httpStatus": null,
+      "redirects": [],
+      "observation": "Check timed out within the bounded request budget."
+    }
+  ]
+}

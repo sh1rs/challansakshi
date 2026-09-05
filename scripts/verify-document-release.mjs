@@ -54,6 +54,8 @@ try {
     await page.screenshot({ path: '/tmp/challansakshi-release-failure.png', fullPage: true });
     throw error;
   }
+  // Keep recognition timing separate from correction actions and screenshot capture.
+  const imageReadingMs = Date.now() - start;
   assert.match(await page.locator('main').innerText(), /KA[O0]1AB1234/);
   await page.getByRole('button', { name: 'Correct: Registration notice', exact: true }).click();
   await page.getByLabel('Value shown in this source').fill('KA01AB1234');
@@ -104,6 +106,6 @@ try {
   const fixtureIdentifierRequests = requests.filter(request => /KA[O0]1AB(?:1234|5678)|TEST20260905|OMIT-THIS-TEST-NAME|synthetic-qa-only\.(?:png|pdf)/i.test(decodeURIComponent(request.url)));
   assert.equal(fixtureIdentifierRequests.length, 0, 'Fixture identifiers must not appear in request URLs.');
   assert.deepEqual(errors, []);
-  const evidence = { origin: base, status: response.status(), imageReadingAndReviewMs, pdfReadingAndReviewMs, pdfTextExtraction: true, independentRegistrationComparison: 'different', documentRequests: 0, fixtureIdentifierRequests: fixtureIdentifierRequests.length, requestCount: requests.length, storage, screenshots: ['/tmp/challansakshi-release-start.png', '/tmp/challansakshi-release-reading.png', '/tmp/challansakshi-release-prepared.png', '/tmp/challansakshi-release-pdf-comparison.png'] };
+  const evidence = { origin: base, status: response.status(), imageReadingMs, imageReadingAndReviewMs, pdfReadingAndReviewMs, pdfTextExtraction: true, independentRegistrationComparison: 'different', documentRequests: 0, fixtureIdentifierRequests: fixtureIdentifierRequests.length, requestCount: requests.length, storage, screenshots: ['/tmp/challansakshi-release-start.png', '/tmp/challansakshi-release-reading.png', '/tmp/challansakshi-release-prepared.png', '/tmp/challansakshi-release-pdf-comparison.png'] };
   console.log(JSON.stringify({ ...evidence, routesChecked: 8, result: 'PASS' }, null, 2));
 } finally { await browser.close(); }

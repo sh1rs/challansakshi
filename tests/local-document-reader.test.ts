@@ -162,6 +162,22 @@ describe('bounded browser-local document reading', () => {
     ready({ terminate, recognize }); await Promise.resolve(); await Promise.resolve();
     expect(terminate).toHaveBeenCalledTimes(1); expect(recognize).not.toHaveBeenCalled();
   });
+  it('fails promptly when OCR bootstrap reports an error without resolving its worker handle', async () => {
+    pdf(['']);
+    const abort = new AbortController();
+    vendor.createWorker.mockImplementation((_languages, _engine, config) => {
+      queueMicrotask(() => config.errorHandler('private-name-must-not-leak failed language download'));
+      return new Promise(() => undefined);
+    });
+    const pending = readLocalDocument(file(), options(abort.signal));
+    const outcome = await Promise.race([
+      pending.then(() => 'unexpected reading', error => (error as Error).message),
+      new Promise(resolve => setTimeout(() => resolve('still waiting for the whole-file timeout'), 1000)),
+    ]);
+    abort.abort();
+    expect(outcome).toBe('This document could not be read locally. Try a clearer PDF or image.');
+    expect(recognize).not.toHaveBeenCalled();
+  });
   it('uses a whole-file time budget rather than restarting the timeout per OCR page', async () => {
     vi.stubGlobal('crypto', { subtle: { digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer) } });
     vi.useFakeTimers(); pdf(['', '']);

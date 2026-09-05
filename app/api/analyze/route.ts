@@ -561,7 +561,7 @@ export async function POST(request: Request) {
     const selectedFixtureId = fixtureInput.fixtureId;
     fixtureId = selectedFixtureId;
     const target = analysisTargets[selectedFixtureId];
-    const syntheticAsset = await fetch(new URL('/evidence-contact-sheet.png', requestUrl));
+    const syntheticAsset = await fetch(new URL('/evidence-contact-sheet-plates-v2.png', requestUrl));
     if (!syntheticAsset.ok || syntheticAsset.headers.get('content-type')?.startsWith('image/png') !== true) {
       return errorResponse('MODEL_UNAVAILABLE', 'The bundled synthetic image is unavailable.', 502, true, 'bundled-precomputed');
     }

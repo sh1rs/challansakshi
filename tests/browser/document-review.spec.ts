@@ -32,6 +32,7 @@ test('document-first is compact and performs real PDF extraction, comparison, co
   await expect(page.locator('main')).not.toContainText('OMIT-THIS-TEST-NAME');
   await choosePdf(page, 'vehicle-record', record);
   await expect(page.getByRole('heading', { name: 'The registrations differ' })).toBeVisible();
+  await page.screenshot({ path: '/tmp/challansakshi-hybrid-reading-phone.png', fullPage: true });
   await page.getByRole('button', { name: 'Correct: Registration notice', exact: true }).click();
   await page.getByLabel('Value shown in this source').fill('KA01AB5678');
   await page.getByRole('button', { name: 'Save correction', exact: true }).click();
@@ -40,6 +41,7 @@ test('document-first is compact and performs real PDF extraction, comparison, co
   await expect(page.getByRole('heading', { name: 'The registrations match' })).toBeVisible();
   await page.getByRole('button', { name: 'I checked these readings — prepare my note', exact: true }).click();
   await expect(page.locator('[data-document-note]')).toContainText('Your correction');
+  await page.screenshot({ path: '/tmp/challansakshi-hybrid-prepared-phone.png', fullPage: true });
   await expect(page.locator('[data-document-download]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Shared device', exact: true }).click();
   await page.emulateMedia({ media: 'print' });

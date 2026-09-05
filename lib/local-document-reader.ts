@@ -126,12 +126,14 @@ export async function readLocalDocument(file: File, options: ReadOptions): Promi
       progress('Loading local text reader');
       const sdk = await wait(import('tesseract.js'));
       const initialization = sdk.createWorker(options.language === 'hi' ? 'eng+hin' : 'eng', 1, {
-        workerPath: asset(`${OCR_ASSETS}/worker.min.js`), corePath: asset(`${OCR_ASSETS}/core`), langPath: asset(`${OCR_ASSETS}/lang`),
+        workerPath: asset(`${OCR_ASSETS}/reader-worker.js`), corePath: asset(`${OCR_ASSETS}/core`), langPath: asset(`${OCR_ASSETS}/lang`),
         cacheMethod: 'none', workerBlobURL: false, gzip: true,
         logger: message => {
           if (!stopped && !options.signal.aborted && message.status === 'recognizing text') options.onProgress(`Reading page ${currentOcrPage} locally`);
         },
-        errorHandler: () => undefined,
+        // The SDK can report language/bootstrap failures without settling createWorker.
+        // End our wait immediately, using fixed copy rather than vendor-provided details.
+        errorHandler: () => stop(new ReadingError(SAFE_FAILURE)),
       }).then(async initialized => {
         // createWorker returns its handle only after bootstrap. No document is sent until this check.
         if (stopped || options.signal.aborted) { await initialized.terminate(); throw stopped ?? aborted(); }

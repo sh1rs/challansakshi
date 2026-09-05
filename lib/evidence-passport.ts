@@ -289,6 +289,7 @@ function statusForVisibility(visibility: ExtractedFact['visibility'] | undefined
 function localizeEvidenceReference(reference: string | undefined, fallback: LocalizedText): LocalizedText {
   const english = reference ?? fallback.en;
   const knownHindiReferences: Record<string, string> = {
+    'Synthetic enforcement image · physical plate': 'सिंथेटिक प्रवर्तन फ़ोटो · वाहन की नंबर प्लेट',
     'Enforcement image · plate region': 'प्रवर्तन फ़ोटो · नंबर प्लेट हिस्सा',
     'Enforcement image · alleged offence area': 'प्रवर्तन फ़ोटो · बताए उल्लंघन का हिस्सा',
     'Enforcement image · rider area': 'प्रवर्तन फ़ोटो · चालक हिस्सा',
@@ -317,10 +318,10 @@ export function buildSuppliedEvidencePassport(fixtureId: FixtureId, facts: Extra
     },
     {
       id: 'EP2',
-      label: { en: 'Vehicle plate visible', hi: 'वाहन नंबर दिखाई देता है' },
+      label: { en: 'Registration in the demo image', hi: 'डेमो फ़ोटो में वाहन नंबर' },
       status: statusForVisibility(observedPlate?.visibility),
       sourceReference: localizeEvidenceReference(observedPlate?.evidenceRef, { en: 'Enforcement image · plate region', hi: 'प्रवर्तन फ़ोटो · नंबर प्लेट हिस्सा' }),
-      note: { en: 'Status describes the citizen-supplied image, not the original camera file.', hi: 'यह स्थिति नागरिक को मिली फ़ोटो बताती है, मूल कैमरा फ़ाइल नहीं।' },
+      note: { en: 'The image and its plate characters are synthetic. Confirm the visible characters yourself; an unclear observation remains unclear.', hi: 'फ़ोटो और उसके नंबर के अक्षर सिंथेटिक हैं। दिखते अक्षरों की खुद पुष्टि करें; अस्पष्ट अवलोकन अस्पष्ट ही रहता है।' },
     },
     {
       id: 'EP3',

@@ -51,29 +51,37 @@ async function mismatchResult(page: Page, language: Language = 'en') {
   const text = labels[language];
   await beginOfficial(page, language);
   await choose(page, text.plateDifferent);
+  // Measure the application's transition, not Playwright scrolling to reach
+  // a control outside a short desktop viewport before activating it.
+  await page.getByRole('button', { name: text.confirm, exact: true }).scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
   await page.getByRole('button', { name: text.confirm, exact: true }).click();
   await expect(page.locator('main')).toHaveAttribute('data-review-phase', 'resolve');
   expect(Math.abs((await page.evaluate(() => scrollY)) - before)).toBeLessThanOrEqual(8);
 }
 
-test.describe('compact home and product chrome', () => {
+test.describe('informative home and product chrome', () => {
   for (const language of ['en', 'hi'] as const) {
-    test(`home keeps all three routes in the 375x812 first viewport (${language})`, async ({ page }) => {
+    test(`home keeps document review immediately available without hiding its useful explanations (${language})`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto('/');
       await chooseLanguage(page, language);
       const mainLinks = page.locator('main a');
-      await expect(mainLinks).toHaveCount(3);
+      await expect(mainLinks).toHaveCount(7);
       expect(await mainLinks.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual([
         '/review',
-        '/review?goal=message',
+        '/manual/challan',
+        '/message-check',
         '/fastag',
+        '/reply-review',
+        '/dashboard',
+        '/sources',
       ]);
-      for (let index = 0; index < 3; index += 1) {
-        const box = await mainLinks.nth(index).boundingBox();
-        expect(box && box.y >= 0 && box.y + box.height <= 812).toBeTruthy();
-      }
+      const box = await mainLinks.first().boundingBox();
+      expect(box && box.y >= 0 && box.y + box.height <= 812).toBeTruthy();
+      await expect(page.locator('[data-home-capability]')).toHaveCount(4);
+      await expect(page.locator('main a[href^="/demo"]')).toHaveCount(0);
+      await expect(page.locator('header > [data-demo-entry]')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     });
   }

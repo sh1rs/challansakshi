@@ -20,6 +20,7 @@ export interface DemoFixture {
   shortDescription: LocalizedText;
   expectedFinding: 'mismatch' | 'inconclusive' | 'consistent';
   photoPanel: 'left' | 'centre' | 'right';
+  citizenPhotoStatus: 'supplied' | 'not-supplied' | 'reused';
   ownerDisplay: string;
   issueDate: string;
   challanNumber: string;
@@ -67,8 +68,8 @@ const evidenceCards: EvidenceCardData[] = [
     title: sourceLabels.photo,
     kind: 'photo',
     why: {
-      en: 'Adds a current visual reference without trying to prove ownership by itself.',
-      hi: 'यह मौजूदा वाहन का दृश्य संदर्भ देता है, लेकिन अकेले मालिकाना हक साबित नहीं करता।',
+      en: 'A separate synthetic scooter illustration supplies the fictional citizen-side reference. It does not prove ownership.',
+      hi: 'अलग सिंथेटिक स्कूटर चित्र नागरिक-पक्ष का काल्पनिक संदर्भ देता है। यह मालिकाना हक साबित नहीं करता।',
     },
   },
 ];
@@ -105,6 +106,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     shortDescription: { en: 'Blue scooter record, white motorcycle image', hi: 'रिकॉर्ड में नीला स्कूटर, फ़ोटो में सफ़ेद मोटरसाइकिल' },
     expectedFinding: 'mismatch',
     photoPanel: 'left',
+    citizenPhotoStatus: 'supplied',
     ownerDisplay: 'Asha · demo citizen',
     issueDate: '2026-08-20',
     challanNumber: 'CS-DEMO-260820-A',
@@ -116,8 +118,8 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     amount: '₹1,000',
     authority: { en: 'Synthetic Pilot Traffic Authority', hi: 'सिंथेटिक पायलट यातायात प्राधिकरण' },
     imageNote: {
-      en: 'Clear enough to compare the vehicle category, colour, and registration. It does not establish the rider’s identity.',
-      hi: 'वाहन का प्रकार, रंग और नंबर मिलाने के लिए फ़ोटो काफ़ी साफ़ है। इससे चालक की पहचान साबित नहीं होती।',
+      en: 'The synthetic photo shows a white motorcycle with fictional plate TEST-26-MC-3817. Check the plate in the image before confirming. It does not establish the rider’s identity.',
+      hi: 'सिंथेटिक फ़ोटो में सफ़ेद मोटरसाइकिल पर काल्पनिक नंबर TEST-26-MC-3817 दिखता है। पुष्टि से पहले फ़ोटो में नंबर जाँचें। इससे चालक की पहचान साबित नहीं होती।',
     },
     confirmedFacts: {
       registeredPlate: 'TEST-26-SC-3317',
@@ -136,7 +138,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
       fact('issue-date', { en: 'Issue date', hi: 'जारी होने की तारीख' }, '20 Aug 2026', 'challan', 'high', 'clear', 'Challan · issue block'),
       fact('alleged-registration', { en: 'Registration on challan', hi: 'चालान पर वाहन नंबर' }, 'TEST-26-SC-3317', 'challan', 'high', 'clear', 'Challan · vehicle line'),
       fact('offence', { en: 'Alleged offence', hi: 'बताया गया उल्लंघन' }, 'Riding without a protective helmet', 'challan', 'high', 'clear', 'Challan · offence line'),
-      fact('observed-registration', { en: 'Registration visible in image', hi: 'फ़ोटो में दिखता वाहन नंबर' }, 'TEST-26-MC-3817', 'enforcement', 'high', 'clear', 'Enforcement image · plate region'),
+      fact('observed-registration', { en: 'Registration visible in demo image', hi: 'डेमो फ़ोटो में दिखता वाहन नंबर' }, 'TEST-26-MC-3817', 'enforcement', 'high', 'clear', 'Synthetic enforcement image · physical plate', { en: 'These fictional plate characters are part of the generated image. Citizen review is still required.', hi: 'ये काल्पनिक नंबर के अक्षर बनाई गई फ़ोटो का हिस्सा हैं। नागरिक की समीक्षा अभी भी ज़रूरी है।' }),
       fact('observed-category', { en: 'Vehicle category in image', hi: 'फ़ोटो में वाहन का प्रकार' }, 'Motorcycle', 'enforcement', 'high', 'clear', 'Enforcement image · full vehicle'),
       fact('observed-colour', { en: 'Vehicle colour in image', hi: 'फ़ोटो में वाहन का रंग' }, 'White', 'enforcement', 'high', 'clear', 'Enforcement image · body panel'),
       fact('offence-visible', { en: 'Is the alleged offence assessable?', hi: 'क्या बताया गया उल्लंघन दिख रहा है?' }, 'No — rider is not reliably visible', 'enforcement', 'medium', 'partial', 'Enforcement image · rider area', { en: 'The image does not establish who was riding.', hi: 'फ़ोटो से यह तय नहीं होता कि वाहन कौन चला रहा था।' }),
@@ -155,6 +157,7 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     shortDescription: { en: 'Plate unreadable, alleged offence not assessable', hi: 'नंबर पढ़ा नहीं जा सकता, उल्लंघन दिखता नहीं' },
     expectedFinding: 'inconclusive',
     photoPanel: 'centre',
+    citizenPhotoStatus: 'not-supplied',
     ownerDisplay: 'Kabir · demo citizen',
     issueDate: '2026-08-20',
     challanNumber: 'CS-DEMO-260820-B',
@@ -195,9 +198,13 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
       fact('record-colour', { en: 'Registered colour', hi: 'रिकॉर्ड में वाहन का रंग' }, 'Red', 'vehicle-record', 'high', 'clear', 'Vehicle record · colour'),
       fact('record-owner', { en: 'Owner display name', hi: 'मालिक का डेमो नाम' }, 'Kabir · demo citizen', 'vehicle-record', 'high', 'clear', 'Vehicle record · owner'),
     ],
-    evidenceCards,
+    evidenceCards: evidenceCards.map((card) => card.id === 'citizen-photo' ? {
+      ...card,
+      title: { en: 'Citizen photo not supplied', hi: 'नागरिक की फ़ोटो नहीं दी गई' },
+      why: { en: 'Only the fictional vehicle record is available on the citizen side. The blurred enforcement image is not a separate citizen photograph.', hi: 'नागरिक-पक्ष में केवल काल्पनिक वाहन रिकॉर्ड है। धुंधली प्रवर्तन फ़ोटो अलग नागरिक फ़ोटो नहीं है।' },
+    } : card),
     readiness: [
-      ...commonReadiness(true),
+      ...commonReadiness(false),
       { id: 'clearer-image', label: { en: 'Clearer original enforcement image or clarification', hi: 'साफ़ मूल प्रवर्तन फ़ोटो या स्पष्टीकरण' }, category: 'authority', status: 'missing' },
     ],
   },
@@ -208,10 +215,11 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     shortDescription: { en: 'Registration, category, colour, and allegation align', hi: 'नंबर, वाहन प्रकार, रंग और आरोप मेल खाते हैं' },
     expectedFinding: 'consistent',
     photoPanel: 'right',
+    citizenPhotoStatus: 'reused',
     ownerDisplay: 'Meera · demo citizen',
     issueDate: '2026-08-20',
     challanNumber: 'CS-DEMO-260820-C',
-    allegedRegistration: 'TEST-26-SC-9024',
+    allegedRegistration: 'TEST-26-SC-3317',
     offence: { en: 'Riding without a protective helmet', hi: 'सुरक्षा हेलमेट के बिना वाहन चलाना' },
     location: { en: 'Model Avenue, Pilot City', hi: 'मॉडल एवेन्यू, पायलट सिटी' },
     incidentAt: '2026-08-20T11:08:00+05:30',
@@ -219,14 +227,14 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     amount: '₹1,000',
     authority: { en: 'Synthetic Pilot Traffic Authority', hi: 'सिंथेटिक पायलट यातायात प्राधिकरण' },
     imageNote: {
-      en: 'The vehicle details appear consistent and the synthetic image appears to show the alleged helmet-related fact. This is not a legal conclusion.',
-      hi: 'वाहन का विवरण मिलता है और सिंथेटिक फ़ोटो में हेलमेट से जुड़ी बताई गई बात दिखती है। यह कानूनी निष्कर्ष नहीं है।',
+      en: 'The synthetic blue scooter photo shows fictional plate TEST-26-SC-3317 and appears consistent with this demo record. Check the image before confirming. This is not a legal conclusion.',
+      hi: 'सिंथेटिक नीले स्कूटर की फ़ोटो में काल्पनिक नंबर TEST-26-SC-3317 दिखता है और वह डेमो रिकॉर्ड से मिलता दिखता है। पुष्टि से पहले फ़ोटो जाँचें। यह कानूनी निष्कर्ष नहीं है।',
     },
     confirmedFacts: {
-      registeredPlate: 'TEST-26-SC-9024',
+      registeredPlate: 'TEST-26-SC-3317',
       registeredCategory: 'Scooter',
       registeredColour: 'Blue',
-      observedPlate: 'TEST-26-SC-9024',
+      observedPlate: 'TEST-26-SC-3317',
       observedCategory: 'Scooter',
       observedColour: 'Blue',
       offenceAssessable: 'yes',
@@ -237,19 +245,23 @@ export const fixtures: Record<FixtureId, DemoFixture> = {
     extractedFacts: [
       fact('challan-number', { en: 'Challan number', hi: 'चालान नंबर' }, 'CS-DEMO-260820-C', 'challan', 'high', 'clear', 'Challan · header'),
       fact('issue-date', { en: 'Issue date', hi: 'जारी होने की तारीख' }, '20 Aug 2026', 'challan', 'high', 'clear', 'Challan · issue block'),
-      fact('alleged-registration', { en: 'Registration on challan', hi: 'चालान पर वाहन नंबर' }, 'TEST-26-SC-9024', 'challan', 'high', 'clear', 'Challan · vehicle line'),
+      fact('alleged-registration', { en: 'Registration on challan', hi: 'चालान पर वाहन नंबर' }, 'TEST-26-SC-3317', 'challan', 'high', 'clear', 'Challan · vehicle line'),
       fact('offence', { en: 'Alleged offence', hi: 'बताया गया उल्लंघन' }, 'Riding without a protective helmet', 'challan', 'high', 'clear', 'Challan · offence line'),
-      fact('observed-registration', { en: 'Registration visible in image', hi: 'फ़ोटो में दिखता वाहन नंबर' }, 'TEST-26-SC-9024', 'enforcement', 'high', 'clear', 'Enforcement image · plate region'),
+      fact('observed-registration', { en: 'Registration visible in demo image', hi: 'डेमो फ़ोटो में दिखता वाहन नंबर' }, 'TEST-26-SC-3317', 'enforcement', 'high', 'clear', 'Synthetic enforcement image · physical plate', { en: 'These fictional plate characters are part of the generated image. Citizen review is still required.', hi: 'ये काल्पनिक नंबर के अक्षर बनाई गई फ़ोटो का हिस्सा हैं। नागरिक की समीक्षा अभी भी ज़रूरी है।' }),
       fact('observed-category', { en: 'Vehicle category in image', hi: 'फ़ोटो में वाहन का प्रकार' }, 'Scooter', 'enforcement', 'high', 'clear', 'Enforcement image · full vehicle'),
       fact('observed-colour', { en: 'Vehicle colour in image', hi: 'फ़ोटो में वाहन का रंग' }, 'Blue', 'enforcement', 'high', 'clear', 'Enforcement image · body panel'),
       fact('offence-visible', { en: 'Is the alleged offence assessable?', hi: 'क्या बताया गया उल्लंघन दिख रहा है?' }, 'Yes — synthetic rider appears without a helmet', 'enforcement', 'high', 'clear', 'Enforcement image · rider area'),
-      fact('record-registration', { en: 'Registered vehicle identifier', hi: 'रिकॉर्ड में वाहन नंबर' }, 'TEST-26-SC-9024', 'vehicle-record', 'high', 'clear', 'Vehicle record · identifier'),
+      fact('record-registration', { en: 'Registered vehicle identifier', hi: 'रिकॉर्ड में वाहन नंबर' }, 'TEST-26-SC-3317', 'vehicle-record', 'high', 'clear', 'Vehicle record · identifier'),
       fact('record-category', { en: 'Registered category', hi: 'रिकॉर्ड में वाहन का प्रकार' }, 'Scooter', 'vehicle-record', 'high', 'clear', 'Vehicle record · category'),
       fact('record-colour', { en: 'Registered colour', hi: 'रिकॉर्ड में वाहन का रंग' }, 'Blue', 'vehicle-record', 'high', 'clear', 'Vehicle record · colour'),
       fact('record-owner', { en: 'Owner display name', hi: 'मालिक का डेमो नाम' }, 'Meera · demo citizen', 'vehicle-record', 'high', 'clear', 'Vehicle record · owner'),
     ],
-    evidenceCards,
-    readiness: commonReadiness(true),
+    evidenceCards: evidenceCards.map((card) => card.id === 'citizen-photo' ? {
+      ...card,
+      title: { en: 'Reused demo reference', hi: 'दोबारा इस्तेमाल किया गया डेमो संदर्भ' },
+      why: { en: 'This is the same synthetic illustration used for the enforcement image, not an independent citizen photograph.', hi: 'यह प्रवर्तन फ़ोटो वाला वही सिंथेटिक चित्र है, अलग नागरिक फ़ोटो नहीं।' },
+    } : card),
+    readiness: commonReadiness(false),
   },
 };
 

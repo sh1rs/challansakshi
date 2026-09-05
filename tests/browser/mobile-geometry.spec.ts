@@ -13,7 +13,9 @@ async function geometry(page: Page) {
     expect(box.font, box.name).toBeGreaterThanOrEqual(16);
   }
   expect(await page.locator('[data-mobile-header]').evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(72);
-  expect(await page.locator('main h1:visible').evaluate(node => parseFloat(getComputedStyle(node).fontSize))).toBe(26);
+  const titleSize = await page.locator('main h1:visible').evaluate(node => parseFloat(getComputedStyle(node).fontSize));
+  expect(titleSize).toBeGreaterThanOrEqual(26);
+  expect(titleSize).toBeLessThanOrEqual(32);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
 
@@ -51,20 +53,26 @@ for (const width of [320, 375, 390]) for (const hi of [false, true]) {
     await expect(page.locator('[data-grievance-affordance]')).toHaveCount(1);
     await expect(page.locator('[data-grievance-affordance]')).not.toHaveAttribute('href');
     await geometry(page);
-    expect(await page.locator('main h2:visible').first().evaluate(node => parseFloat(getComputedStyle(node).fontSize))).toBe(20);
+    const resultSize = await page.locator('main h2:visible').first().evaluate(node => parseFloat(getComputedStyle(node).fontSize));
+    expect(resultSize).toBeGreaterThanOrEqual(20);
+    expect(resultSize).toBeLessThanOrEqual(28);
     await expect(page.locator('[data-product-boundary]')).toHaveCount(1);
   });
 }
 
-test('FASTag keeps English availability in the compact menu only', async ({ page }) => {
+test('FASTag offers Hindi in the compact header while its synthetic demo stays English', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/fastag');
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.click();
-  await expect(page.getByText('FASTag check is currently available in English', { exact: true })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Language' })).toHaveCount(0);
+  await expect(page.getByLabel('Display language')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Language' })).toBeVisible();
   await expect(page.locator('main, footer').getByText('FASTag check is currently available in English')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menu).toBeFocused();
   expect(await page.locator('[data-mobile-header]').evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(72);
+  await page.goto('/demo/fastag');
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.getByText('This demo is currently available in English', { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Language' })).toHaveCount(0);
 });

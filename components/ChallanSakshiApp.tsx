@@ -79,6 +79,8 @@ type AnalysisMode = 'precomputed' | 'live' | 'fallback';
 type Pair = { en: string; hi: string };
 interface PersistedDemoStateV5 {
   version: 5;
+  photoRevision: 'physical-plates-v2';
+  previousConsistentSource: string | null;
   language: Language;
   step: StepId;
   fixtureId: FixtureId;
@@ -107,6 +109,7 @@ interface UiPreferencesV1 { version: 1; easyRead: boolean; textFirst: boolean }
 
 const DEMO_REFERENCE_DATE = '2026-08-27';
 const STORAGE_KEY = 'challansakshi-demo-v5';
+const DEMO_PHOTO_REVISION = 'physical-plates-v2';
 const PREFERENCES_KEY = 'challansakshi-ui-v1';
 const OLD_STORAGE_KEYS = ['challansakshi-demo-v4', 'challansakshi-demo-v3', 'challansakshi-demo-v2', 'challansakshi-demo-v1'];
 const ORDER_FACT_IDS: OrderFactId[] = ['order-id', 'grievance-id', 'challan-id', 'order-date', 'outcome', 'reason', 'next-route'];
@@ -484,7 +487,25 @@ function EvidencePhoto({ fixture, label, id, citizen = false, textFirst = false,
   onReveal?: () => void;
   onSkip?: () => void;
 }) {
-  const panel = citizen ? (fixture.id === 'mismatch' ? 'right' : fixture.photoPanel) : fixture.photoPanel;
+  const panel = citizen ? 'right' : fixture.photoPanel;
+  const plate = citizen ? fixture.confirmedFacts.registeredPlate : fixture.confirmedFacts.observedPlate;
+  const provenance = panel === 'centre'
+    ? (language === 'hi' ? 'सिंथेटिक डेमो फ़ोटो · नंबर पढ़ा नहीं जा सकता।' : 'Synthetic demo photo · plate remains unreadable.')
+    : (language === 'hi' ? 'काल्पनिक नंबर फ़ोटो में दिखता है · केवल सिंथेटिक डेमो।' : 'Fictional plate text is visible in the image · synthetic demo only.');
+  const reusedReference = citizen && fixture.citizenPhotoStatus === 'reused';
+  const referenceNote = reusedReference
+    ? (language === 'hi' ? 'वही प्रवर्तन चित्र · अलग नागरिक फ़ोटो नहीं।' : 'Same enforcement illustration · not an independent citizen photo.')
+    : '';
+  if (citizen && fixture.citizenPhotoStatus === 'not-supplied') {
+    return (
+      <div id={id} className="evidence-photo-placeholder" role="group" aria-label={label}>
+        <span aria-hidden="true">—</span>
+        <strong>{language === 'hi' ? 'नागरिक की फ़ोटो नहीं दी गई' : 'Citizen photo not supplied'}</strong>
+        <p>{fixture.confirmedFacts.registeredPlate} · {fixture.confirmedFacts.registeredColour} · {fixture.confirmedFacts.registeredCategory}</p>
+        <small>{language === 'hi' ? 'केवल काल्पनिक वाहन रिकॉर्ड का संदर्भ' : 'FICTIONAL VEHICLE RECORD REFERENCE ONLY'}</small>
+      </div>
+    );
+  }
   if (!citizen && uninspected) {
     return (
       <div id={id} className="evidence-photo-placeholder" role="group" aria-label={label} tabIndex={id ? -1 : undefined}>
@@ -502,18 +523,22 @@ function EvidencePhoto({ fixture, label, id, citizen = false, textFirst = false,
         <span aria-hidden="true">TXT</span>
         <strong>{citizen ? (fixture.confirmedFacts.registeredPlate || 'Plate unavailable') : (fixture.confirmedFacts.observedPlate || 'Plate reading unclear')}</strong>
         <p>{citizen ? `${fixture.confirmedFacts.registeredColour} · ${fixture.confirmedFacts.registeredCategory}` : local(fixture.imageNote, language)}</p>
+        {reusedReference && <p>{referenceNote}</p>}
         <small>{language === 'hi' ? 'टेक्स्ट-पहले मोड · सिंथेटिक डेमो' : 'TEXT-FIRST MODE · SYNTHETIC DEMO'}</small>
-        {onReveal && <button type="button" className="button button-secondary" onClick={onReveal}>{language === 'hi' ? 'डेमो फ़ोटो लोड करें · लगभग 1.6 MB' : 'Load demo image · about 1.6 MB'}</button>}
+        {onReveal && <button type="button" className="button button-secondary" onClick={onReveal}>{language === 'hi' ? 'डेमो फ़ोटो लोड करें · लगभग 2 MB' : 'Load demo image · about 2 MB'}</button>}
         {onSkip && <button type="button" className="text-skip-button" onClick={onSkip}>{language === 'hi' ? 'मैं यह फ़ोटो नहीं देख सका/सकी' : 'I could not inspect this image'}</button>}
       </div>
     );
   }
   return (
-    <div id={id} className={`evidence-photo photo-panel-${panel} ${citizen ? 'citizen-evidence' : ''}`} role="img" aria-label={label} tabIndex={id ? -1 : undefined}>
-      <span className="synthetic-stamp">SYNTHETIC DEMO DATA</span>
-      <span className="photo-corner-label">{citizen ? 'CITIZEN PHOTO' : 'ENFORCEMENT IMAGE'}</span>
-      <span className="photo-plate">{citizen ? fixture.confirmedFacts.registeredPlate : fixture.confirmedFacts.observedPlate}</span>
-    </div>
+    <>
+      <div id={id} className={`evidence-photo photo-panel-${panel} ${citizen ? 'citizen-evidence' : ''}`} style={{ backgroundImage: "linear-gradient(rgb(16 44 71 / 5%), rgb(16 44 71 / 5%)), url('/evidence-contact-sheet-plates-v2.png')", backgroundPosition: panel === 'right' ? 'right 72%' : panel === 'left' ? 'left 60%' : 'center center' }} role="img" aria-label={`${label}. ${plate || (language === 'hi' ? 'नंबर अस्पष्ट' : 'Plate unclear')}. ${provenance} ${referenceNote}`} tabIndex={id ? -1 : undefined}>
+        <span className="synthetic-stamp">SYNTHETIC DEMO DATA</span>
+        <span className="photo-corner-label">{citizen ? (reusedReference ? 'REUSED REFERENCE' : 'CITIZEN REFERENCE') : 'ENFORCEMENT IMAGE'}</span>
+        <span className="photo-plate">{panel === 'centre' ? (language === 'hi' ? 'नंबर अस्पष्ट' : 'Plate unreadable') : (language === 'hi' ? 'काल्पनिक डेमो नंबर' : 'Fictional demo plate')}</span>
+      </div>
+      <p className="photo-provenance">{provenance}{reusedReference && <> {referenceNote}</>}</p>
+    </>
   );
 }
 
@@ -558,12 +583,13 @@ function EvidenceCard({ card, fixture, language, textFirst, imageRevealed, onRev
   imageRevealed: boolean;
   onRevealImage: () => void;
 }) {
+  const photoStatus = card.id === 'citizen-photo' ? fixture.citizenPhotoStatus : 'supplied';
   return (
     <article className="evidence-card" id={`source-${card.id}`}>
       <div className="evidence-card-head">
         <span className="source-number">{card.id === 'challan' ? '01' : card.id === 'vehicle-record' ? '02' : '03'}</span>
         <div><h3>{local(card.title, language)}</h3><span className="synthetic-chip">{local(copy.synthetic, language)}</span></div>
-        <span className="loaded-chip"><b aria-hidden="true">✓</b>{local(copy.loaded, language)}</span>
+        <span className="loaded-chip"><b aria-hidden="true">{photoStatus === 'supplied' ? '✓' : '—'}</b>{photoStatus === 'not-supplied' ? (language === 'hi' ? 'नहीं दी गई' : 'Not supplied') : photoStatus === 'reused' ? (language === 'hi' ? 'केवल संदर्भ' : 'Reference only') : local(copy.loaded, language)}</span>
       </div>
       {card.id === 'challan' && <ChallanPreview fixture={fixture} language={language} />}
       {card.id === 'vehicle-record' && <VehicleRecordPreview fixture={fixture} language={language} />}
@@ -793,7 +819,7 @@ function buildContestDraft(fixture: DemoFixture, facts: ExtractedFact[], languag
     : `Subject: Request to review the available image and record\n\nI request review of e-Challan ${fixture.challanNumber}. The citizen-confirmed record contains these evidence limitations: ${limitations}${custodyContext} I am not asserting a vehicle mismatch. Please review the original image and related record and provide a reasoned decision.`;
 }
 
-export default function ChallanSakshiApp() {
+export default function ChallanSakshiApp({ liveAnalysisEnabled = false }: { liveAnalysisEnabled?: boolean } = {}) {
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<StepId>('landing');
   const [fixtureId, setFixtureId] = useState<FixtureId>('mismatch');
@@ -803,6 +829,7 @@ export default function ChallanSakshiApp() {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('precomputed');
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisMessage, setAnalysisMessage] = useState('');
+  const [previousConsistentSource, setPreviousConsistentSource] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [copied, setCopied] = useState(false);
   const [trackingStage, setTrackingStage] = useState(2);
@@ -824,6 +851,7 @@ export default function ChallanSakshiApp() {
   const [submittedPassport, setSubmittedPassport] = useState<EvidencePassportSnapshot | null>(null);
   const [passportError, setPassportError] = useState('');
   const [easyRead, setEasyRead] = useState(false);
+  // Keep photos unloaded until the saved data preference has been checked.
   const [textFirst, setTextFirst] = useState(true);
   const [revealedImages, setRevealedImages] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -928,8 +956,9 @@ export default function ChallanSakshiApp() {
     registeredPlate: submittedVehicleFacts.registeredPlate,
     observedPlate: submittedVehicleFacts.observedPlate,
     submittedRevisionId,
+    citizenPhotoStatus: fixture.citizenPhotoStatus,
     custody: activePassport ? { id: activeCustodyInterval.id, label: activeCustodyInterval.label, summary: activeCustodyInterval.evidenceReference } : null,
-  }), [fixture.challanNumber, submittedVehicleFacts.registeredPlate, submittedVehicleFacts.observedPlate, submittedRevisionId, activePassport, activeCustodyInterval]);
+  }), [fixture.challanNumber, fixture.citizenPhotoStatus, submittedVehicleFacts.registeredPlate, submittedVehicleFacts.observedPlate, submittedRevisionId, activePassport, activeCustodyInterval]);
   const rejectedOrder = useMemo(() => buildSyntheticRejectedOrder({
     finding: submittedClassification.finding,
     grievanceNumber,
@@ -971,6 +1000,7 @@ export default function ChallanSakshiApp() {
   const ledgerEvents = useMemo(() => buildCaseLedger({
     fixtureId,
     issueDate: fixture.issueDate,
+    citizenPhotoStatus: fixture.citizenPhotoStatus,
     analysisMode,
     confirmed: simulatedSubmitted || (confirmed && reviewValidation.complete),
     corrections,
@@ -986,7 +1016,7 @@ export default function ChallanSakshiApp() {
     passportRevisionId: activePassport?.revisionId ?? null,
     custodyEvidenceId: activePassport ? activeCustodyInterval.id as CustodyEvidenceItemId : null,
     canPreparePack: activeCaseAssessment.canPreparePack,
-  }), [fixtureId, fixture.issueDate, analysisMode, confirmed, reviewValidation.complete, corrections, ledgerFinding, packPrepared, simulatedSubmitted, submittedRevisionId, trackingStage, outcome, orderFactValidation.complete, orderWorkflowComplete, activePassport, activeCustodyInterval.id, activeCaseAssessment.canPreparePack]);
+  }), [fixtureId, fixture.issueDate, fixture.citizenPhotoStatus, analysisMode, confirmed, reviewValidation.complete, corrections, ledgerFinding, packPrepared, simulatedSubmitted, submittedRevisionId, trackingStage, outcome, orderFactValidation.complete, orderWorkflowComplete, activePassport, activeCustodyInterval.id, activeCaseAssessment.canPreparePack]);
   const ledgerSnapshot = useMemo(() => deriveCaseLedgerSnapshot(ledgerEvents, submittedRevisionId), [ledgerEvents, submittedRevisionId]);
   const latestLedgerDate = ledgerEvents.reduce((latest, event) => event.recordedOn > latest ? event.recordedOn : latest, DEMO_REFERENCE_DATE);
   const extractedOrderDate = effectiveOrderExtractedFacts.find((fact) => fact.id === 'order-date')?.value;
@@ -1027,15 +1057,37 @@ export default function ChallanSakshiApp() {
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
+      let migratedConsistentSource = false;
       try {
         const storedV5 = window.localStorage.getItem(STORAGE_KEY);
         const storedV4 = window.localStorage.getItem('challansakshi-demo-v4');
         const stored = storedV5 ?? storedV4;
         if (stored) {
-          const saved = JSON.parse(stored) as Omit<Partial<PersistedDemoStateV5>, 'version'> & { version?: number };
+          let saved = JSON.parse(stored) as Omit<Partial<PersistedDemoStateV5>, 'version'> & { version?: number };
           if (saved.version !== 5 && saved.version !== 4) throw new Error('Unsupported persisted state');
           if (saved.language === 'en' || saved.language === 'hi') setLanguage(saved.language);
           const restoredFixtureId: FixtureId = saved.fixtureId && fixtures[saved.fixtureId] ? saved.fixtureId : 'mismatch';
+          const registrationIds = ['alleged-registration', 'observed-registration', 'record-registration'];
+          if (restoredFixtureId === 'consistent' && saved.photoRevision !== DEMO_PHOTO_REVISION) {
+            migratedConsistentSource = true;
+            const priorFacts = isStoredFactListForFixture(saved.facts, 'consistent') ? saved.facts : fixtures.consistent.extractedFacts;
+            saved = {
+              ...saved,
+              previousConsistentSource: stored,
+              facts: priorFacts.map((item) => {
+                if (!registrationIds.includes(item.id) || item.value.trim() !== 'TEST-26-SC-9024') return item;
+                const currentSource = fixtures.consistent.extractedFacts.find((fact) => fact.id === item.id)!;
+                return { ...currentSource, visibility: item.visibility };
+              }),
+              analysisFacts: fixtures.consistent.extractedFacts,
+              step: 'review', confirmed: false, analysisMode: 'precomputed', trackingStage: 2, outcome: 'none',
+              submittedFacts: null, submittedRevisionId: null, submittedPassport: null,
+              custodyReviewed: false, passportScopeReviewed: false,
+              orderExtractedFacts: [], orderConfirmedFactIds: [], orderCompleteness: null,
+              orderMapReviews: {}, orderLimitationConfirmed: false, orderNoteCreated: false,
+            };
+          }
+          setPreviousConsistentSource(typeof saved.previousConsistentSource === 'string' ? saved.previousConsistentSource : null);
           setFixtureId(restoredFixtureId);
           {
             const restoredFacts = isStoredFactListForFixture(saved.facts, restoredFixtureId) ? saved.facts : fixtures[restoredFixtureId].extractedFacts;
@@ -1092,6 +1144,7 @@ export default function ChallanSakshiApp() {
             setOutcome('none');
           }
         }
+        setTextFirst(false);
         try {
           const storedPreferences = window.localStorage.getItem(PREFERENCES_KEY);
           if (storedPreferences) {
@@ -1106,7 +1159,8 @@ export default function ChallanSakshiApp() {
         } catch {
           window.localStorage.removeItem(PREFERENCES_KEY);
         }
-        const location = parseAppHash(window.location.hash);
+        const location: ReturnType<typeof parseAppHash> = migratedConsistentSource ? { step: 'review' } : parseAppHash(window.location.hash);
+        if (migratedConsistentSource) window.history.replaceState({ step: 'review' }, '', '#review');
         if (location) {
           if (location.step === 'intake' && location.issueId && evidenceFixtureForIssue(location.issueId)) {
             loadEvidenceIssue(location.issueId as 'wrong-evidence' | 'unclear-evidence');
@@ -1144,6 +1198,8 @@ export default function ChallanSakshiApp() {
     if (!hydrated) return;
     const persisted: PersistedDemoStateV5 = {
       version: 5,
+      photoRevision: DEMO_PHOTO_REVISION,
+      previousConsistentSource,
       language,
       step: renderStep,
       fixtureId,
@@ -1170,7 +1226,7 @@ export default function ChallanSakshiApp() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
     OLD_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
     document.documentElement.lang = language === 'hi' ? 'hi' : 'en';
-  }, [language, renderStep, fixtureId, facts, analysisFacts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, submittedFacts, submittedRevisionId, orderExtractedFacts, orderConfirmedFactIds, orderCompleteness, orderMapReviews, orderLimitationConfirmed, orderNoteCreated, custodyScenarioId, custodyReviewed, passportScopeReviewed, submittedPassport, hydrated]);
+  }, [language, renderStep, fixtureId, facts, analysisFacts, confirmed, analysisMode, trackingStage, outcome, resolutionIssue, submittedFacts, submittedRevisionId, orderExtractedFacts, orderConfirmedFactIds, orderCompleteness, orderMapReviews, orderLimitationConfirmed, orderNoteCreated, custodyScenarioId, custodyReviewed, passportScopeReviewed, submittedPassport, previousConsistentSource, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1252,6 +1308,7 @@ export default function ChallanSakshiApp() {
     const message = language === 'hi' ? 'क्या यह डेमो फिर से शुरू करना है? आपके बदलाव हट जाएँगे।' : 'Start this demo over? Your edits and progress will be cleared.';
     if (!window.confirm(message)) return;
     window.localStorage.removeItem(STORAGE_KEY);
+    setPreviousConsistentSource(null);
     setFixtureId('mismatch');
     setFacts(fixtures.mismatch.extractedFacts);
     setAnalysisFacts(fixtures.mismatch.extractedFacts);
@@ -1273,6 +1330,10 @@ export default function ChallanSakshiApp() {
   };
 
   const rerunLiveAnalysis = async () => {
+    if (!liveAnalysisEnabled) {
+      setAnalysisMessage(language === 'hi' ? 'इस काल्पनिक वॉकथ्रू में लाइव विश्लेषण बंद है।' : 'Live analysis is off in this fictional walkthrough.');
+      return;
+    }
     if (textFirst) {
       setAnalysisMessage(language === 'hi' ? 'टेक्स्ट-पहले मोड में लाइव फ़ोटो विश्लेषण बंद है। पहले डेमो फ़ोटो लोड करें या यह विकल्प बंद करें।' : 'Live image analysis is off in text-first mode. Load the demo image or turn the option off first.');
       return;
@@ -1715,7 +1776,7 @@ export default function ChallanSakshiApp() {
             <div className="evidence-grid">
               {fixture.evidenceCards.map((card) => <EvidenceCard key={card.id} card={card} fixture={fixture} language={language} textFirst={textFirst} imageRevealed={revealedImages.includes(citizenImageKey)} onRevealImage={() => revealImage(citizenImageKey)} />)}
             </div>
-            <div className="sticky-action"><div><strong>{language === 'hi' ? '3 में से 3 काल्पनिक रिकॉर्ड तैयार' : '3 of 3 fictional records ready'}</strong><span>{language === 'hi' ? 'यह प्रोटोटाइप असली फ़ाइल अपलोड स्वीकार नहीं करता।' : 'This prototype does not accept real file uploads.'}</span></div><Button type="button" onClick={runInitialAnalysis} disabled={analysisBusy}>{analysisBusy ? local(copy.analysing, language) : local(copy.analyse, language)} <span aria-hidden="true">→</span></Button></div>
+            <div className="sticky-action"><div><strong>{fixture.citizenPhotoStatus === 'supplied' ? (language === 'hi' ? '3 में से 3 काल्पनिक रिकॉर्ड तैयार' : '3 of 3 fictional records ready') : (language === 'hi' ? 'काल्पनिक रिकॉर्ड तैयार · अलग नागरिक फ़ोटो नहीं है' : 'Fictional records ready · independent citizen photo missing')}</strong><span>{language === 'hi' ? 'यह प्रोटोटाइप असली फ़ाइल अपलोड स्वीकार नहीं करता।' : 'This prototype does not accept real file uploads.'}</span></div><Button type="button" onClick={runInitialAnalysis} disabled={analysisBusy}>{analysisBusy ? local(copy.analysing, language) : local(copy.analyse, language)} <span aria-hidden="true">→</span></Button></div>
           </Screen>
           <Footer language={language} />
         </>
@@ -1726,8 +1787,9 @@ export default function ChallanSakshiApp() {
           <Screen>
             <BackButton onClick={() => go('intake')} language={language} />
             <SyntheticGuidedHeader step="review" language={language} state={{ reviewComplete: confirmed && reviewValidation.complete }} />
-            <div className="review-heading-row"><div className="screen-heading"><p className="eyebrow"><span />{local(copy.reviewFacts, language)}</p><h1>{local(copy.reviewFacts, language)}</h1><p>{local(copy.reviewLead, language)}</p></div><div className="analysis-controls"><StatusPill mode={analysisMode} language={language} /><Button variant="secondary" type="button" onClick={rerunLiveAnalysis} disabled={analysisBusy || textFirst}>{analysisBusy ? local(copy.rerunning, language) : local(copy.rerun, language)}</Button>{textFirst && <small>{language === 'hi' ? 'टेक्स्ट-पहले मोड में लाइव इमेज अनुरोध बंद है।' : 'Live image requests are off in text-first mode.'}</small>}</div></div>
+            <div className="review-heading-row"><div className="screen-heading"><p className="eyebrow"><span />{local(copy.reviewFacts, language)}</p><h1>{local(copy.reviewFacts, language)}</h1><p>{local(copy.reviewLead, language)}</p></div><div className="analysis-controls"><StatusPill mode={analysisMode} language={language} /><Button variant="secondary" type="button" onClick={rerunLiveAnalysis} disabled={analysisBusy || textFirst || !liveAnalysisEnabled}>{analysisBusy ? local(copy.rerunning, language) : local(copy.rerun, language)}</Button>{(!liveAnalysisEnabled || textFirst) && <small>{!liveAnalysisEnabled ? (language === 'hi' ? 'इस काल्पनिक वॉकथ्रू में लाइव विश्लेषण बंद है।' : 'Live analysis is off in this fictional walkthrough.') : (language === 'hi' ? 'टेक्स्ट-पहले मोड में लाइव इमेज अनुरोध बंद है।' : 'Live image requests are off in text-first mode.')}</small>}</div></div>
             {analysisMessage && <p className={`analysis-message ${analysisMode === 'fallback' ? 'warning' : ''}`} role="status">{analysisMessage}</p>}
+            {previousConsistentSource && fixtureId === 'consistent' && <div className="analysis-message warning" role="status"><p>{language === 'hi' ? 'डेमो फ़ोटो बदल गई है: पुराना काल्पनिक नंबर TEST-26-SC-9024 था; नई फ़ोटो में TEST-26-SC-3317 दिखता है। वर्तमान रिकॉर्ड फिर जाँचें। आपका पिछला सहेजा डेमो सुरक्षित है।' : 'The demo photograph changed: the old fictional source used TEST-26-SC-9024; the current image shows TEST-26-SC-3317. Review the current records again. Your previous saved demo is preserved.'}</p><button className="text-skip-button" type="button" onClick={() => downloadBlob(previousConsistentSource, 'application/json', 'challansakshi-previous-consistent-source-9024.json')}>{language === 'hi' ? 'पिछला सहेजा डेमो डाउनलोड करें (.json)' : 'Download previous saved demo (.json)'}</button></div>}
             <div className="review-layout">
               <aside className="review-source-sticky"><EvidencePhoto id="review-enforcement-image" fixture={fixture} label={local(copy.imageSource, language)} textFirst={textFirst} revealed={revealedImages.includes(enforcementImageKey)} uninspected={imageMarkedUninspected} language={language} onReveal={imageMarkedUninspected ? inspectImageAfterSkip : () => revealImage(enforcementImageKey)} onSkip={imageMarkedUninspected ? undefined : markImageUninspected} /><div><span className="synthetic-chip">{local(copy.synthetic, language)}</span><p>{imageMarkedUninspected ? (language === 'hi' ? 'फ़ोटो नहीं देखी गई; कोई फ़ोटो-आधारित विवरण आगे नहीं लिया गया।' : 'Image not inspected; no image-derived detail was carried forward.') : local(fixture.imageNote, language)}</p></div></aside>
               <div className="fact-groups">

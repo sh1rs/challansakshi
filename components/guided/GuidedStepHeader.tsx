@@ -24,6 +24,7 @@ export function GuidedStepHeader({
   progressLabel,
   headingRef,
   headingId = 'guided-step-title',
+  headingLevel = 2,
   labels = {},
 }: {
   currentLabel: string;
@@ -36,6 +37,7 @@ export function GuidedStepHeader({
   progressLabel: string;
   headingRef?: Ref<HTMLHeadingElement>;
   headingId?: string;
+  headingLevel?: 1 | 2;
   labels?: Partial<{
     doNow: string;
     why: string;
@@ -57,6 +59,7 @@ export function GuidedStepHeader({
     next: labels.next ?? 'Next',
     allSteps: labels.allSteps ?? 'All steps',
   };
+  const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const stateLabels: Record<GuidedStepState, string> = {
     complete: labels.stateComplete ?? defaultStateLabels.complete,
     current: labels.stateCurrent ?? defaultStateLabels.current,
@@ -74,7 +77,7 @@ export function GuidedStepHeader({
 
       <div className={styles.primaryInstruction}>
         <span className={styles.visuallyHidden}>{copy.doNow}</span>
-        <h2 id={headingId} ref={headingRef} tabIndex={-1}>{instruction}</h2>
+        <Heading id={headingId} ref={headingRef} tabIndex={-1}>{instruction}</Heading>
       </div>
 
       <div className={styles.status} role="status" aria-live="polite" data-tone={statusTone}><span className={styles.visuallyHidden}>{copy.status}</span><strong>{status}</strong></div>

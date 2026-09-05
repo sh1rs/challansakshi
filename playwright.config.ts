@@ -12,7 +12,7 @@ export default defineConfig({
   outputDir: '/tmp/challansakshi-playwright-results',
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4177',
+    baseURL: process.env.CHALLANSAKSHI_BASE_URL ?? 'http://127.0.0.1:4177',
     ...devices['Desktop Chrome'],
     browserName: 'chromium',
     locale: 'en-IN',
@@ -21,7 +21,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium' }],
-  webServer: {
+  webServer: process.env.CHALLANSAKSHI_BASE_URL ? undefined : {
     command: 'node node_modules/vinext/dist/cli.js dev --hostname 127.0.0.1 --port 4177',
     url: 'http://127.0.0.1:4177/review',
     timeout: 60_000,

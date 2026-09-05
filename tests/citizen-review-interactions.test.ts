@@ -62,6 +62,18 @@ function privatePreparation(host: HTMLElement) {
 }
 
 describe('rendered adaptive citizen review', () => {
+  it('keeps enough page height for the current viewport when the result replaces a longer form', () => {
+    const { host } = mount();
+    mismatch(host);
+    const main = host.querySelector('main')!;
+    vi.stubGlobal('scrollY', 240);
+    vi.stubGlobal('innerHeight', 812);
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(1500);
+    vi.spyOn(main, 'getBoundingClientRect').mockReturnValue({ height: 1100 } as DOMRect);
+    press(host, 'I checked these answers — see my next step');
+    expect(main.style.minHeight).toBe('652px');
+    expect(host.querySelector('main')?.getAttribute('data-review-phase')).toBe('resolve');
+  });
   it('keeps direct source unselected and unknown-device exports unavailable until chosen', () => {
     const { host } = mount();
     expect(host.querySelector('#review-source-official-service:checked')).toBeNull();

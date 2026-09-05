@@ -7,6 +7,7 @@ import { readLocalDocument } from '../lib/local-document-reader';
 vi.mock('../lib/local-document-reader', () => ({ readLocalDocument: vi.fn() }));
 const roots: ReturnType<typeof createRoot>[] = [];
 beforeEach(() => {
+  vi.mocked(readLocalDocument).mockReset();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:test-document') });
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
@@ -29,6 +30,40 @@ function press(host: HTMLElement, label: string) {
   const button = [...host.querySelectorAll('button')].find(node => node.textContent?.trim() === label);
   expect(button, label).toBeDefined(); act(() => button!.click());
 }
+it('keeps the current step aligned with reading, checking and explicit preparation', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof readLocalDocument>>) => void;
+  vi.mocked(readLocalDocument).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const host = mount();
+  const currentStep = () => host.querySelector('ol[aria-label="Review progress"] [aria-current="step"]')?.textContent ?? '';
+  expect(currentStep()).toContain('Read');
+  await file(host, 'notice');
+  expect(currentStep()).toContain('Read');
+  expect(host.querySelector('[data-document-note]')).toBeNull();
+  const options = vi.mocked(readLocalDocument).mock.calls.at(-1)![1];
+  await act(async () => { finish({ sourceId: options.sourceId, role: 'notice', limited: false, pages: [{ page: 1, text: 'Registration Number: KA01AB1234', method: 'pdf-text' }] }); });
+  expect(currentStep()).toContain('Check');
+  press(host, 'I checked these readings — prepare my note');
+  expect(currentStep()).toContain('Prepare');
+  press(host, 'Review documents');
+  expect(currentStep()).toContain('Check');
+  press(host, 'Remove challan');
+  expect(currentStep()).toContain('Read');
+});
+it('opens only the selected field source reading without moving keyboard focus', async () => {
+  const host = mount(); await file(host, 'notice'); await file(host, 'vehicle-record');
+  const source = host.querySelector<HTMLButtonElement>('button[aria-label="Show source reading: Registration notice"]');
+  expect(source).not.toBeNull();
+  expect(source!.getAttribute('aria-expanded')).toBe('false');
+  source!.focus();
+  act(() => source!.click());
+  const excerpt = document.getElementById(source!.getAttribute('aria-controls')!);
+  expect(source!.getAttribute('aria-expanded')).toBe('true');
+  expect(excerpt?.textContent).toContain('Registration Number: KA01AB1234');
+  expect(excerpt?.textContent).not.toContain('KA01AB5678');
+  expect(document.activeElement).toBe(source);
+  act(() => source!.click());
+  expect(source!.getAttribute('aria-expanded')).toBe('false');
+});
 it('starts document-first without questions and reads automatically after choosing a file', async () => {
   const host = mount();
   expect(host.querySelector('a[href="/manual/challan"]')).not.toBeNull();
@@ -38,6 +73,12 @@ it('starts document-first without questions and reads automatically after choosi
   expect(host.textContent).toContain('KA01AB1234');
   expect(host.textContent).toContain('Read on this device');
   expect(host.textContent).not.toContain('not-logged.pdf');
+});
+it('offers the manual fallback before optional guidance in the reading order', () => {
+  const host = mount();
+  const fallback = host.querySelector('a[href="/manual/challan"]')!;
+  const guide = host.querySelector('aside[aria-labelledby="document-guide-title"]')!;
+  expect(fallback.compareDocumentPosition(guide) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 it('compares two sources then prepares only after an explicit review confirmation', async () => {
   const host = mount(); await file(host, 'notice'); await file(host, 'vehicle-record');

@@ -1,0 +1,26 @@
+.page { max-width: 980px; }
+.page > p { font-size: 16px; }
+.routes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.card { min-width: 0; padding: 22px; border: 1px solid var(--pb-line); border-radius: var(--radius-panel); background: var(--pb-card); }
+.cardHeading { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.cardHeading h2 { flex: 1 1 170px; margin: 0; font: 650 22px/1.25 var(--font-heading); }
+.badge { padding: 5px 9px; border-radius: 6px; background: var(--teal-soft); color: var(--pb-teal-dark); font-size: 14px; font-weight: 700; }
+.badge[data-status='needs-recheck'], .badge[data-status='reference-only'] { color: var(--amber-text); background: var(--amber-soft); }
+.card p { margin: 16px 0; color: var(--pb-muted); font-size: 16px; line-height: 1.55; }
+.codes { overflow-wrap: anywhere; }
+.dates { display: flex; flex-wrap: wrap; gap: 16px 32px; padding-block: 16px; border-block: 1px solid var(--pb-line); }
+.dates dt { color: var(--pb-muted); font-size: 14px; }
+.dates dd { margin: 5px 0 0; font-size: 16px; font-weight: 600; }
+.officialLink { display: block; padding-block: 8px; color: var(--pb-teal-dark); font-size: 16px; font-weight: 700; line-height: 1.5; text-decoration: none; }
+.officialLink:hover { text-decoration: underline; }
+.officialLink small { display: block; color: var(--pb-muted); font-size: 14px; font-weight: 400; overflow-wrap: anywhere; }
+.provenance { margin-top: 8px; }
+.provenance summary { min-height: 48px; align-content: center; color: var(--pb-muted); font-size: 16px; cursor: pointer; }
+.provenance dt { font-size: 14px; color: var(--pb-muted); }
+.provenance dd { margin: 5px 0 14px; font-size: 14px; overflow-wrap: anywhere; }
+.note { margin-top: 24px; padding: 18px 22px; border-inline-start: 3px solid var(--pb-teal); background: var(--panel); font-size: 16px; line-height: 1.5; }
+.note p { margin: 8px 0 0; color: var(--pb-muted); }
+.note a, .apiLink a { display: inline-flex; align-items: center; min-height: 48px; color: var(--pb-teal-dark); }
+.page a:focus-visible, .page summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.card .unavailable { color: var(--amber-text); }
+@media (max-width: 700px) { .routes { grid-template-columns: 1fr; } .card { padding: 18px; } .cardHeading h2 { font-size: 20px; } .badge, .dates dt, .officialLink small, .provenance dt, .provenance dd { font-size: 16px; } }

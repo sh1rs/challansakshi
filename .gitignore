@@ -52,3 +52,7 @@ next-env.d.ts
 # codex scratch build dirs (local only)
 /.codex-build/
 /.codex-finalizer/
+
+# Local operational evidence kept outside the public source repository
+/qa/public-launch-audit-2026-09-02/
+/qa/citizen-toolkit-release-2026-09-05/cloudflare-deployments.log

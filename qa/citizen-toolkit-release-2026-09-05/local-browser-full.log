@@ -1,0 +1,199 @@
+[WebServer] (node:46429) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 59 tests using 1 worker
+
+(node:46456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (en) (6.0s)
+(node:46476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   2 [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (hi) (5.9s)
+(node:46498) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   3 [chromium] › tests/browser/citizen-review.spec.ts:87:5 › informative home and product chrome › header and footer satisfy mobile geometry at 320px (652ms)
+  ✓   4 [chromium] › tests/browser/citizen-review.spec.ts:99:5 › informative home and product chrome › Hindi footer content remains inside its 320px geometry (776ms)
+  ✓   5 [chromium] › tests/browser/citizen-review.spec.ts:87:5 › informative home and product chrome › header and footer satisfy mobile geometry at 375px (605ms)
+  ✓   6 [chromium] › tests/browser/citizen-review.spec.ts:99:5 › informative home and product chrome › Hindi footer content remains inside its 375px geometry (757ms)
+  ✓   7 [chromium] › tests/browser/citizen-review.spec.ts:119:3 › informative home and product chrome › dark mode retains readable foreground contrast (711ms)
+  ✓   8 [chromium] › tests/browser/citizen-review.spec.ts:159:3 › review entry and short resolution paths › direct entry has native unselected radios and validation does not select a source (1.5s)
+  ✓   9 [chromium] › tests/browser/citizen-review.spec.ts:170:3 › review entry and short resolution paths › keyboard radio choices retain focus and Change reopens the selected native control (697ms)
+  ✓  10 [chromium] › tests/browser/citizen-review.spec.ts:194:3 › review entry and short resolution paths › query-seeded message renders the safe stop in server HTML and first page state (462ms)
+  ✓  11 [chromium] › tests/browser/citizen-review.spec.ts:206:5 › review entry and short resolution paths › plate mismatch reaches self result in four actions with first result affordances visible (en) (789ms)
+  ✓  12 [chromium] › tests/browser/citizen-review.spec.ts:206:5 › review entry and short resolution paths › plate mismatch reaches self result in four actions with first result affordances visible (hi) (899ms)
+  ✓  13 [chromium] › tests/browser/citizen-review.spec.ts:220:3 › review entry and short resolution paths › editing a result preserves scroll position and invalidates the resolved phase (880ms)
+  ✓  14 [chromium] › tests/browser/citizen-review.spec.ts:229:3 › review entry and short resolution paths › missing RC and unavailable photo resolve conservatively (970ms)
+  ✓  15 [chromium] › tests/browser/citizen-review.spec.ts:245:3 › review entry and short resolution paths › unclear and fully aligned branches reach their bounded findings (1.6s)
+  ✓  16 [chromium] › tests/browser/citizen-review.spec.ts:264:3 › review entry and short resolution paths › category-only mismatch stays bounded without an actionable grievance destination (1.4s)
+  ✓  17 [chromium] › tests/browser/citizen-review.spec.ts:284:3 › review entry and short resolution paths › helper path requires both ordered confirmations before Resolve (875ms)
+  ✓  18 [chromium] › tests/browser/citizen-review.spec.ts:294:3 › review entry and short resolution paths › shared devices block exports while a private-device print contains the visible summary (1.1s)
+  ✓  19 [chromium] › tests/browser/citizen-review.spec.ts:321:3 › review entry and short resolution paths › a live clock crossing route expiry removes the link before activation (894ms)
+  ✓  20 [chromium] › tests/browser/citizen-review.spec.ts:342:1 › case actions create no storage record or application network request (993ms)
+  ✓  21 [chromium] › tests/browser/citizen-tools.spec.ts:7:1 › message checker keeps pasted links inert, clears results on edits, and fits a phone in EN/HI (934ms)
+  ✓  22 [chromium] › tests/browser/citizen-tools.spec.ts:31:1 › reply review links exact source text, gates a real download and invalidates changed evidence (1.1s)
+  ✓  23 [chromium] › tests/browser/deep-demo-preservation.spec.ts:32:3 › long fictional demo retains confirmed evidence, passport, pack, and order review on desktop (14.3s)
+  ✓  24 [chromium] › tests/browser/deep-demo-preservation.spec.ts:32:3 › long fictional demo retains confirmed evidence, passport, pack, and order review on phone (20.5s)
+  ✓  25 [chromium] › tests/browser/deep-demo-preservation.spec.ts:198:1 › a saved low-data preference keeps photos unloaded until the citizen reveals one (2.6s)
+  ✓  26 [chromium] › tests/browser/deep-demo-preservation.spec.ts:230:1 › text-first is an optional saved preference and missing or reused photo references remain honest (1.3s)
+  ✓  27 [chromium] › tests/browser/demo-source-visuals.spec.ts:4:3 › lab shows original synthetic sources and preserves them through corrections at 1440px (4.1s)
+  ✓  28 [chromium] › tests/browser/demo-source-visuals.spec.ts:59:3 › physical plate crops are inspectable for clear, changed, blurred and partial cases at 1440px (2.4s)
+  ✓  29 [chromium] › tests/browser/demo-source-visuals.spec.ts:4:3 › lab shows original synthetic sources and preserves them through corrections at 390px (2.3s)
+  ✓  30 [chromium] › tests/browser/demo-source-visuals.spec.ts:59:3 › physical plate crops are inspectable for clear, changed, blurred and partial cases at 390px (2.3s)
+  ✓  31 [chromium] › tests/browser/document-review.spec.ts:20:1 › document-first is compact and performs real PDF extraction, comparison, correction and private download (2.9s)
+  ✓  32 [chromium] › tests/browser/document-review.spec.ts:64:1 › actual on-device image OCR uses only local assets and no document storage (1.9s)
+  ✓  33 [chromium] › tests/browser/document-review.spec.ts:93:1 › same document twice stays inconclusive and malformed files fall back without a fabricated result (1.5s)
+  ✓  34 [chromium] › tests/browser/evidence-photo.spec.ts:4:1 › local photo inspection preserves context, records uncertainty and invalidates edited regions (1.5s)
+  ✓  35 [chromium] › tests/browser/hybrid-journey.spec.ts:3:1 › informative home keeps real review primary and all examples behind Demo (4.8s)
+  ✓  36 [chromium] › tests/browser/hybrid-journey.spec.ts:44:1 › all real walkthrough entries retain readable mobile hierarchy and visible Demo access (5.0s)
+  ✓  37 [chromium] › tests/browser/hybrid-journey.spec.ts:60:1 › FASTag demo carries the shared design through comparison and a clearly labelled preparation note (1.4s)
+[WebServer] Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+[WebServer] Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+[WebServer] Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+[WebServer] Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+[WebServer] Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+  ✓  38 [chromium] › tests/browser/local-intake.spec.ts:8:1 › a private local photo remains bounded by explicit answers, invalidation, and Quick Exit (3.3s)
+  ✓  39 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 320px English (1.5s)
+  ✓  40 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 320px Hindi (1.7s)
+  ✓  41 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 375px English (1.4s)
+  ✓  42 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 375px Hindi (1.1s)
+  ✓  43 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 390px English (1.5s)
+  ✓  44 [chromium] › tests/browser/mobile-geometry.spec.ts:23:3 › required mobile controls and typography 390px Hindi (1.1s)
+  ✘  45 [chromium] › tests/browser/mobile-geometry.spec.ts:63:1 › FASTag keeps English availability in the compact menu only (5.7s)
+(node:46926) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  46 [chromium] › tests/browser/mobility-dashboard.spec.ts:3:1 › private checklist is opt-in, persists only allowlisted task metadata and supports clear across tabs (2.1s)
+  ✓  47 [chromium] › tests/browser/mobility-dashboard.spec.ts:29:1 › checklist handles blocked storage without implying success and fits a Hindi phone (699ms)
+  ✓  48 [chromium] › tests/browser/mobility-dashboard.spec.ts:43:1 › reopening after inactivity arms a fresh privacy lock (750ms)
+  ✓  49 [chromium] › tests/browser/official-sources.spec.ts:3:1 › public sources remain readable in Hindi on mobile and disable expired handoffs (954ms)
+  ✓  50 [chromium] › tests/browser/route-clock.spec.ts:6:1 › server HTML and mounted lookup obey the configured clock and expiry boundary (618ms)
+  ✓  51 [chromium] › tests/browser/test-lab-discoverability.spec.ts:4:3 › plain Test Lab entry exposes the ten-case runner immediately at 1440px (1.4s)
+  ✓  52 [chromium] › tests/browser/test-lab-discoverability.spec.ts:31:3 › Demo makes all ten runtime test cases reachable without searching at 1440px (2.3s)
+  ✓  53 [chromium] › tests/browser/test-lab-discoverability.spec.ts:4:3 › plain Test Lab entry exposes the ten-case runner immediately at 390px (1.5s)
+  ✓  54 [chromium] › tests/browser/test-lab-discoverability.spec.ts:31:3 › Demo makes all ten runtime test cases reachable without searching at 390px (2.0s)
+  ✓  55 [chromium] › tests/browser/test-lab-discoverability.spec.ts:76:1 › Test Lab preserves filtering, source traces, editable cases and stale-result invalidation (1.3s)
+  ✓  56 [chromium] › tests/browser/test-lab-discoverability.spec.ts:115:1 › 90-second proof retains handoff, correction, recomputation and abstention guardrails (1.2s)
+  ✓  57 [chromium] › tests/browser/toll-language.spec.ts:4:1 › real FASTag Hindi journey keeps its guide, outcome, evidence passport and private download in Hindi (1.7s)
+  ✓  58 [chromium] › tests/browser/uniform-style.spec.ts:5:1 › all public routes share the reference palette, compact chrome and one footer boundary (3.9s)
+  ✓  59 [chromium] › tests/browser/uniform-style.spec.ts:34:1 › the shared dark theme preserves readable chrome and action foregrounds (1.3s)
+
+
+  1) [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (en)
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('main a')
+    Expected: 4
+    Received: 7
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('main a') with timeout 5000ms
+      - waiting for locator('main a')
+        14 × locator resolved to 7 elements
+           - unexpected value "7"
+
+
+      68 |       await chooseLanguage(page, language);
+      69 |       const mainLinks = page.locator('main a');
+    > 70 |       await expect(mainLinks).toHaveCount(4);
+         |                               ^
+      71 |       expect(await mainLinks.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual([
+      72 |         '/review',
+      73 |         '/manual/challan',
+        at /Users/shars/Desktop/challansakshi/tests/browser/citizen-review.spec.ts:70:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-ecb91-its-useful-explanations-en--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-ecb91-its-useful-explanations-en--chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-ecb91-its-useful-explanations-en--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-ecb91-its-useful-explanations-en--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (hi)
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('main a')
+    Expected: 4
+    Received: 7
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('main a') with timeout 5000ms
+      - waiting for locator('main a')
+        14 × locator resolved to 7 elements
+           - unexpected value "7"
+
+
+      68 |       await chooseLanguage(page, language);
+      69 |       const mainLinks = page.locator('main a');
+    > 70 |       await expect(mainLinks).toHaveCount(4);
+         |                               ^
+      71 |       expect(await mainLinks.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual([
+      72 |         '/review',
+      73 |         '/manual/challan',
+        at /Users/shars/Desktop/challansakshi/tests/browser/citizen-review.spec.ts:70:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-d976e-its-useful-explanations-hi--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-d976e-its-useful-explanations-hi--chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-d976e-its-useful-explanations-hi--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/challansakshi-playwright-results/citizen-review-informative-d976e-its-useful-explanations-hi--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests/browser/mobile-geometry.spec.ts:63:1 › FASTag keeps English availability in the compact menu only
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('FASTag check is currently available in English', { exact: true })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByText('FASTag check is currently available in English', { exact: true }) with timeout 5000ms
+      - waiting for getByText('FASTag check is currently available in English', { exact: true })
+
+
+      66 |   const menu = page.getByRole('button', { name: 'Menu', exact: true });
+      67 |   await menu.click();
+    > 68 |   await expect(page.getByText('FASTag check is currently available in English', { exact: true })).toBeVisible();
+         |                                                                                                   ^
+      69 |   await expect(page.getByRole('group', { name: 'Language' })).toHaveCount(0);
+      70 |   await expect(page.locator('main, footer').getByText('FASTag check is currently available in English')).toHaveCount(0);
+      71 |   await page.keyboard.press('Escape');
+        at /Users/shars/Desktop/challansakshi/tests/browser/mobile-geometry.spec.ts:68:99
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/mobile-geometry-FASTag-kee-59cc5-ty-in-the-compact-menu-only-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/challansakshi-playwright-results/mobile-geometry-FASTag-kee-59cc5-ty-in-the-compact-menu-only-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/mobile-geometry-FASTag-kee-59cc5-ty-in-the-compact-menu-only-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/challansakshi-playwright-results/mobile-geometry-FASTag-kee-59cc5-ty-in-the-compact-menu-only-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (en)
+    [chromium] › tests/browser/citizen-review.spec.ts:65:5 › informative home and product chrome › home keeps document review immediately available without hiding its useful explanations (hi)
+    [chromium] › tests/browser/mobile-geometry.spec.ts:63:1 › FASTag keeps English availability in the compact menu only
+  56 passed (2.5m)

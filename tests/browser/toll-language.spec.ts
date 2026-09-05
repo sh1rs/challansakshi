@@ -1,0 +1,32 @@
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+test('real FASTag Hindi journey keeps its guide, outcome, evidence passport and private download in Hindi', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/fastag');
+  await page.getByLabel('Display language').selectOption('hi');
+  await expect(page.getByRole('heading', { name: 'FASTag की कटौती समझें', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'लेन-देन जाँच शुरू करें', exact: false }).click();
+  await page.locator('#concern').selectOption('unrecognised');
+  await page.locator('#issuer').selectOption('Bank / issuer app');
+  await page.getByLabel('मैंने यह डेबिट ऊपर चुनी आधिकारिक खाता सेवा', { exact: false }).check();
+  await page.getByText('एक लेन-देन की पुष्टि करें', { exact: true }).click();
+  await page.getByLabel('मैंने इन अंतिम प्रविष्टियों को उसी आधिकारिक लेन-देन से मिलाया', { exact: false }).check();
+  await page.getByRole('button', { name: 'देखें क्या मेल खाता या टकराता है', exact: false }).click();
+  await expect(page.getByRole('heading', { name: 'आप क्रॉसिंग नहीं पहचानते — जारीकर्ता से सबूत जाँचें', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: 'सबूत और आधिकारिक रास्ता देखें', exact: false }).click();
+  await page.getByText('सभी 14 सबूत जाँच देखें', { exact: true }).click();
+  await expect(page.getByText('स्वतंत्र रूप से खोली आधिकारिक खाता सेवा में डेबिट दिखाता है।', { exact: true })).toBeVisible();
+  await page.getByText('तैयारी नोट देखें', { exact: true }).click();
+  await expect(page.locator('pre')).toContainText('भेजा नहीं गया');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '.txt डाउनलोड करें', exact: true }).click();
+  const download = await downloadPromise;
+  expect(await readFile((await download.path())!, 'utf8')).toContain('गारंटी नहीं');
+  await page.screenshot({ path: '/tmp/challansakshi-fastag-phone-hi.png', fullPage: true });
+  await page.goto('/demo/fastag');
+  await expect(page.getByLabel('Display language')).toHaveCount(0);
+  await expect(page.getByText('SYNTHETIC FIXTURE — NOT A REAL TRANSACTION.', { exact: true })).toBeVisible();
+});

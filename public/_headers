@@ -1,0 +1,7 @@
+# Public, versioned reader software only. Never cache citizen documents here.
+# Change the asset URL whenever an SDK, core or language-data file changes.
+/document-assets/tesseract-7.0.0/*
+  Cache-Control: public, max-age=604800
+
+/document-assets/pdfjs-6.3.289/*
+  Cache-Control: public, max-age=604800

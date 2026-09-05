@@ -353,6 +353,8 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
   const [error, setError] = useState<ReviewError | null>(null);
   const [artifactStatus, setArtifactStatus] = useState<{ signature: string; message: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const [minimumContentHeight, setMinimumContentHeight] = useState<number>();
   const questionFocusRef = useRef<CitizenReviewDecisionQuestionId | null>(null);
   const previousStep = useRef(step);
   const signatureRef = useRef('');
@@ -641,7 +643,17 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
     return guard.stop;
   }, [device]);
 
+  const preserveViewportHeight = () => {
+    const main = mainRef.current;
+    if (!main) return;
+    // A shorter result must not clamp the browser's current scroll position.
+    // Reserve only the height needed for this viewport, not the whole old form.
+    const surroundingHeight = document.documentElement.scrollHeight - main.getBoundingClientRect().height;
+    setMinimumContentHeight(Math.max(0, Math.ceil(window.scrollY + window.innerHeight - surroundingHeight)));
+  };
+
   const editAnswers = () => {
+    preserveViewportHeight();
     // Move focus off the departing subtree before React removes it.
     headingRef.current?.focus({ preventScroll: true });
     invalidate();
@@ -737,7 +749,10 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
       showError(t(language, 'Check the optional last four characters or deadline you entered.', 'दर्ज किए आखिरी चार अक्षर/अंक या अंतिम तारीख जाँचें।'));
       return;
     }
-    if (result.state.phase !== step) headingRef.current?.focus({ preventScroll: true });
+    if (result.state.phase !== step) {
+      preserveViewportHeight();
+      headingRef.current?.focus({ preventScroll: true });
+    }
     invalidate();
     setHandoffState(current => ({ ...current, role: targetRole === 'helper' ? 'present-helper' : 'self' }));
     confirmedSignatureRef.current = result.state.confirmedFactsSignature;
@@ -752,6 +767,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
   };
 
   const confirmAffectedPerson = () => {
+    preserveViewportHeight();
     headingRef.current?.focus({ preventScroll: true });
     invalidate();
     setReviewState(confirmCitizenReviewHelper);
@@ -1028,7 +1044,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
   );
   const lookupResolution = resolveCurrentOfficialAuxiliaryRoute('national-record-lookup', routeNowIso);
   const lookup = lookupResolution.status === 'current' ? lookupResolution.route : null;
-  const safeLookup = lookup ? <div>
+  const safeLookup = lookup ? <div className={adaptive.officialLookup}>
     <a data-required-action className={adaptive.secondary} data-official-lookup href={lookup.canonicalUrl} target="_blank" rel="noopener noreferrer"
       onClick={event => {
         const nowIso = new Date().toISOString();
@@ -1094,11 +1110,14 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
 
   return (
     <PublicBetaShell language={language} setLanguage={changeLanguage} service="ChallanSakshi" serviceHindi="चालान साक्षी" onQuickExit={quickExit} simpleMode={simpleMode} preserveScroll>
-      <main className={adaptive.main} data-device-context={device} data-review-phase={step} inert={!clientReady}>
+      <main ref={mainRef} className={adaptive.main} style={{ minHeight: minimumContentHeight }} data-device-context={device} data-review-phase={step} inert={!clientReady}>
         {device !== 'private' && <aside className={styles.sharedPrintWarning} data-shared-print-warning><h1>{t(language, 'Private-device choice required to print', 'प्रिंट करने के लिए निजी डिवाइस चुनना ज़रूरी है')}</h1></aside>}
         <header className={adaptive.heading}>
           <p className={adaptive.progress}>{step === 'check' ? t(language, '1 of 2 · Check', '1 / 2 · जाँच') : t(language, '2 of 2 · Resolve', '2 / 2 · अगला कदम')}</p>
           <h1 ref={headingRef} tabIndex={-1} id="review-heading">{step === 'check' ? t(language, 'Check your challan', 'अपना चालान जाँचें') : t(language, 'Your next step', 'आपका अगला कदम')}</h1>
+          <p className={adaptive.intro}>{step === 'check'
+            ? t(language, 'Keep the notice and your vehicle record open. Review what you can see, then get a next step based on your answers.', 'नोटिस और अपने वाहन का रिकॉर्ड खुला रखें। जो दिख रहा है उसे जाँचें, फिर अपने उत्तरों के अनुसार अगला कदम देखें।')
+            : t(language, 'Review the finding and prepare your next official step.', 'नतीजा देखकर अगले आधिकारिक कदम की तैयारी करें।')}</p>
         </header>
         {step === 'check' ? <section className={adaptive.panel} aria-labelledby="review-heading">
           {!reviewState.answeredQuestionIds.source && safeLookup}
@@ -1110,11 +1129,14 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
           </CitizenReviewCheck>
         </section> : <section className={adaptive.panel} aria-labelledby="review-heading" data-print-result>
           <div data-result-finding className={adaptive.result} data-tone={copy.tone}>
-            <p className={adaptive.subtle}>{t(language, 'What we found', 'क्या पता चला')}</p>
+            <div className={adaptive.resultTopline}>
+              <p className={adaptive.resultLabel}>{t(language, 'What we found', 'क्या पता चला')}</p>
+              <button data-required-action className={adaptive.change} type="button" onClick={editAnswers}>{t(language, 'Edit my answers', 'मेरे उत्तर बदलें')}</button>
+            </div>
             <h2>{resultTitle}</h2>
-            <p className={adaptive.subtle}>{t(language, 'What it means', 'इसका मतलब')}</p>
+            <p className={adaptive.resultLabel}>{t(language, 'What it means', 'इसका मतलब')}</p>
             <p>{resultBody}</p>
-            <p className={adaptive.subtle}>{t(language, 'What to do now', 'अब क्या करें')}</p>
+            <p className={adaptive.resultLabel}>{t(language, 'What to do now', 'अब क्या करें')}</p>
             <p>{answers.sourceStatus === 'message-only'
               ? t(language, 'Do not use the message link. Find your notice on the official service first.', 'संदेश का लिंक उपयोग न करें। पहले आधिकारिक सेवा पर अपना नोटिस खोजें।')
               : t(language, 'Continue on the official e-Challan service with the record you checked.', 'जाँचे गए रिकॉर्ड के साथ आधिकारिक ई-चालान सेवा पर आगे बढ़ें।')}</p>
@@ -1123,8 +1145,9 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
           {safeLookup}
           {factsConfirmed && <>
             <button data-required-action className={adaptive.primary} type="button" aria-expanded={preparationOpen} data-grievance-affordance aria-controls="review-preparation" onClick={() => setPreparationOpen(!preparationOpen)}>{t(language, 'Prepare my checklist', 'मेरी चेकलिस्ट तैयार करें')}</button>
-            {preparationOpen && <div id="review-preparation" data-print-preparation>
+            {preparationOpen && <div id="review-preparation" className={adaptive.preparation} data-print-preparation>
               <h2>{t(language, 'Your checklist', 'आपकी चेकलिस्ट')}</h2>
+              <p className={adaptive.subtle}>{t(language, 'Use this to organise the records and details for your next official step. You can add only the details you have.', 'अगले आधिकारिक कदम के लिए रिकॉर्ड और विवरण व्यवस्थित करें। आपके पास जो विवरण हैं, केवल वे जोड़ सकते हैं।')}</p>
               {localizedAssessment.missingEvidence.length > 0 && <ul>{localizedAssessment.missingEvidence.map(item => <li key={item}>{item}</li>)}</ul>}
               {optionalDetails}
               {deviceQuestion}
@@ -1255,7 +1278,6 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
               {artifactStatus?.signature === presentationSignature && <p role="status">{artifactStatus.message}</p>}
             </div>}
           </>}
-          <button data-required-action className={adaptive.secondary} type="button" onClick={editAnswers}>{t(language, 'Edit my answers', 'मेरे उत्तर बदलें')}</button>
         </section>}
       </main>
     </PublicBetaShell>

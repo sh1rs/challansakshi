@@ -15,17 +15,34 @@ function linksFrom(html: string) {
   }));
 }
 
-describe('compact citizen home', () => {
-  it('renders exactly three meaningful journey anchors', () => {
+describe('informative citizen home', () => {
+  it('offers one document review entry and distinct message, FASTag and manual routes', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome));
     const main = html.match(/<main\b[\s\S]*?<\/main>/)?.[0] ?? '';
-    expect(linksFrom(main)).toEqual([
-      { href: '/review', name: 'Review a challan or its photo Check the official record and compare only what you can see.' },
-      { href: '/review?goal=message', name: 'I only have an SMS or forwarded link Check it safely without entering or sharing the message.' },
-      { href: '/fastag', name: 'Check a FASTag transaction Compare the transaction and find the appropriate official route.' },
+    const links = linksFrom(main);
+    expect(links.map(({ href }) => href).sort()).toEqual([
+      '/dashboard', '/fastag', '/manual/challan', '/message-check', '/reply-review', '/review', '/sources',
     ]);
-    expect(main).not.toMatch(/Understand the notice|Compare the photo|Find the next step|I already paid|My grievance was rejected|Virtual Court/);
+    expect(links.find(({ href }) => href === '/review')?.name).toBe('Review my challan');
     expect(main.match(/<h1\b/g)).toHaveLength(1);
+  });
+
+  it('explains the four capabilities in disclosures without introducing unsupported review routes', () => {
+    const html = renderToStaticMarkup(createElement(CitizenHome));
+    const capabilities = [...html.matchAll(/<details\b[^>]*data-home-capability="([^"]+)"[^>]*>([\s\S]*?)<\/details>/g)];
+    expect(capabilities.map((match) => match[1])).toEqual(['verify', 'understand', 'evidence', 'resolve']);
+    for (const [, , content] of capabilities) {
+      expect(content).toMatch(/<summary\b/);
+      expect(content).toMatch(/<\/summary>\s*<div\b[\s\S]*?<p\b/);
+      expect(linksFrom(content)).toEqual([]);
+    }
+  });
+
+  it('keeps demo navigation and sample content out of the real homepage main', () => {
+    const html = renderToStaticMarkup(createElement(CitizenHome));
+    const main = html.match(/<main\b[\s\S]*?<\/main>/)?.[0] ?? '';
+    expect(main).not.toMatch(/\/demo|try a sample|sample case|synthetic example/i);
+    expect(html.match(/<footer\b/g)).toHaveLength(1);
   });
 
   it('accepts only a scalar message navigation hint', () => {
@@ -42,12 +59,11 @@ describe('compact citizen home', () => {
     expect(parseCitizenGoalValue({ source: 'official-service' })).toBeNull();
   });
 
-  it('renders the Hindi home with the same three destinations', () => {
+  it('renders the Hindi home with the same real service destinations', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome, { initialLanguage: 'hi' }));
     const main = html.match(/<main\b[\s\S]*?<\/main>/)?.[0] ?? '';
     expect(main).toContain('lang="hi"');
-    expect(linksFrom(main).map(({ href }) => href)).toEqual(['/review', '/review?goal=message', '/fastag']);
-    expect(main).toContain('चालान या उसकी फ़ोटो की समीक्षा करें');
-    expect(main).toContain('मेरे पास केवल SMS या फ़ॉरवर्ड किया हुआ लिंक है');
+    expect(linksFrom(main).map(({ href }) => href).sort()).toEqual(['/dashboard', '/fastag', '/manual/challan', '/message-check', '/reply-review', '/review', '/sources']);
+    expect(linksFrom(main).find(({ href }) => href === '/review')?.name).toBe('मेरे चालान की समीक्षा करें');
   });
 });

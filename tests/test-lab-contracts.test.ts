@@ -120,10 +120,13 @@ function renderProof(View: ComponentType<{ state: unknown; dispatch: (action: un
 }
 
 describe('synthetic Test Lab product contract', () => {
-  it('opens on one compact citizen problem pair boundary and primary 90-second action', () => {
+  it('retains the compact citizen problem and 90-second action after a clearly identified lab entry', () => {
     const html = renderToStaticMarkup(createElement(SyntheticTestLabApp));
     const entry = judgeEntry(html);
 
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toContain('<h1 id="lab-title">Synthetic Evidence Test Lab</h1>');
+    expect(html.indexOf('id="lab-title"')).toBeLessThan(html.indexOf('data-challansakshi-judge-entry="v1"'));
     expect(entry).not.toBe('');
     expect(entry).toContain('Does this fictional image show the same vehicle as the record?');
     expect(entry).toContain('Synthetic demonstration data');
@@ -142,7 +145,7 @@ describe('synthetic Test Lab product contract', () => {
 
     const suiteIndex = html.indexOf('id="suite-heading"');
     expect(suiteIndex).toBeGreaterThan(html.indexOf('data-challansakshi-judge-entry="v1"'));
-    expect(html.indexOf('Run all 10 cases')).toBeGreaterThan(suiteIndex);
+    expect(html.indexOf('Run all 10 cases', suiteIndex)).toBeGreaterThan(suiteIndex);
     expect(html.indexOf('10 fictional cases')).toBeGreaterThan(suiteIndex);
   });
 
@@ -357,16 +360,16 @@ describe('synthetic Test Lab product contract', () => {
     expect(styles).toMatch(/outline-offset:\s*5px/);
   });
 
-  it('keeps the judge entry vertically isolated and fluid at 390px 320px and zoom-equivalent widths', () => {
-    expect(ruleFor(styles, '.judgeEntry')).toMatch(/min-height:\s*calc\(100svh\s*-\s*\d+px\)/);
+  it('keeps the preserved judge entry fluid without reserving a second full phone viewport', () => {
+    expect(ruleFor(styles, '.judgeEntry')).toMatch(/min-height:\s*0/);
     expect(ruleFor(styles, '.judgeEntry')).toMatch(/align-content:\s*center/);
     expect(ruleFor(styles, '.judgePair strong')).toMatch(/overflow-wrap:\s*anywhere/);
 
     const mobile = mediaBlock(styles, '(max-width: 560px)');
-    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/min-height:\s*calc\(100svh\s*-\s*180px\)/);
+    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/min-height:\s*0/);
     expect(ruleFor(mobile, '.judgeEntry')).toMatch(/gap:\s*12px/);
-    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/padding-block:\s*18px/);
-    expect(ruleFor(mobile, '.judgeIntro h1')).toMatch(/font-size:\s*32px/);
+    expect(ruleFor(mobile, '.judgeEntry')).toMatch(/padding:\s*20px\s+16px/);
+    expect(ruleFor(mobile, '.judgeIntro h2')).toMatch(/font-size:\s*28px/);
     expect(ruleFor(mobile, '.judgePair')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+minmax\(0,\s*1fr\)/);
     expect(ruleFor(mobile, '.judgePair article')).toMatch(/padding:\s*10px/);
     expect(ruleFor(mobile, '.judgeBoundary')).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
@@ -375,7 +378,7 @@ describe('synthetic Test Lab product contract', () => {
     expect(ruleFor(mobile, '.judgeEntry .primaryButton')).toMatch(/font-size:\s*16px/);
 
     const narrow = mediaBlock(styles, '(max-width: 390px)');
-    expect(ruleFor(narrow, '.judgeEntry')).toMatch(/padding-inline:\s*0/);
+    expect(ruleFor(narrow, '.judgeEntry')).toMatch(/padding-inline:\s*14px/);
     const narrowest = mediaBlock(styles, '(max-width: 320px)');
     expect(ruleFor(narrowest, '.judgeEntry')).toMatch(/min-width:\s*0/);
     expect(ruleFor(narrowest, '.judgePair')).toMatch(/grid-template-columns:\s*1fr/);

@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createMobilityTask, encodeTaskStore } from '../lib/mobility-tasks';
+import { createTaskCalendar, parseTaskBackup } from '../lib/mobility-continuity';
 
-// These home/review/toll route modules are the complete real-mode boundary. Following every
+// Public citizen journeys, including explicitly opted-in checklist storage. Following every
 // relative import/export keeps the audit current when a route gains a new local dependency.
 const publicModeEntryPoints = [
   'app/page.tsx',
@@ -10,6 +12,10 @@ const publicModeEntryPoints = [
   'app/fastag/page.tsx',
   'app/manual/challan/page.tsx',
   'app/toll/page.tsx',
+  'app/dashboard/page.tsx',
+  'app/message-check/page.tsx',
+  'app/reply-review/page.tsx',
+  'app/sources/page.tsx',
 ] as const;
 const localModulePattern = /(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g;
 
@@ -70,11 +76,13 @@ describe('real-mode privacy isolation', () => {
   it('contains no network-send, persistence, analyze, raw paste, or unsafe HTML surface', () => {
     for (const { path, source } of publicModeFiles) {
       expect(source, path).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket\s*\(|EventSource\s*\(/);
-      expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
+      if (path !== 'components/public-beta/MobilityDashboard.tsx') expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
+      else expect(source, path).not.toMatch(/sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
       expect(source, path).not.toMatch(/dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
       expect(source, path).not.toMatch(/contenteditable|contentEditable/);
       const textareas = source.match(/<textarea\b/g) ?? [];
-      expect(textareas, path).toHaveLength(path === 'components/public-beta/OfficialHandoffPanel.tsx' ? 1 : 0);
+      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2 } as Record<string, number>)[path] ?? 0;
+      expect(textareas, path).toHaveLength(count);
     }
   });
 
@@ -105,9 +113,9 @@ describe('real-mode privacy isolation', () => {
     expect(new Set(queryKeys)).toEqual(new Set(['goal']));
   });
 
-  it('allows native file inputs only inside the two controlled local intake components', () => {
+  it('allows native file inputs only inside controlled local intake, photo and checklist components', () => {
     for (const { path, source } of publicModeFiles) {
-      if (path === 'components/public-beta/LocalRecordIntake.tsx' || path === 'components/public-beta/CitizenDocumentReview.tsx') {
+      if (path === 'components/public-beta/LocalRecordIntake.tsx' || path === 'components/public-beta/CitizenDocumentReview.tsx' || path === 'components/public-beta/EvidencePhotoWorkspace.tsx' || path === 'components/public-beta/MobilityDashboard.tsx') {
         expect(source, path).toMatch(/type=["']file["']/);
       } else {
         expect(source, path).not.toMatch(/type=["']file["']/);
@@ -121,6 +129,9 @@ describe('real-mode privacy isolation', () => {
       'components/public-beta/LocalRecordIntake.tsx',
       'components/public-beta/TollSakshiApp.tsx',
       'components/public-beta/CitizenDocumentReview.tsx',
+      'components/public-beta/EvidencePhotoWorkspace.tsx',
+      'components/public-beta/ReplyReview.tsx',
+      'components/public-beta/MobilityDashboard.tsx',
     ]);
     for (const { path, source } of publicModeFiles) {
       if (!allowed.has(path)) expect(source, path).not.toMatch(/URL\.(?:create|revoke)ObjectURL/);
@@ -138,8 +149,21 @@ describe('real-mode privacy isolation', () => {
     expect(`${citizen}\n${intake}\n${toll}`).not.toMatch(/fetch\s*\([^)]*blob:|sendBeacon\s*\([^)]*blob:/);
   });
 
+  it('checklist exports exclude private records and restore rejects unrecognized private fields', () => {
+    const now = '2026-09-05T10:00:00.000Z';
+    const task = { ...createMobilityTask({ kind: 'challan', followUpDate: '2026-09-06' }, now, 'task-one'), plate: 'KA01ZZ1234', reply: 'PRIVATE_REPLY_SENTINEL', document: 'PRIVATE_DOCUMENT_SENTINEL' };
+    const backup = encodeTaskStore([task], now);
+    const calendar = createTaskCalendar(task, now, 'en');
+    expect(`${backup}\n${calendar}`).not.toMatch(/KA01ZZ1234|PRIVATE_REPLY_SENTINEL|PRIVATE_DOCUMENT_SENTINEL/);
+    expect(Object.keys(JSON.parse(backup).tasks[0]).sort()).toEqual(['createdAt', 'followUpDate', 'id', 'kind', 'status', 'updatedAt']);
+    expect(parseTaskBackup(JSON.stringify({ version: 1, savedAt: now, tasks: [task] }), now)).toBeNull();
+  });
+
   it('uses no HTML form that could fall back to a URL or server submission', () => {
-    for (const { path, source } of publicModeFiles) expect(source, path).not.toMatch(/<form\b/);
+    for (const { path, source } of publicModeFiles) {
+      if (path !== 'components/public-beta/MobilityDashboard.tsx') expect(source, path).not.toMatch(/<form\b/);
+      else { expect(source).toContain('event.preventDefault()'); expect(source).not.toMatch(/<(?:input|select|textarea)[^>]*\bname=/); }
+    }
   });
 
   it('loads OCR locally with persistence off and versioned same-origin workers', () => {
@@ -166,11 +190,11 @@ describe('real-mode privacy isolation', () => {
     expect(inputs).not.toMatch(/name=["'](?:name|phone|email|address|aadhaar|password)/i);
   });
 
-  it('keeps the translated e-Challan flow bilingual while FASTag remains English-only', () => {
+  it('offers Hindi in real reviews while preserving the English-only FASTag synthetic examples', () => {
     const citizenApp = publicModeFiles.find((file) => file.path === 'components/public-beta/CitizenReviewApp.tsx')?.source;
     const tollApp = publicModeFiles.find((file) => file.path === 'components/public-beta/TollSakshiApp.tsx')?.source;
     expect(citizenApp, 'components/public-beta/CitizenReviewApp.tsx').not.toMatch(/<PublicBetaShell[^>]*englishOnly/);
-    expect(tollApp, 'components/public-beta/TollSakshiApp.tsx').toMatch(/<PublicBetaShell[^>]*englishOnly/);
+    expect(tollApp, 'components/public-beta/TollSakshiApp.tsx').toMatch(/<PublicBetaShell[^>]*englishOnly=\{synthetic\}/);
   });
 
   it('keeps FASTag manual entry compact now that the product boundary copy lives in the shared footer', () => {

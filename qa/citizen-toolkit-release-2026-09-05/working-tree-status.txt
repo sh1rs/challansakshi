@@ -1,0 +1,102 @@
+ M README.md
+ M app/api/analyze/route.ts
+ M app/globals.css
+ M components/ChallanSakshiApp.tsx
+ M components/guided/GuidedStepHeader.module.css
+ M components/guided/GuidedStepHeader.tsx
+ M components/public-beta/CitizenDocumentReview.module.css
+ M components/public-beta/CitizenDocumentReview.tsx
+ M components/public-beta/CitizenHome.module.css
+ M components/public-beta/CitizenHome.tsx
+ M components/public-beta/CitizenReviewAdaptive.module.css
+ M components/public-beta/CitizenReviewApp.tsx
+ M components/public-beta/PublicBetaShell.tsx
+ M components/public-beta/PublicInfoPage.tsx
+ M components/public-beta/TollSakshiApp.tsx
+ M components/shared/CitizenChrome.module.css
+ M components/shared/CitizenChrome.tsx
+ M components/test-lab/SyntheticTestLabApp.module.css
+ M components/test-lab/SyntheticTestLabApp.tsx
+ M lib/case-ledger.ts
+ M lib/evidence-passport.ts
+ M lib/fixtures.ts
+ M lib/notice-safety.ts
+ M lib/synthetic-evidence-corpus.ts
+ M package.json
+ M playwright.config.ts
+ M tests/analyze-route.test.ts
+ M tests/browser/citizen-review.spec.ts
+ M tests/browser/document-review.spec.ts
+ M tests/browser/mobile-geometry.spec.ts
+ M tests/browser/uniform-style.spec.ts
+ M tests/case-ledger.test.ts
+ M tests/citizen-chrome-contracts.test.ts
+ M tests/citizen-home.test.ts
+ M tests/citizen-review-interactions.test.ts
+ M tests/document-review-interactions.test.ts
+ M tests/domain.test.ts
+ M tests/evidence-passport.test.ts
+ M tests/guided-step-header.test.ts
+ M tests/public-mode-privacy.test.ts
+ M tests/test-lab-contracts.test.ts
+ M wrangler.jsonc
+?? app/api/official-routes/
+?? app/dashboard/
+?? app/demo/fastag/
+?? app/message-check/
+?? app/reply-review/
+?? app/sources/
+?? components/public-beta/EvidencePhotoWorkspace.module.css
+?? components/public-beta/EvidencePhotoWorkspace.tsx
+?? components/public-beta/MessageSafetyCheck.module.css
+?? components/public-beta/MessageSafetyCheck.tsx
+?? components/public-beta/MobilityDashboard.module.css
+?? components/public-beta/MobilityDashboard.tsx
+?? components/public-beta/OfficialSourcesPage.module.css
+?? components/public-beta/OfficialSourcesPage.tsx
+?? components/public-beta/ReplyReview.tsx
+?? components/public-beta/ReplyReviewPrivacy.ts
+?? components/public-beta/TollSakshiApp.module.css
+?? components/test-lab/SyntheticSourceVisuals.module.css
+?? components/test-lab/SyntheticSourceVisuals.tsx
+?? design-qa.md
+?? docs/official-route-maintenance.md
+?? docs/superpowers/handoffs/2026-09-05-citizen-toolkit-live-release.md
+?? docs/superpowers/handoffs/2026-09-05-demo-visuals-live-release.md
+?? docs/superpowers/plans/2026-09-05-citizen-toolkit-release.md
+?? lib/evidence-photo-tools.ts
+?? lib/mobility-tasks.ts
+?? lib/public-official-routes.ts
+?? lib/reply-review.ts
+?? lib/toll-presentation.ts
+?? public/demo-plates/
+?? public/demo-scooter-plate-cases-v2.png
+?? public/demo-vehicle-plates-v2.png
+?? public/demo-vehicle-scenes.png
+?? public/evidence-contact-sheet-plates-v2.png
+?? qa/citizen-toolkit-release-2026-09-05/
+?? qa/official-route-checks/
+?? qa/public-launch-audit-2026-09-02/
+?? scripts/check-official-routes.mjs
+?? tests/browser/citizen-tools.spec.ts
+?? tests/browser/deep-demo-preservation.spec.ts
+?? tests/browser/demo-source-visuals.spec.ts
+?? tests/browser/evidence-photo.spec.ts
+?? tests/browser/hybrid-journey.spec.ts
+?? tests/browser/mobility-dashboard.spec.ts
+?? tests/browser/official-sources.spec.ts
+?? tests/browser/test-lab-discoverability.spec.ts
+?? tests/browser/toll-language.spec.ts
+?? tests/citizen-utilities.test.ts
+?? tests/citizen-utility-interactions.test.ts
+?? tests/demo-photo-records.test.ts
+?? tests/document-evidence-properties.test.ts
+?? tests/evidence-photo-interactions.test.ts
+?? tests/evidence-photo-tools.test.ts
+?? tests/mobility-tasks.test.ts
+?? tests/official-route-checker.test.ts
+?? tests/public-official-routes.test.ts
+?? tests/synthetic-source-visuals.test.ts
+?? tests/toll-demo-source-records.test.ts
+?? tests/toll-language.test.ts
+?? tests/toll-review-interactions.test.ts

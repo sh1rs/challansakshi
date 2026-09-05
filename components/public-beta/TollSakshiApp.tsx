@@ -6,15 +6,17 @@ import { buildTollGuidedProgress, getTollGuideContent } from '../../lib/guided-j
 import {
   assessTollReview,
   buildTollPassport,
-  buildTollWorksheet,
   calculateRecordedIntervalMinutes,
   type TollConcern,
   type TollRecordStatus,
   type TollReviewAnswers,
 } from '../../lib/toll-domain';
+import { buildLocalizedTollWorksheet, presentTollAssessment, tollText } from '../../lib/toll-presentation';
 import { tollFixtures, type TollFixture } from '../../lib/toll-fixtures';
 import { GuidedStepHeader } from '../guided/GuidedStepHeader';
+import { useClientReady } from '../shared/useClientReady';
 import { PublicBetaShell, publicBetaStyles as styles } from './PublicBetaShell';
+import toll from './TollSakshiApp.module.css';
 
 type Step = 'start' | 'records' | 'reconcile' | 'packet';
 type Mode = 'real' | 'synthetic';
@@ -65,15 +67,63 @@ function statusLabel(value: TollRecordStatus, language: Language): string {
   return t(language, labels[value][0], labels[value][1]);
 }
 
-export default function TollSakshiApp() {
+function SyntheticSourceRecords({ fixture }: { fixture: TollFixture }) {
+  const { refs, answers } = fixture;
+  const observationLabels = { match: 'Appears to match', different: 'Appears different', unclear: 'Unclear', 'not-supplied': 'Not supplied' };
+  return <section className={toll.sampleRecords} aria-labelledby="toll-sample-records-title">
+    <div className={toll.sampleHeading}>
+      <h3 id="toll-sample-records-title">Sample source records</h3>
+      <p>Fictional records for “{fixture.label}”. These stay fixed while you edit the worksheet.</p>
+    </div>
+    <div className={toll.sampleGrid}>
+      <article className={toll.sampleDocument} aria-label="Fictional issuer debit">
+        <header><span>01 · Issuer debit</span><b>SYNTHETIC</b></header>
+        <div className={toll.sampleDocumentBody}>
+          <h4>{refs.issuerLabel}</h4>
+          <div className={toll.sampleAmount}><strong>₹{refs.amount}</strong><span>Recorded debit</span></div>
+          <dl className={toll.sampleFields}>
+            <div><dt>Plaza</dt><dd>{refs.plaza}</dd></div>
+            <div><dt>Reader-read time</dt><dd><time dateTime={refs.eventDateTime}>{refs.eventDateTime.replace('T', ' · ')}</time></dd></div>
+            <div><dt>Transaction ending</dt><dd>•••• {refs.transactionSuffix}</dd></div>
+            <div><dt>FASTag / vehicle ending</dt><dd>•••• {refs.tagSuffix} / •••• {refs.vehicleSuffix}</dd></div>
+          </dl>
+        </div>
+        <footer>Fictional issuer record · Demo use only</footer>
+      </article>
+      <article className={`${toll.sampleDocument} ${toll.sampleSource}`} aria-label="Fictional supporting source">
+        <header><span>02 · Source extract</span><b>SYNTHETIC</b></header>
+        <div className={toll.sampleDocumentBody}>
+          <h4>{answers.secondDebitPresent ? 'Second debit record' : 'Passing-image notes'}</h4>
+          <p className={toll.sampleObservation}>{fixture.description}</p>
+          <dl className={toll.sampleFields}>
+            {answers.secondDebitPresent ? <>
+              <div><dt>Second reader-read time</dt><dd><time dateTime={refs.secondEventDateTime}>{refs.secondEventDateTime.replace('T', ' · ')}</time></dd></div>
+              <div><dt>Credit adjustment</dt><dd>{answers.creditAdjustment.replaceAll('-', ' ')}</dd></div>
+              <div><dt>Second debit amount / reference</dt><dd>Not supplied in this fixture</dd></div>
+            </> : <>
+              <div><dt>Passing-image plate</dt><dd>{observationLabels[answers.passingPlateObservation]}</dd></div>
+              <div><dt>Vehicle class</dt><dd>{observationLabels[answers.vehicleClassObservation]}</dd></div>
+              <div><dt>Separate payment receipt</dt><dd>{statusLabel(answers.alternateReceipt, 'en')}</dd></div>
+            </>}
+          </dl>
+        </div>
+        <footer>Fixture observations · No live issuer or plaza access</footer>
+      </article>
+    </div>
+  </section>;
+}
+
+export default function TollSakshiApp({ synthetic = false }: { synthetic?: boolean } = {}) {
+  const clientReady = useClientReady();
   const [language, setLanguage] = useState<Language>('en');
   const [step, setStep] = useState<Step>('start');
-  const [mode, setMode] = useState<Mode>('real');
+  const mode: Mode = synthetic ? 'synthetic' : 'real';
   const [device, setDevice] = useState<Device>('private');
   const [answers, setAnswers] = useState<TollReviewAnswers>(defaultAnswers);
   const [refs, setRefs] = useState(emptyRefs);
   const [direction, setDirection] = useState('unknown');
   const [fixtureId, setFixtureId] = useState<TollFixture['id']>('different-vehicle');
+  const selectedFixture = tollFixtures.find((fixture) => fixture.id === fixtureId) ?? tollFixtures[0];
   const [error, setError] = useState('');
   const [artifactStatus, setArtifactStatus] = useState('');
   const [tagMappingSignature, setTagMappingSignature] = useState('');
@@ -114,9 +164,9 @@ export default function TollSakshiApp() {
     tariffOrPassConflictConfirmed: mode === 'synthetic' ? answers.tariffOrPassConflictConfirmed : tariffConflictConfirmed,
     reconciliationConfirmed: mode === 'synthetic' ? answers.reconciliationConfirmed : reconciliationConfirmed,
   }), [answers, refs, direction, mode, sourceConfirmed, tagMappingConfirmed, receiptMatchConfirmed, tariffConflictConfirmed, reconciliationConfirmed]);
-  const assessment = useMemo(() => assessTollReview(reviewedAnswers), [reviewedAnswers]);
-  const passport = useMemo(() => buildTollPassport(reviewedAnswers, refs), [reviewedAnswers, refs]);
-  const worksheet = useMemo(() => buildTollWorksheet({ ...refs, answers: reviewedAnswers, assessment, synthetic: mode === 'synthetic' }), [refs, reviewedAnswers, assessment, mode]);
+  const assessment = useMemo(() => presentTollAssessment(assessTollReview(reviewedAnswers), language), [reviewedAnswers, language]);
+  const passport = useMemo(() => buildTollPassport(reviewedAnswers, refs).map(item => ({ ...item, label: tollText(item.label, language), why: tollText(item.why, language) })), [reviewedAnswers, refs, language]);
+  const worksheet = useMemo(() => buildLocalizedTollWorksheet({ ...refs, answers: reviewedAnswers, assessment, synthetic: mode === 'synthetic' }, language), [refs, reviewedAnswers, assessment, mode, language]);
   // A review mode is always selected (real by default) and the shared-device checkbox is optional, so the start step never blocks.
   const startReady = true;
   const sourceReady = mode === 'synthetic'
@@ -126,7 +176,7 @@ export default function TollSakshiApp() {
     .every((value) => value.length === 0 || value.length === 4);
   const recordsReady = identifiersValid && (!refs.amount || isValidAmount(refs.amount)) && sourceReady;
   const finalConfirmationReady = mode === 'synthetic' ? reviewedAnswers.reconciliationConfirmed : reconciliationConfirmed;
-  const guide = getTollGuideContent({
+  const rawGuide = getTollGuideContent({
     step,
     startReady,
     sourceReady,
@@ -137,10 +187,11 @@ export default function TollSakshiApp() {
     route: assessment.route,
     finding: assessment.finding,
   });
-  const guideProgress = buildTollGuidedProgress(step);
+  const guide = { ...rawGuide, currentLabel: tollText(rawGuide.currentLabel, language), instruction: tollText(rawGuide.instruction, language), why: tollText(rawGuide.why, language), status: tollText(rawGuide.status, language), next: tollText(rawGuide.next, language) };
+  const guideProgress = buildTollGuidedProgress(step).map(item => ({ ...item, label: tollText(item.label, language) }));
   const isNhaiFastagSource = refs.issuerLabel === 'IHMCL portal — NHAI FASTag only';
   const isNoDisputeOutcome = assessment.route === 'no-dispute';
-  const displayedRoute = assessment.route === 'issuer'
+  const rawDisplayedRoute = assessment.route === 'issuer'
     ? (isNhaiFastagSource ? 'verified IHMCL portal or 1033' : 'issuing bank / official account provider')
     : assessment.route === 'issuer-and-1033'
       ? (isNhaiFastagSource ? 'verified IHMCL portal or 1033' : 'issuing bank plus 1033 for the NHAI plaza issue')
@@ -150,8 +201,10 @@ export default function TollSakshiApp() {
           ? 'verify records'
           : '';
 
+  const displayedRoute = tollText(rawDisplayedRoute, language);
+
   const reset = () => {
-    setStep('start'); setMode('real'); setDevice('private'); setAnswers(defaultAnswers);
+    setStep('start'); setDevice('private'); setAnswers(defaultAnswers);
     setRefs(emptyRefs); setDirection('unknown'); setFixtureId('different-vehicle'); setError(''); setArtifactStatus('');
     setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
     setSourceVerificationSignature(''); setReconciliationSignature('');
@@ -199,20 +252,6 @@ export default function TollSakshiApp() {
 
   const chooseFixture = (fixture: TollFixture) => {
     setFixtureId(fixture.id); setAnswers(fixture.answers); setRefs(fixture.refs); setDirection('forward'); setError('');
-  };
-
-  const selectRealMode = () => {
-    setMode('real'); setAnswers(defaultAnswers); setRefs(emptyRefs);
-    setDirection('unknown'); setFixtureId('different-vehicle'); setError(''); setArtifactStatus('');
-    setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
-    setSourceVerificationSignature(''); setReconciliationSignature('');
-  };
-
-  const selectSyntheticMode = () => {
-    setMode('synthetic'); setArtifactStatus('');
-    setTagMappingSignature(''); setReceiptMatchSignature(''); setTariffConflictSignature('');
-    setSourceVerificationSignature(''); setReconciliationSignature('');
-    chooseFixture(tollFixtures[0]);
   };
 
   const continueStart = () => {
@@ -297,23 +336,27 @@ export default function TollSakshiApp() {
   ];
 
   const mapRows: Array<{ label: string; record: string; status: string; defaultVisible?: boolean; concerns?: TollConcern[] }> = [
-    { label: t(language, 'Vehicle identity', 'वाहन पहचान'), record: answers.passingImageStatus !== 'readable' ? t(language, `Passing image: ${answers.passingImageStatus.replaceAll('-', ' ')}`, `पासिंग तस्वीर: ${answers.passingImageStatus.replaceAll('-', ' ')}`) : `${t(language, 'Plate observation', 'प्लेट अवलोकन')}: ${answers.passingPlateObservation}`, status: answers.passingImageStatus !== 'readable' ? 'unclear' : answers.passingPlateObservation === 'different' ? 'conflicts' : answers.passingPlateObservation === 'match' ? 'agrees' : 'unclear', defaultVisible: true },
-    { label: t(language, 'Event time', 'घटना समय'), record: answers.timestampType === 'sms-received' ? t(language, 'SMS time—cannot establish passage time', 'SMS समय—पास होने का समय साबित नहीं') : `${t(language, 'Entered as', 'इस रूप में दर्ज')}: ${answers.timestampType}`, status: answers.timestampType === 'reader-read' ? 'verify official' : 'unclear', defaultVisible: true },
-    { label: t(language, 'Plaza & direction', 'प्लाज़ा और दिशा'), record: `${refs.plaza || t(language, 'Not entered', 'दर्ज नहीं')} · ${direction}`, status: refs.plaza ? 'verify official' : 'not supplied', defaultVisible: true },
+    { label: t(language, 'Vehicle identity', 'वाहन पहचान'), record: answers.passingImageStatus !== 'readable' ? t(language, `Passing image: ${answers.passingImageStatus.replaceAll('-', ' ')}`, `पासिंग तस्वीर: ${statusLabel(answers.passingImageStatus, language)}`) : `${t(language, 'Plate observation', 'प्लेट अवलोकन')}: ${tollText(answers.passingPlateObservation, language)}`, status: answers.passingImageStatus !== 'readable' ? 'unclear' : answers.passingPlateObservation === 'different' ? 'conflicts' : answers.passingPlateObservation === 'match' ? 'agrees' : 'unclear', defaultVisible: true },
+    { label: t(language, 'Event time', 'घटना समय'), record: answers.timestampType === 'sms-received' ? t(language, 'SMS time—cannot establish passage time', 'SMS समय—पास होने का समय साबित नहीं') : `${t(language, 'Entered as', 'इस रूप में दर्ज')}: ${tollText(answers.timestampType, language)}`, status: answers.timestampType === 'reader-read' ? 'verify official' : 'unclear', defaultVisible: true },
+    { label: t(language, 'Plaza & direction', 'प्लाज़ा और दिशा'), record: `${refs.plaza || t(language, 'Not entered', 'दर्ज नहीं')} · ${tollText(direction, language)}`, status: refs.plaza ? 'verify official' : 'not supplied', defaultVisible: true },
     { label: t(language, 'Two-debit interval', 'दो डेबिट का अंतर'), record: reviewedAnswers.recordedIntervalMinutes === null ? (answers.secondDebitPresent ? t(language, 'Two debits entered; valid reader-time pair missing', 'दो डेबिट दर्ज; मान्य रीडर-समय जोड़ी गायब') : t(language, 'One debit in this worksheet', 'इस वर्कशीट में एक डेबिट')) : t(language, `${reviewedAnswers.recordedIntervalMinutes} minutes between entered reader times`, `दर्ज रीडर समयों में ${reviewedAnswers.recordedIntervalMinutes} मिनट`), status: answers.secondDebitPresent && answers.samePlaza && answers.closeInTime ? 'issuer rule required' : 'unclear', concerns: ['duplicate'] },
-    { label: t(language, 'Amount & vehicle class', 'राशि और वाहन श्रेणी'), record: `${refs.amount ? `₹${refs.amount}` : t(language, 'Amount not entered', 'राशि दर्ज नहीं')} · ${answers.passingImageStatus === 'readable' ? answers.vehicleClassObservation : t(language, 'no readable passing-image comparison', 'पढ़ने योग्य पासिंग-तस्वीर तुलना नहीं')}`, status: answers.passingImageStatus !== 'readable' ? 'unclear' : answers.vehicleClassObservation === 'different' ? 'conflicts' : answers.vehicleClassObservation === 'match' ? 'agrees' : 'verify official', defaultVisible: true },
+    { label: t(language, 'Amount & vehicle class', 'राशि और वाहन श्रेणी'), record: `${refs.amount ? `₹${refs.amount}` : t(language, 'Amount not entered', 'राशि दर्ज नहीं')} · ${answers.passingImageStatus === 'readable' ? tollText(answers.vehicleClassObservation, language) : t(language, 'no readable passing-image comparison', 'पढ़ने योग्य पासिंग-तस्वीर तुलना नहीं')}`, status: answers.passingImageStatus !== 'readable' ? 'unclear' : answers.vehicleClassObservation === 'different' ? 'conflicts' : answers.vehicleClassObservation === 'match' ? 'agrees' : 'verify official', defaultVisible: true },
     { label: t(language, 'Other payment / pass', 'अन्य भुगतान / पास'), record: answers.concern === 'paid-another-way' ? statusLabel(answers.alternateReceipt, language) : answers.concern === 'pass-or-discount' ? statusLabel(answers.tariffOrPassRecord, language) : t(language, 'Not claimed', 'दावा नहीं'), status: answers.concern === 'paid-another-way' || answers.concern === 'pass-or-discount' ? 'verify official' : 'not applicable', concerns: ['paid-another-way', 'pass-or-discount'] },
-    { label: t(language, 'Credit adjustment', 'क्रेडिट समायोजन'), record: answers.concern === 'duplicate' ? answers.creditAdjustment.replaceAll('-', ' ') : t(language, 'Not applicable to selected concern', 'चुनी समस्या पर लागू नहीं'), status: answers.concern !== 'duplicate' ? 'not applicable' : answers.creditAdjustment === 'visible' ? 'agrees' : answers.creditAdjustment === 'not-visible-in-checked-period' ? 'not found in checked period' : 'unclear', concerns: ['duplicate'] },
+    { label: t(language, 'Credit adjustment', 'क्रेडिट समायोजन'), record: answers.concern === 'duplicate' ? tollText(answers.creditAdjustment, language).replaceAll('-', ' ') : t(language, 'Not applicable to selected concern', 'चुनी समस्या पर लागू नहीं'), status: answers.concern !== 'duplicate' ? 'not applicable' : answers.creditAdjustment === 'visible' ? 'agrees' : answers.creditAdjustment === 'not-visible-in-checked-period' ? 'not found in checked period' : 'unclear', concerns: ['duplicate'] },
   ];
   const visibleMapRows = mapRows.filter((row) => row.defaultVisible || row.concerns?.includes(answers.concern));
   const showExtraCheck = ['duplicate', 'paid-another-way', 'fare-or-class', 'pass-or-discount', 'tag-lifecycle'].includes(answers.concern);
   const unresolvedPassport = passport.filter((item) => item.status !== 'readable' && item.status !== 'not-applicable');
 
   return (
-    <PublicBetaShell language={language} setLanguage={setLanguage} service="TollSakshi" serviceHindi="टोल साक्षी · by ChallanSakshi" onQuickExit={quickExit} englishOnly>
-      <main className={styles.main}>
+    <PublicBetaShell language={language} setLanguage={setLanguage} service="TollSakshi" serviceHindi="टोल साक्षी · by ChallanSakshi" onQuickExit={quickExit} englishOnly={synthetic} demo={synthetic}>
+      <main className={`${styles.main} ${toll.main}`} inert={!clientReady}>
         <GuidedStepHeader
           {...guide}
+          headingLevel={1}
+          currentLabel={step === 'start' ? tollText('Step 1 of 4 · FASTag transaction check', language) : guide.currentLabel}
+          instruction={step === 'start' ? (synthetic ? 'Explore a fictional FASTag transaction' : tollText('Make sense of a FASTag debit', language)) : guide.instruction}
+          labels={language === 'hi' ? { doNow: 'अभी करें', why: 'यह क्यों ज़रूरी है', status: 'स्थिति', next: 'अगला कदम', allSteps: 'सभी चरण', stateComplete: 'पूरा', stateCurrent: 'वर्तमान', stateUpcoming: 'आगामी', stateSkipped: 'छोड़ा गया', stateBlocked: 'रुका हुआ', stateSafeStop: 'सुरक्षित विराम' } : undefined}
           steps={guideProgress}
           progressLabel={t(language, 'TollSakshi guided review progress', 'TollSakshi निर्देशित समीक्षा प्रगति')}
           headingRef={guideHeadingRef}
@@ -321,20 +364,27 @@ export default function TollSakshiApp() {
         />
         {mode === 'synthetic' && <p className={styles.restricted} role="status"><strong>SYNTHETIC FIXTURE — NOT A REAL TRANSACTION.</strong> {t(language, 'Fictional values only. Do not send the generated note to an issuer.', 'सभी मान काल्पनिक हैं। तैयार नोट जारीकर्ता को न भेजें।')}</p>}
 
-        {step === 'start' && <section className={styles.panel} aria-labelledby="toll-start-title">
-          <div className={styles.sectionTitle}><div><h2 id="toll-start-title">{t(language, 'Manual self-review or synthetic walkthrough', 'मैन्युअल स्वयं-समीक्षा या सिंथेटिक उदाहरण')}</h2></div></div>
-          <div className={styles.choiceGroup} role="group" aria-label={t(language, 'Review mode', 'समीक्षा मोड')}>
-            <button type="button" aria-pressed={mode === 'real'} className={`${styles.choice} ${mode === 'real' ? styles.choiceActive : ''}`} onClick={selectRealMode}><strong>{t(language, 'Use my own records manually', 'अपने रिकॉर्ड मैन्युअली उपयोग करें')}</strong></button>
-            <button type="button" aria-pressed={mode === 'synthetic'} className={`${styles.choice} ${mode === 'synthetic' ? styles.choiceActive : ''}`} onClick={selectSyntheticMode}><strong>{t(language, 'Explore fictional examples', 'काल्पनिक उदाहरण देखें')}</strong></button>
-          </div>
+        {step === 'start' && <section className={`${styles.panel} ${toll.panel}`} aria-labelledby="toll-start-title">
+          <div className={styles.sectionTitle}><div><h2 id="toll-start-title">{synthetic ? 'Choose a fictional example' : t(language, 'Keep your transaction record beside you', 'अपना लेन-देन रिकॉर्ड साथ रखें')}</h2><p>{synthetic ? 'Follow a labelled example through the same transaction checks and next-step guidance.' : t(language, 'Check one debit against your issuer record, see what needs clarification, and find the appropriate official route.', 'एक डेबिट को जारीकर्ता रिकॉर्ड से जाँचें, देखें कहाँ स्पष्टीकरण चाहिए और उचित आधिकारिक रास्ता खोजें।')}</p></div></div>
+          {mode === 'real' && <div className={toll.preparationGrid}>
+            <article><span aria-hidden="true">1</span><div><h3>{t(language, 'Open the official record', 'आधिकारिक रिकॉर्ड खोलें')}</h3><p>{t(language, 'Use the bank or issuer service you normally use for this FASTag.', 'इस FASTag के लिए अपने नियमित बैंक या जारीकर्ता की सेवा उपयोग करें।')}</p></div></article>
+            <article><span aria-hidden="true">2</span><div><h3>{t(language, 'Keep related evidence ready', 'संबंधित सबूत तैयार रखें')}</h3><p>{t(language, 'The debit, plaza and event time help. A passing image or receipt is useful if available.', 'डेबिट, प्लाज़ा और घटना समय उपयोगी हैं। उपलब्ध हो तो पासिंग तस्वीर या रसीद साथ रखें।')}</p></div></article>
+            <article><span aria-hidden="true">3</span><div><h3>{t(language, 'Review before acting', 'अगले कदम से पहले समीक्षा करें')}</h3><p>{t(language, 'See which entries agree, what is missing, and what to take to the official service.', 'देखें कौन सी प्रविष्टियाँ मिलती हैं, क्या बाकी है और आधिकारिक सेवा को क्या देना है।')}</p></div></article>
+          </div>}
+          {mode === 'real' && <div className={toll.contextNote}>
+            <strong>{t(language, 'Only have a debit message?', 'केवल कटौती का संदेश मिला है?')}</strong>
+            <p>{t(language, 'Find the transaction in your issuer account first. Use the event time shown there; an SMS can arrive later.', 'पहले जारीकर्ता खाते में लेन-देन खोजें। वहाँ दिख रहा घटना समय उपयोग करें; SMS बाद में आ सकता है।')}</p>
+          </div>}
           {mode === 'synthetic' && <div className={styles.fixtureBar}>{tollFixtures.map((fixture) => <button type="button" key={fixture.id} className={`${styles.fixtureChoice} ${fixtureId === fixture.id ? styles.choiceActive : ''}`} onClick={() => chooseFixture(fixture)}><span className={styles.syntheticChip}>SYNTHETIC</span><strong>{fixture.label}</strong><small>{fixture.description}</small></button>)}</div>}
+          {mode === 'synthetic' && <SyntheticSourceRecords fixture={selectedFixture} />}
           <div className={styles.acknowledgements}><label className={styles.check}><input type="checkbox" checked={device === 'shared'} onChange={(event) => setDevice(event.target.checked ? 'shared' : 'private')} />{t(language, 'This is a shared or public device', 'यह साझा या सार्वजनिक डिवाइस है')}</label></div>
           {device === 'shared' && <p className={styles.restricted}>{t(language, 'For safety, this review clears after about 10 minutes without deliberate activity, and copy and download stay disabled.', 'सुरक्षा के लिए, लगभग 10 मिनट तक कोई जानबूझकर गतिविधि न होने पर यह समीक्षा साफ़ हो जाती है, और कॉपी तथा डाउनलोड बंद रहते हैं।')}</p>}
-          <div className={styles.actions}><a className={styles.buttonQuiet} href="/review">{t(language, 'Review an e-Challan instead', 'इसके बजाय ई-चालान समीक्षा करें')}</a><button type="button" className={styles.button} onClick={continueStart}>{t(language, 'Start transaction check', 'लेन-देन जाँच शुरू करें')} →</button></div>
+          <div className={styles.actions}><a className={styles.buttonQuiet} href="/review">{t(language, 'Review an e-Challan instead', 'इसके बजाय ई-चालान समीक्षा करें')}</a><button type="button" className={styles.button} disabled={!clientReady} onClick={continueStart}>{t(language, 'Start transaction check', 'लेन-देन जाँच शुरू करें')} →</button></div>
         </section>}
 
-        {step === 'records' && <section className={styles.panel} aria-labelledby="toll-records-title">
-          <div className={styles.sectionTitle}><div><h2 id="toll-records-title">{t(language, 'Describe the transaction—not your account', 'लेन-देन बताएँ—अपना खाता नहीं')}</h2><p>{t(language, 'Open one evidence group at a time. Keep reader, posting, and SMS times distinct.', 'एक समय में एक सबूत समूह खोलें। रीडर, पोस्टिंग और SMS समय अलग रखें।')}</p></div></div>
+        {step === 'records' && <section className={`${styles.panel} ${toll.panel}`} aria-labelledby="toll-records-title">
+          <div className={styles.sectionTitle}><div><h2 id="toll-records-title">{t(language, 'Check the details of one transaction', 'एक लेन-देन का विवरण जाँचें')}</h2><p>{t(language, 'Start with the issue and source. Open the other groups to add what your record shows; leave missing details blank or unclear.', 'समस्या और स्रोत से शुरू करें। अन्य समूह खोलकर रिकॉर्ड में दिखा विवरण जोड़ें; गायब विवरण खाली या अस्पष्ट रखें।')}</p></div></div>
+          {mode === 'synthetic' && <SyntheticSourceRecords fixture={selectedFixture} />}
           <div className={styles.recordSections}>
           <details className={`${styles.recordSection} ${styles.recordDisclosure}`} ref={(node) => { recordGroupRefs.current.issue = node; }} open>
             <summary className={styles.recordSectionHeading}><span>1</span><div><strong id="record-source-title">{t(language, 'Issue and source', 'समस्या और स्रोत')}</strong><small>{t(language, 'Choose one issue and independently opened official source.', 'एक समस्या और स्वतंत्र रूप से खोला आधिकारिक स्रोत चुनें।')}</small></div></summary>
@@ -405,19 +455,19 @@ export default function TollSakshiApp() {
           <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('start')}>← {t(language, 'Back', 'पीछे')}</button><button type="button" className={styles.button} onClick={continueRecords}>{t(language, 'Check what agrees and conflicts', 'देखें क्या मेल खाता या टकराता है')} →</button></div>
         </section>}
 
-        {step === 'reconcile' && <section className={styles.panel} aria-labelledby="reconcile-title">
+        {step === 'reconcile' && <section className={`${styles.panel} ${toll.panel}`} aria-labelledby="reconcile-title">
           <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>{t(language, 'Transaction-to-Journey Map', 'लेन-देन से यात्रा नक्शा')}</p><h2 id="reconcile-title">{t(language, 'Where the supplied entries agree, conflict, or stop', 'दी गई प्रविष्टियाँ कहाँ मेल, अंतर या रुकती हैं')}</h2></div></div>
           <div className={styles.resultHero} data-tone={assessment.finding === 'records-align' || assessment.finding === 'already-corrected' ? 'good' : assessment.finding === 'insufficient' ? 'stop' : 'warn'}><span className={styles.resultIcon} aria-hidden="true">{assessment.finding === 'records-align' || assessment.finding === 'already-corrected' ? '✓' : assessment.finding === 'insufficient' ? 'i' : '!'}</span><div><h2>{assessment.title}</h2><p>{assessment.reasons.join(' ')}</p><p><strong>{t(language, 'Based only on your answers.', 'केवल आपके उत्तरों पर आधारित।')}</strong> {t(language, 'The issuer and plaza records were not authenticated here.', 'जारीकर्ता और प्लाज़ा रिकॉर्ड यहाँ प्रमाणित नहीं हुए।')}</p></div></div>
-          <div className={styles.journeyMap} role="table" aria-label={t(language, 'Relevant transaction checks', 'प्रासंगिक लेन-देन जाँच')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{visibleMapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{row.status}</span></div>)}</div>
+          <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('records')}>← {t(language, 'Edit records', 'रिकॉर्ड बदलें')}</button><button type="button" className={styles.button} onClick={() => setStep('packet')}>{t(language, guide.ctaLabel ?? 'Check evidence and official route', isNoDisputeOutcome ? 'परिणाम और सबूत सूची देखें' : 'सबूत और आधिकारिक रास्ता देखें')} →</button></div>
+          <div className={styles.journeyMap} role="table" aria-label={t(language, 'Relevant transaction checks', 'प्रासंगिक लेन-देन जाँच')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{visibleMapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{tollText(row.status, language)}</span></div>)}</div>
           <details className={styles.disclosure}>
             <summary>{t(language, 'Show all checks', 'सभी जाँच दिखाएँ')}</summary>
-            <div className={styles.journeyMap} role="table" aria-label={t(language, 'Complete transaction check map', 'पूरा लेन-देन जाँच नक्शा')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{mapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{row.status}</span></div>)}</div>
+            <div className={styles.journeyMap} role="table" aria-label={t(language, 'Complete transaction check map', 'पूरा लेन-देन जाँच नक्शा')}><header role="row"><span>{t(language, 'Question', 'प्रश्न')}</span><span>{t(language, 'Your entered record', 'आपका दर्ज रिकॉर्ड')}</span><span>{t(language, 'Map status', 'नक्शा स्थिति')}</span></header>{mapRows.map((row) => <div className={styles.journeyRow} role="row" key={row.label}><strong>{row.label}</strong><span>{row.record}</span><span className={styles.mapStatus}>{tollText(row.status, language)}</span></div>)}</div>
           </details>
           <div className={styles.listPanel}><h3>{t(language, 'What this does not conclude', 'यह क्या निष्कर्ष नहीं देता')}</h3><ul>{assessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></div>
-          <div className={styles.actions}><button type="button" className={styles.buttonSecondary} onClick={() => setStep('records')}>← {t(language, 'Edit records', 'रिकॉर्ड बदलें')}</button><button type="button" className={styles.button} onClick={() => setStep('packet')}>{t(language, guide.ctaLabel ?? 'Check evidence and official route', isNoDisputeOutcome ? 'परिणाम और सबूत सूची देखें' : 'सबूत और आधिकारिक रास्ता देखें')} →</button></div>
         </section>}
 
-        {step === 'packet' && <section className={styles.panel} aria-labelledby="packet-title">
+        {step === 'packet' && <section className={`${styles.panel} ${toll.panel}`} aria-labelledby="packet-title">
           <div className={styles.sectionTitle}><div>{isNoDisputeOutcome ? <>
             <p className={styles.eyebrow}>{t(language, 'Review complete', 'समीक्षा पूरी')}</p>
             <h2 id="packet-title">{t(language, 'Keep the outcome with your evidence checklist', 'परिणाम को अपनी सबूत सूची के साथ रखें')}</h2>
@@ -467,7 +517,7 @@ export default function TollSakshiApp() {
           <details className={styles.disclosure}>
             <summary>{t(language, 'View all 14 evidence checks', 'सभी 14 सबूत जाँच देखें')}</summary>
             <p className={styles.recordSectionNote}>{t(language, '“Not supplied” means not found in the records you reviewed—not that the record does not exist.', '“नहीं दिया” का अर्थ समीक्षा किए रिकॉर्ड में नहीं मिला—यह नहीं कि रिकॉर्ड मौजूद नहीं है।')}</p>
-            <div className={styles.passport}>{passport.map((item) => <article key={item.id}><b>{item.id}</b><div><strong>{item.label}</strong><small>{item.why}</small></div><em>{statusLabel(item.status, language)}</em></article>)}</div>
+            <div className={`${styles.passport} ${toll.passport}`}>{passport.map((item) => <article key={item.id}><b>{item.id}</b><div><strong>{item.label}</strong><small>{item.why}</small></div><em>{statusLabel(item.status, language)}</em></article>)}</div>
           </details>
 
           {assessment.shouldPrepareIssuerNote && <details className={styles.disclosure}>

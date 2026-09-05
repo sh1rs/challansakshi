@@ -10,6 +10,16 @@ const source = readFileSync(
 );
 
 describe('GuidedStepHeader', () => {
+  it('can provide the page heading while preserving its accessible instruction target', () => {
+    const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
+      headingLevel: 1,
+      currentLabel: 'Step 1 of 4', instruction: 'Make sense of a FASTag debit',
+      why: 'Compare one transaction.', status: 'Record needed', statusTone: 'needs-action',
+      next: 'Check the record', progressLabel: 'FASTag steps', steps: [],
+    }));
+    expect(html).toContain('<h1 id="guided-step-title"');
+    expect(html).toContain('aria-labelledby="guided-step-title"');
+  });
   it('keeps one accessible instruction and live status visible while disclosing supporting guide detail', () => {
     const html = renderToStaticMarkup(createElement(GuidedStepHeader, {
       currentLabel: 'Step 2 of 4 · Verify the source',

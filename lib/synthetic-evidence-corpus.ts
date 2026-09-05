@@ -187,11 +187,11 @@ export const syntheticEvaluationCases: SyntheticEvaluationCase[] = [
   makeCase(
     'case-06-partial-plate',
     'Matching suffix only',
-    'The last four characters align, but the full registration is outside the frame.',
+    'The last four characters align, but the registration prefix is obscured.',
     'inconclusive',
     (value) => {
       value.enforcement_image.registration = observation('3317', 'enforcement_image', 'Image · partial plate suffix', {
-        confidence: 'medium', visibility: 'partial', limitation: 'Only the final four characters are visible.',
+        confidence: 'medium', visibility: 'partial', limitation: 'The registration prefix is obscured; only the final four characters are visible.',
       });
     },
   ),
@@ -225,6 +225,10 @@ export const syntheticEvaluationCases: SyntheticEvaluationCase[] = [
       value.enforcement_image.vehicle_category.value = 'Hatchback';
       value.vehicle_record.colour.value = 'Gray';
       value.enforcement_image.colour.value = 'Grey';
+      value.vehicle_record.make_model.value = 'Maruti Swift';
+      value.enforcement_image.make_model.value = 'maruti swift';
+      value.challan_document.alleged_offence.value = 'Stopping beyond the marked stop line';
+      value.enforcement_image.offence_assessable.evidence_reference = 'Image · marked stop-line area';
       value.challan_document.alleged_registration.value = 'ka-01-ab-3317';
       value.vehicle_record.registration.value = 'ka-01-ab-3317';
       value.enforcement_image.registration.value = 'KA 01 AB 3317';

@@ -81,6 +81,16 @@ describe('supplied-evidence passport', () => {
     expect(passport.elements.find((element) => element.id === 'EP3')?.status).toBe('supplied-unclear');
   });
 
+  it('describes the synthetic physical plate in both passport languages', () => {
+    const passport = buildSuppliedEvidencePassport('consistent', fixtures.consistent.extractedFacts);
+    const plate = passport.elements.find((element) => element.id === 'EP2');
+    expect(plate?.sourceReference).toEqual({
+      en: 'Synthetic enforcement image · physical plate',
+      hi: 'सिंथेटिक प्रवर्तन फ़ोटो · वाहन की नंबर प्लेट',
+    });
+    expect(plate?.note.en).toContain('Confirm the visible characters yourself');
+  });
+
   it('creates a stable revision only after both citizen confirmations', () => {
     const suppliedEvidence = buildSuppliedEvidencePassport('mismatch', fixtures.mismatch.extractedFacts);
     const base = {

@@ -1,0 +1,28 @@
+
+Running 21 tests using 1 worker
+
+(node:47375) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/browser/citizen-tools.spec.ts:7:1 › message checker keeps pasted links inert, clears results on edits, and fits a phone in EN/HI (4.1s)
+  ✓   2 [chromium] › tests/browser/citizen-tools.spec.ts:31:1 › reply review links exact source text, gates a real download and invalidates changed evidence (5.3s)
+  ✓   3 [chromium] › tests/browser/deep-demo-preservation.spec.ts:32:3 › long fictional demo retains confirmed evidence, passport, pack, and order review on desktop (18.4s)
+  ✓   4 [chromium] › tests/browser/deep-demo-preservation.spec.ts:32:3 › long fictional demo retains confirmed evidence, passport, pack, and order review on phone (22.5s)
+  ✓   5 [chromium] › tests/browser/deep-demo-preservation.spec.ts:198:1 › a saved low-data preference keeps photos unloaded until the citizen reveals one (5.3s)
+  ✓   6 [chromium] › tests/browser/deep-demo-preservation.spec.ts:230:1 › text-first is an optional saved preference and missing or reused photo references remain honest (6.4s)
+  ✓   7 [chromium] › tests/browser/evidence-photo.spec.ts:4:1 › local photo inspection preserves context, records uncertainty and invalidates edited regions (4.5s)
+  ✓   8 [chromium] › tests/browser/hybrid-journey.spec.ts:3:1 › informative home keeps real review primary and all examples behind Demo (14.8s)
+  ✓   9 [chromium] › tests/browser/hybrid-journey.spec.ts:44:1 › all real walkthrough entries retain readable mobile hierarchy and visible Demo access (11.4s)
+  ✓  10 [chromium] › tests/browser/hybrid-journey.spec.ts:60:1 › FASTag demo carries the shared design through comparison and a clearly labelled preparation note (3.1s)
+  ✓  11 [chromium] › tests/browser/mobility-dashboard.spec.ts:3:1 › private checklist is opt-in, persists only allowlisted task metadata and supports clear across tabs (3.5s)
+  ✓  12 [chromium] › tests/browser/mobility-dashboard.spec.ts:29:1 › checklist handles blocked storage without implying success and fits a Hindi phone (1.9s)
+  ✓  13 [chromium] › tests/browser/mobility-dashboard.spec.ts:43:1 › reopening after inactivity arms a fresh privacy lock (1.8s)
+  ✓  14 [chromium] › tests/browser/official-sources.spec.ts:3:1 › public sources remain readable in Hindi on mobile and disable expired handoffs (3.0s)
+  ✓  15 [chromium] › tests/browser/test-lab-discoverability.spec.ts:4:3 › plain Test Lab entry exposes the ten-case runner immediately at 1440px (5.3s)
+  ✓  16 [chromium] › tests/browser/test-lab-discoverability.spec.ts:31:3 › Demo makes all ten runtime test cases reachable without searching at 1440px (4.1s)
+  ✓  17 [chromium] › tests/browser/test-lab-discoverability.spec.ts:4:3 › plain Test Lab entry exposes the ten-case runner immediately at 390px (6.4s)
+  ✓  18 [chromium] › tests/browser/test-lab-discoverability.spec.ts:31:3 › Demo makes all ten runtime test cases reachable without searching at 390px (3.7s)
+  ✓  19 [chromium] › tests/browser/test-lab-discoverability.spec.ts:76:1 › Test Lab preserves filtering, source traces, editable cases and stale-result invalidation (6.1s)
+  ✓  20 [chromium] › tests/browser/test-lab-discoverability.spec.ts:115:1 › 90-second proof retains handoff, correction, recomputation and abstention guardrails (5.4s)
+  ✓  21 [chromium] › tests/browser/toll-language.spec.ts:4:1 › real FASTag Hindi journey keeps its guide, outcome, evidence passport and private download in Hindi (3.2s)
+
+  21 passed (2.4m)

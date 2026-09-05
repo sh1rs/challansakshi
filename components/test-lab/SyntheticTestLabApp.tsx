@@ -10,6 +10,7 @@ import {
   type ChangeEvent,
 } from 'react';
 import { CitizenFooter, CitizenHeader } from '../shared/CitizenChrome';
+import { ArrowDownRight, ArrowUpRight, FlaskConical, Play } from 'lucide-react';
 import {
   runSyntheticEvaluationCorpus,
   syntheticEvaluationCases,
@@ -40,6 +41,7 @@ import {
   validateSyntheticLabImageContents,
 } from '../../lib/synthetic-lab-file';
 import styles from './SyntheticTestLabApp.module.css';
+import { SyntheticScene, SyntheticSourceBundle } from './SyntheticSourceVisuals';
 
 type FilterId = 'all' | SyntheticOverallFinding;
 
@@ -299,6 +301,7 @@ export function TestCaseWorkbench({ testCase }: { testCase: SyntheticEvaluationC
           <div><p className={styles.kicker}>01 · EVIDENCE</p><h3 id={`${idPrefix}-evidence-heading`}>Review every source value before comparison</h3></div>
           <span className={styles.sourceBoundary}>{sourceBoundary}</span>
         </div>
+        {syntheticEvaluationCases.some((item) => item.id === testCase.id) && <SyntheticSourceBundle extraction={testCase.extraction} />}
         <section className={styles.recordDetails} aria-labelledby={`${idPrefix}-record-details-heading`}>
           <div>
             <p className={styles.kicker}>RECORD FACTS</p>
@@ -499,16 +502,19 @@ export function SyntheticJudgeProofView({
             <div className={styles.proofPair}>
               <article>
                 <span>FICTIONAL VEHICLE RECORD</span>
-                <strong>{state.draft.vehicle_record.colour.value} {state.draft.vehicle_record.make_model.value}</strong>
-                <p>{state.draft.vehicle_record.vehicle_category.value}</p>
+                <strong>{state.original.vehicle_record.colour.value} {state.original.vehicle_record.make_model.value}</strong>
+                <p>{state.original.vehicle_record.vehicle_category.value}</p>
+                <SyntheticScene vehicle={state.original.vehicle_record} compact />
               </article>
-              <b aria-hidden="true">≠</b>
+              <b aria-hidden="true">↔</b>
               <article>
                 <span>FICTIONAL ENFORCEMENT IMAGE</span>
-                <strong>{state.draft.enforcement_image.colour.value} {state.draft.enforcement_image.make_model.value}</strong>
-                <p>{state.draft.enforcement_image.vehicle_category.value}</p>
+                <strong>{state.original.enforcement_image.colour.value} {state.original.enforcement_image.make_model.value}</strong>
+                <p>{state.original.enforcement_image.vehicle_category.value}</p>
+                <SyntheticScene vehicle={state.original.enforcement_image} compact />
               </article>
             </div>
+            <p className={styles.visualProvenance}>{state.correctionApplied ? 'Only the test observations were edited; the original synthetic photos stay unchanged. Re-comparison tests the rules on those edited inputs, not the truth of the photograph.' : 'Original synthetic test photos, including physical plate lettering. Observations are pre-authored; this proof does not run live AI.'}</p>
           </section>
 
           <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-evidence-heading">
@@ -607,7 +613,7 @@ export function SyntheticJudgeProofView({
         <section className={styles.proofBeat} aria-labelledby="challansakshi-proof-reconfirm-heading">
           <p className={styles.kicker}>EARLIER RESULT CLEARED</p>
           <h3 id="challansakshi-proof-reconfirm-heading" tabIndex={-1}>Reconfirm the corrected observations</h3>
-          <p>The fictional image now reads Blue Honda Activa 6G · Two-wheeler. The earlier confirmation, field pack, route simulation, and return are gone.</p>
+          <p>The edited test observations now say Blue Honda Activa 6G · Two-wheeler. The original photo remains a white car. This deliberately tests correction and invalidation—not visual verification. The earlier confirmation, field pack, route simulation, and return are gone.</p>
           <button className={styles.confirmButton} type="button" onClick={confirmObservations}>
             Reconfirm corrected observations · Compare again
           </button>
@@ -807,6 +813,8 @@ export default function SyntheticTestLabApp() {
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
   const [selectionAnnouncement, setSelectionAnnouncement] = useState('');
   const [proofRequest, setProofRequest] = useState(0);
+  const [suiteRevealRequest, setSuiteRevealRequest] = useState(0);
+  const suiteHeadingRef = useRef<HTMLHeadingElement>(null);
   const selectedWorkbenchRef = useRef<HTMLDivElement>(null);
   const selected = syntheticEvaluationCases.find((item) => item.id === selectedId) ?? syntheticEvaluationCases[0];
   const filteredCases = syntheticEvaluationCases.filter((item) => filter === 'all' || item.expectedOverall === filter);
@@ -832,6 +840,15 @@ export default function SyntheticTestLabApp() {
   }, [focusTargetId, selectionRequest]);
 
   const runSuite = () => setSuiteReport(runSyntheticEvaluationCorpus());
+  const runSuiteAndReveal = () => {
+    runSuite();
+    setSuiteRevealRequest((request) => request + 1);
+  };
+  useEffect(() => {
+    if (suiteRevealRequest === 0) return;
+    suiteHeadingRef.current?.focus({ preventScroll: true });
+    suiteHeadingRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }, [suiteRevealRequest]);
   const applySelectionAction = (action: TestLabSelectionAction) => {
     const next = transitionTestLabSelection({
       filter,
@@ -858,23 +875,52 @@ export default function SyntheticTestLabApp() {
       <a className={styles.skipLink} href="#test-lab-main">Skip to Test Lab</a>
       <CitizenHeader language="en" setLanguage={() => undefined} boundary="demo" englishOnly />
       <main id="test-lab-main" className={styles.main}>
-        <section className={styles.judgeEntry} data-challansakshi-judge-entry="v1">
+        <section className={styles.labMasthead} aria-labelledby="lab-title">
+          <div className={styles.labIntroduction}>
+            <p className={styles.labEyebrow}><FlaskConical size={18} aria-hidden="true" /> TEN CASES. ONE EVIDENCE ENGINE.</p>
+            <h1 id="lab-title">Synthetic Evidence Test Lab</h1>
+            <p className={styles.labLead}>Run the cases. Inspect the reasoning. Change a fact and see what changes.</p>
+            <p className={styles.labDescription}>Compare source-linked observations, test uncertainty, and follow each result to a prepared next step. Every case stays open for inspection.</p>
+            <div className={styles.labActions}>
+              <button className={styles.labRunButton} type="button" onClick={runSuiteAndReveal}>Run all 10 cases <ArrowDownRight size={20} aria-hidden="true" /></button>
+              <a className={styles.labWalkthrough} href="/demo">Full challan walkthrough <ArrowUpRight size={18} aria-hidden="true" /></a>
+            </div>
+            <a className={styles.labProofLink} href="#guided-proof"><Play size={15} aria-hidden="true" /> Or follow the 90-second guided proof</a>
+          </div>
+          <aside className={styles.engineOverview} aria-label="Synthetic case coverage">
+            <div className={styles.engineOverviewHeader}><span>CASE COVERAGE</span><span className={styles.engineStatus}>Synthetic inputs</span></div>
+            <div className={styles.engineCount}><strong>{syntheticEvaluationCases.length}</strong><span>different cases.<br />One set of rules.</span></div>
+            <div className={styles.coverageBar} aria-hidden="true"><i style={{ flex: outcomeCounts.discrepancies }} /><i style={{ flex: outcomeCounts.consistent }} /><i style={{ flex: outcomeCounts.inconclusive }} /></div>
+            <dl className={styles.coverageLegend}>
+              <div><dt>Potential discrepancy</dt><dd>{outcomeCounts.discrepancies}</dd></div>
+              <div><dt>Appears consistent</dt><dd>{outcomeCounts.consistent}</dd></div>
+              <div><dt>Inconclusive</dt><dd>{outcomeCounts.inconclusive}</dd></div>
+            </dl>
+            <p>Expected case mix. Actual results are calculated when you run the suite.</p>
+          </aside>
+        </section>
+
+        <section id="guided-proof" className={styles.judgeEntry} data-challansakshi-judge-entry="v1">
           <div className={styles.judgeIntro}>
             <p className={styles.kicker}>SYNTHETIC 90-SECOND PROOF</p>
-            <h1>Does this fictional image show the same vehicle as the record?</h1>
+            <a className={styles.suiteJump} href="#case-suite">Looking for the 10-case Test Lab? Open all ten cases ↓</a>
+            <h2>Does this fictional image show the same vehicle as the record?</h2>
             <p className={styles.heroLead}>See one complete evidence-to-handoff loop, including a correction that clears the earlier result.</p>
           </div>
           <div className={styles.judgePair} aria-label="Compact fictional record and image pair">
             <article>
               <span>FICTIONAL VEHICLE RECORD</span>
               <strong>Blue Honda Activa 6G · Two-wheeler</strong>
+              <SyntheticScene vehicle={syntheticEvaluationCases[3].extraction.vehicle_record} compact />
             </article>
             <b aria-hidden="true">≠</b>
             <article>
               <span>FICTIONAL ENFORCEMENT IMAGE</span>
               <strong>White Maruti Swift · Four-wheeler</strong>
+              <SyntheticScene vehicle={syntheticEvaluationCases[3].extraction.enforcement_image} compact />
             </article>
           </div>
+            <p className={styles.visualProvenance}>Synthetic photos with visible plates · pre-authored observations · no live model reading</p>
           <div className={styles.judgeBoundary} aria-label="Proof responsibility boundary">
             <p><b>AI extracts</b><span>Source-linked observations</span></p>
             <p><b>Rules compare</b><span>Bounded deterministic outcomes</span></p>
@@ -886,9 +932,9 @@ export default function SyntheticTestLabApp() {
 
         {proofRequest > 0 ? <SyntheticJudgeProofLane key={proofRequest} /> : null}
 
-        <section className={styles.suiteSection} aria-labelledby="suite-heading">
+        <section id="case-suite" className={styles.suiteSection} aria-labelledby="suite-heading">
           <div className={styles.suiteHeading}>
-            <div><p className={styles.kicker}>RUNTIME EVALUATION</p><h2 id="suite-heading">Synthetic Evidence Test Lab</h2><p>One engine, not ten canned conclusions.</p></div>
+            <div><p className={styles.kicker}>RUNTIME EVALUATION</p><h2 id="suite-heading" ref={suiteHeadingRef} tabIndex={-1}>Synthetic Evidence Test Lab</h2><p>One engine, not ten canned conclusions.</p></div>
             {suiteReport ? <strong className={suiteReport.failed === 0 ? styles.suitePass : styles.suiteFail}>{suiteReport.passed} / {suiteReport.total} expected outcomes reproduced</strong> : <span>Press Run all to calculate every actual outcome.</span>}
           </div>
           <div className={styles.suiteOverview}>
