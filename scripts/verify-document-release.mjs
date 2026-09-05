@@ -38,6 +38,7 @@ try {
   const requests = []; const requestRecords = new Map(); const page = await context.newPage();
   context.on('request', request => { if (/^https?:/.test(request.url())) { const record = { url: request.url(), method: request.method(), data: request.postData(), failure: null }; requests.push(record); requestRecords.set(request, record); } });
   context.on('requestfailed', request => { const record = requestRecords.get(request); if (record) record.failure = request.failure()?.errorText ?? 'failed'; });
+  context.on('response', response => { const record = requestRecords.get(response.request()); if (record) record.status = response.status(); });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const response = await page.goto(`${base}/review`);
   assert.equal(response.status(), 200);
@@ -46,7 +47,13 @@ try {
   await page.screenshot({ path: '/tmp/challansakshi-release-start.png', fullPage: true });
   const start = Date.now();
   await page.locator('input[data-document-role="notice"]').setInputFiles({ name: 'synthetic-qa-only.png', mimeType: 'image/png', buffer });
-  await page.getByText('Read on this device', { exact: true }).waitFor({ timeout: 100_000 });
+  try { await page.getByText('Read on this device', { exact: true }).waitFor({ timeout: 100_000 }); }
+  catch (error) {
+    // This verifier generates its own fixture; never run it with citizen documents.
+    console.error(JSON.stringify({ phase: 'fabricated-image-reading', visibleStatus: await page.locator('main').innerText(), pageErrors: errors, requests: requests.map(request => ({ origin: new URL(request.url).origin, path: new URL(request.url).pathname, status: request.status, failure: request.failure })) }, null, 2));
+    await page.screenshot({ path: '/tmp/challansakshi-release-failure.png', fullPage: true });
+    throw error;
+  }
   assert.match(await page.locator('main').innerText(), /KA[O0]1AB1234/);
   await page.getByRole('button', { name: 'Correct: Registration notice', exact: true }).click();
   await page.getByLabel('Value shown in this source').fill('KA01AB1234');

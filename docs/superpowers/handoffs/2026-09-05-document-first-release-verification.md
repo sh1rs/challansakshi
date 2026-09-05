@@ -25,7 +25,22 @@ The initial product commit `8665ed7` deployed successfully as Cloudflare version
 
 The stricter network probe then rejected automatic Cloudflare analytics script injection. All nine unexpected script attempts were GETs without bodies and had Playwright failure `csp`: the existing Content Security Policy blocked them. No document data transmission was observed. The probe was not weakened to allow these requests.
 
-A follow-up response policy appends `no-transform` to HTML cache headers without replacing existing `no-store`/security directives. Fifteen new Worker-boundary tests cover streaming, immutable headers, cache/security preservation, duplicate handling and unchanged API/non-HTML behavior. Cloudflare documents this directive as preventing automatic beacon injection: [Web Analytics setup](https://developers.cloudflare.com/web-analytics/get-started/). Final deployment and live probe results will be recorded below after verification.
+A follow-up response policy appends `no-transform` to HTML cache headers without replacing existing `no-store`/security directives. Fifteen new Worker-boundary tests cover streaming, immutable headers, cache/security preservation, duplicate handling and unchanged API/non-HTML behavior. Cloudflare documents this directive as preventing automatic beacon injection: [Web Analytics setup](https://developers.cloudflare.com/web-analytics/get-started/).
+
+### Final deployed state
+
+- Deployed source commit: `6973d2c` (document-first base `8665ed7`).
+- Active Cloudflare version: `93356e65-0f0d-444e-8209-be0974cfc4a5`, confirmed at 100% traffic.
+- Deploy script: `CODEX-DEPLOY OK (mode: real)` after a fresh production build.
+- Final full browser suite: 34/34 passed after both the response-policy and correction-state changes.
+- Public release probe: **PASS**. Eight distinct public routes returned 200. Actual image OCR, correction, PDF text extraction, an independent notice-versus-RC mismatch and source-linked note preparation succeeded.
+- Public probe observed 126 HTTP requests, all same-origin GETs without bodies. No hosting analytics injection remained, no fixture identifiers appeared in request URLs, and no page errors were recorded. IndexedDB databases, localStorage and sessionStorage were empty when checked after the document journeys.
+- Production `/review` served `Cache-Control` containing `no-transform`; existing CSP and security headers were retained. Both `ANALYSIS_ENABLED` and `SYNTHETIC_UPLOADS_ENABLED` remained `false` in the deployment output.
+- The deploy script restored the pre-existing local compatibility date. No app code remained dirty after the source commit; the later release-evidence commit changes documentation and the diagnostic verifier only.
+
+### Performance limitation — not an instant-OCR claim
+
+The first final-version production image attempt timed out. A repeat completed the fabricated image reading/correction/note check in **71,872 ms**, including reader startup/download and verification actions/screenshots; the separate two-PDF reading/comparison/note check took **4,207 ms**. Those are single desktop-browser release-check timings, not engine-only measurements, mobile benchmarks or accuracy estimates. The chosen OCR core and two language files require roughly 8 MiB on first use. First-use image latency remains an optimization item; the UI names the initial reader download, supports cancel/remove, enforces a 90-second reading bound and retains manual review. Do not market this build as instant, offline-ready on first use, or validated on low-end phones.
 
 ## Privacy and capability limits
 
