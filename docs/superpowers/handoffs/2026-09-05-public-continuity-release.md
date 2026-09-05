@@ -1,6 +1,6 @@
 # Public source and citizen continuity release — 5 September 2026
 
-The user authorized committing and pushing all project work/history to a new public `sh1rs/challansakshi` repository and confirmed that new features should work without a backend. The public repository was created successfully; publishing the committed history is the remaining release operation at the time this record was written.
+The user authorized committing and pushing all project work/history to a new public `sh1rs/challansakshi` repository and confirmed that new features should work without a backend. The public repository now contains the finished product and preserved development history. Main and the historical extension branch were both pushed and their remote tips matched the local commits.
 
 ## Application release
 
@@ -37,6 +37,6 @@ The first implementation commit captures 140 files, including the previously unc
 
 The existing history was preserved. A heuristic scan checked 855 historical text blobs across 107 existing commits for recognized private keys, common API tokens, bearer literals, JWTs and passworded database URLs; no matches were found. This is not a guarantee of secret absence. `.env.example` is the only tracked environment-file path. The local compatibility-date override and private operational logs remain outside the public commits; the protected older audit directory remains untouched and ignored. No root project licence was invented.
 
-`origin` is `https://github.com/sh1rs/challansakshi.git`. GitHub Desktop is authenticated for `sh1rs`; its native folder chooser successfully added this checkout after direct path-entry automation failed. The public repository's visibility and administrator/push permissions were verified through the GitHub connector. Verify remote branch tips before claiming upload completion.
+`origin` is `https://github.com/sh1rs/challansakshi.git`. GitHub Desktop is authenticated for `sh1rs`; its native folder chooser successfully added this checkout after direct path-entry automation failed. The public repository's visibility and user administrator/push permissions were verified through the GitHub connector. GitHub Desktop performed the authenticated pushes. The connector itself returned HTTP 403 for reference creation on this new repository, so configure its repository grant before relying on connector write operations; user permissions do not establish that integration grant. The published main tip was verified at `46efc68118f9627efdad54f2391d30bf09874f53`, and `codex/challansakshi-extension-task4` at `0c9f27c3b575f3695fe71e2d86ef4beac34b555b`, before this final documentation checkpoint. Together they contain all 109 preceding local commits, including the three historical extension commits outside main. This checkpoint adds the publication record. The local compatibility-date override is restored from its byte-identical backup after branch publication.
 
 Accounts, automatic sync, cloud vision, official integrations, delivery services and independent Hindi review remain separate follow-on work. The user explicitly selected backend-free delivery for this round.
