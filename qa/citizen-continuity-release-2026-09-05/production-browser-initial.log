@@ -1,0 +1,102 @@
+
+Running 16 tests using 1 worker
+
+(node:60706) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/browser/citizen-tools.spec.ts:7:1 › message checker keeps pasted links inert, clears results on edits, and fits a phone in EN/HI (2.0s)
+  ✓   2 [chromium] › tests/browser/citizen-tools.spec.ts:31:1 › reply review links exact source text, gates a real download and invalidates changed evidence (3.4s)
+  ✓   3 [chromium] › tests/browser/evidence-photo.spec.ts:4:1 › local photo inspection preserves context, records uncertainty and invalidates edited regions (3.3s)
+  ✓   4 [chromium] › tests/browser/mobility-continuity.spec.ts:6:1 › calendar and backup stay local and restore requires review and deliberate replacement (4.8s)
+  ✓   5 [chromium] › tests/browser/mobility-continuity.spec.ts:40:1 › invalid imports leave the saved checklist unchanged and Hindi preview fits a phone (3.0s)
+  ✓   6 [chromium] › tests/browser/mobility-continuity.spec.ts:61:1 › inactivity and another-tab deletion discard restore previews (2.5s)
+  ✓   7 [chromium] › tests/browser/mobility-continuity.spec.ts:85:1 › delayed file reads cannot reopen a preview after the checklist is hidden (1.8s)
+  ✓   8 [chromium] › tests/browser/mobility-continuity.spec.ts:107:1 › export and restore check expiry even when background timers have not run (3.9s)
+  ✓   9 [chromium] › tests/browser/mobility-dashboard.spec.ts:3:1 › private checklist is opt-in, persists only allowlisted task metadata and supports clear across tabs (5.8s)
+  ✓  10 [chromium] › tests/browser/mobility-dashboard.spec.ts:29:1 › checklist handles blocked storage without implying success and fits a Hindi phone (2.9s)
+  ✓  11 [chromium] › tests/browser/mobility-dashboard.spec.ts:43:1 › reopening after inactivity arms a fresh privacy lock (3.3s)
+  ✘  12 [chromium] › tests/browser/ocr-recovery.spec.ts:11:1 › failed OCR language bootstrap releases its worker and permits a clean retry (19.7s)
+(node:60831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  13 [chromium] › tests/browser/ocr-recovery.spec.ts:30:1 › cancelling during OCR bootstrap releases the late worker without publishing a reading (1.0m)
+(node:60924) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  14 [chromium] › tests/browser/private-note-print.spec.ts:12:1 › private reply printing isolates the exact note in EN/HI without exposing the source form or retaining a print copy (5.2s)
+  ✓  15 [chromium] › tests/browser/private-note-print.spec.ts:59:1 › document print action preserves source lineage, blocks shared mode and discards its copy before reviewing again (9.1s)
+  ✓  16 [chromium] › tests/browser/toll-language.spec.ts:4:1 › real FASTag Hindi journey keeps its guide, outcome, evidence passport and private download in Hindi (25.0s)
+
+
+  1) [chromium] › tests/browser/ocr-recovery.spec.ts:11:1 › failed OCR language bootstrap releases its worker and permits a clean retry
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Could not read this file. Try a clearer image or use manual review.')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByText('Could not read this file. Try a clearer image or use manual review.') with timeout 15000ms
+      - waiting for getByText('Could not read this file. Try a clearer image or use manual review.')
+
+
+      19 |   const worker = await created;
+      20 |   const closed = worker.waitForEvent('close');
+    > 21 |   await expect(page.getByText('Could not read this file. Try a clearer image or use manual review.')).toBeVisible({ timeout: 15_000 });
+         |                                                                                                       ^
+      22 |   await closed;
+      23 |   await expect(page.getByText('Read on this device', { exact: true })).toHaveCount(0);
+      24 |   await context.unroute('**/*.traineddata.gz');
+        at /Users/shars/Desktop/challansakshi/tests/browser/ocr-recovery.spec.ts:21:103
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/ocr-recovery-failed-OCR-la-5d994-r-and-permits-a-clean-retry-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/challansakshi-playwright-results/ocr-recovery-failed-OCR-la-5d994-r-and-permits-a-clean-retry-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/ocr-recovery-failed-OCR-la-5d994-r-and-permits-a-clean-retry-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/challansakshi-playwright-results/ocr-recovery-failed-OCR-la-5d994-r-and-permits-a-clean-retry-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/browser/ocr-recovery.spec.ts:30:1 › cancelling during OCR bootstrap releases the late worker without publishing a reading
+
+    Test timeout of 60000ms exceeded.
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Read on this device', { exact: true })
+    Expected: 0
+    Received: undefined
+
+
+      46 |   release();
+      47 |   await closed;
+    > 48 |   await expect(page.getByText('Read on this device', { exact: true })).toHaveCount(0);
+         |                                                                        ^
+      49 |   await expect(page.locator('main')).not.toContainText('KA01AB1234');
+      50 |   expect(await page.evaluate(async () => ({ databases: await indexedDB.databases(), local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ databases: [], local: [], session: [] });
+      51 | });
+        at /Users/shars/Desktop/challansakshi/tests/browser/ocr-recovery.spec.ts:48:72
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/ocr-recovery-cancelling-du-56a76-ithout-publishing-a-reading-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/challansakshi-playwright-results/ocr-recovery-cancelling-du-56a76-ithout-publishing-a-reading-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/challansakshi-playwright-results/ocr-recovery-cancelling-du-56a76-ithout-publishing-a-reading-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../tmp/challansakshi-playwright-results/ocr-recovery-cancelling-du-56a76-ithout-publishing-a-reading-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › tests/browser/ocr-recovery.spec.ts:11:1 › failed OCR language bootstrap releases its worker and permits a clean retry
+    [chromium] › tests/browser/ocr-recovery.spec.ts:30:1 › cancelling during OCR bootstrap releases the late worker without publishing a reading
+  14 passed (2.6m)

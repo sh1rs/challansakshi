@@ -1,0 +1,8 @@
+
+ RUN  v4.1.11 /Users/shars/Desktop/challansakshi
+
+
+ Test Files  66 passed (66)
+      Tests  1024 passed (1024)
+   Start at  18:43:15
+   Duration  11.05s (transform 7.49s, setup 0ms, import 18.80s, tests 22.06s, environment 22.19s)

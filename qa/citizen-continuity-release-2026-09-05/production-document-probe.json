@@ -1,0 +1,25 @@
+{
+  "origin": "https://challansakshi.sh1rs.com",
+  "status": 200,
+  "imageReadingMs": 17424,
+  "imageReadingAndReviewMs": 17790,
+  "pdfReadingAndReviewMs": 2566,
+  "pdfTextExtraction": true,
+  "independentRegistrationComparison": "different",
+  "documentRequests": 0,
+  "fixtureIdentifierRequests": 0,
+  "requestCount": 151,
+  "storage": {
+    "databases": [],
+    "local": [],
+    "session": []
+  },
+  "screenshots": [
+    "/tmp/challansakshi-release-start.png",
+    "/tmp/challansakshi-release-reading.png",
+    "/tmp/challansakshi-release-prepared.png",
+    "/tmp/challansakshi-release-pdf-comparison.png"
+  ],
+  "routesChecked": 8,
+  "result": "PASS"
+}
