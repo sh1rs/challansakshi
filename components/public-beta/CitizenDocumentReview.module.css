@@ -188,3 +188,5 @@
   .main[data-document-device='private'][data-document-stage='prepared'] > .printWarning { display: none !important; }
   .main[data-document-device='private'][data-document-stage='prepared'] > .printNote { display: block !important; white-space: pre-wrap; overflow-wrap: anywhere; color: black; font: 12pt/1.5 sans-serif; }
 }
+
+.main [data-coach-highlight="true"] { outline: 3px solid var(--accent-text); outline-offset: 4px; border-radius: 8px; }

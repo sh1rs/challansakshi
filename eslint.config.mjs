@@ -29,6 +29,7 @@ const eslintConfig = defineConfig([
   },
   globalIgnores([
     'public/document-assets/**',
+    'public/voice-assets/**',
     '.next/**',
     'out/**',
     'build/**',

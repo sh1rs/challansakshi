@@ -7,6 +7,7 @@ import { createTaskCalendar, parseTaskBackup } from '../lib/mobility-continuity'
 // Public citizen journeys, including explicitly opted-in checklist storage. Following every
 // relative import/export keeps the audit current when a route gains a new local dependency.
 const publicModeEntryPoints = [
+  'lib/workers/voice-recognition.worker.ts',
   'app/page.tsx',
   'app/review/page.tsx',
   'app/fastag/page.tsx',
@@ -24,7 +25,8 @@ function workspacePath(absolutePath: string) {
 }
 
 function resolveLocalModule(importerPath: string, specifier: string) {
-  const base = resolve(process.cwd(), dirname(importerPath), specifier);
+  // Vite worker imports still belong to the audited local source graph.
+  const base = resolve(process.cwd(), dirname(importerPath), specifier.replace(/\?worker$/, ''));
   const candidates = extname(base)
     ? [base]
     : [base, `${base}.ts`, `${base}.tsx`, `${base}.css`, join(base, 'index.ts'), join(base, 'index.tsx')];
@@ -63,6 +65,7 @@ describe('real-mode privacy isolation', () => {
       'lib/citizen-review-presentation.ts',
       'components/public-beta/CitizenDocumentReview.tsx',
       'lib/local-document-reader.ts',
+      'lib/workers/voice-recognition.worker.ts',
       'lib/document-evidence.ts',
       'lib/domain.ts',
       'lib/guided-journey.ts',
@@ -81,9 +84,21 @@ describe('real-mode privacy isolation', () => {
       expect(source, path).not.toMatch(/dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
       expect(source, path).not.toMatch(/contenteditable|contentEditable/);
       const textareas = source.match(/<textarea\b/g) ?? [];
-      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2 } as Record<string, number>)[path] ?? 0;
+      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2, 'components/public-beta/VoiceCoach.tsx': 1 } as Record<string, number>)[path] ?? 0;
       expect(textareas, path).toHaveLength(count);
     }
+  });
+
+  it('bounds local conversation text and never submits or persists it', () => {
+    const coach = publicModeFiles.find(file => file.path === 'components/public-beta/VoiceCoach.tsx')!.source;
+    expect(coach).toContain('maxLength={500}');
+    expect(coach).toContain('event.preventDefault()');
+    expect(coach).not.toMatch(/<(?:input|textarea)[^>]*\bname=|<form[^>]*\baction=/);
+    expect(coach).not.toMatch(/SpeechRecognition|webkitSpeechRecognition|localStorage|sessionStorage|fetch\s*\(/);
+    const input = publicModeFiles.find(file => file.path === 'lib/local-voice-input.ts')!.source;
+    expect(input).toContain('navigator.mediaDevices.getUserMedia');
+    expect(input).toContain('track.stop()');
+    expect(input).toContain('worker?.terminate()');
   });
 
   it('keeps raw selected filenames out of the complete real-mode graph', () => {
@@ -161,7 +176,7 @@ describe('real-mode privacy isolation', () => {
 
   it('uses no HTML form that could fall back to a URL or server submission', () => {
     for (const { path, source } of publicModeFiles) {
-      if (path !== 'components/public-beta/MobilityDashboard.tsx') expect(source, path).not.toMatch(/<form\b/);
+      if (!['components/public-beta/MobilityDashboard.tsx', 'components/public-beta/VoiceCoach.tsx'].includes(path)) expect(source, path).not.toMatch(/<form\b/);
       else { expect(source).toContain('event.preventDefault()'); expect(source).not.toMatch(/<(?:input|select|textarea)[^>]*\bname=/); }
     }
   });

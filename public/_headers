@@ -5,3 +5,12 @@
 
 /document-assets/pdfjs-6.3.289/*
   Cache-Control: public, max-age=604800
+
+# Cloudflare serves static assets before the application Worker. These policies
+# must also exist here, independently of next.config.ts response headers.
+/voice/voice-recognition.worker.js
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cas-bridge.xethub.hf.co https://us.aws.cdn.hf.co
+
+# The unmodified compact runtime needs eval only inside its isolated worker.
+/voice-assets/espeak-ng-1.49.1/espeakng.worker.js
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'self'

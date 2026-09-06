@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Memory-only previews must not pass through an image proxy. */
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { FileText, ScanLine, ShieldCheck, ArrowUpRight, Download, ChevronRight, BookOpen, Check, ClipboardCheck, Link2 } from 'lucide-react';
 import { buildDocumentEvidenceNote, correctDocumentField, extractDocumentEvidence, type DocumentEvidence, type DocumentField, type DocumentReading } from '../../lib/document-evidence';
 import { readLocalDocument } from '../../lib/local-document-reader';
@@ -12,6 +12,8 @@ import { PublicBetaShell } from './PublicBetaShell';
 import { useClientReady } from '../shared/useClientReady';
 import PrivateNotePrintButton from '../shared/PrivateNotePrintButton';
 import styles from './CitizenDocumentReview.module.css';
+import VoiceCoach from './VoiceCoach';
+import type { CoachAction, CoachContext } from '../../lib/voice-coach';
 
 type Language = 'en' | 'hi';
 type Role = 'notice' | 'vehicle-record';
@@ -33,6 +35,10 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
   const [editing, setEditing] = useState<string | null>(null);
   const [inspectedField, setInspectedField] = useState<string | null>(null);
   const [correction, setCorrection] = useState('');
+  const [draftVersion, setDraftVersion] = useState(0);
+  const updateCorrection = useCallback((value: string) => {
+    setCorrection(value); setDraftVersion(version => version + 1);
+  }, []);
   const [error, setError] = useState('');
   const [photoObservation, setPhotoObservation] = useState<PhotoObservation | null>(null);
   const [photoEpoch, setPhotoEpoch] = useState(0);
@@ -55,11 +61,12 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
     delete selections.current[role];
   }, []);
   const clear = useCallback(() => {
+    window.dispatchEvent(new Event('voice-coach-clear'));
     roles.forEach(release); corrections.current = {};
     setPhotoObservation(null); setPhotoEpoch(value => value + 1);
     setSlots({}); setEvidence({ fields: [], comparison: 'inconclusive', limitations: [] });
-    setPrepared(false); setEditing(null); setInspectedField(null); setCorrection(''); setDevice('unknown'); setError('');
-  }, [release]);
+    setPrepared(false); setEditing(null); setInspectedField(null); updateCorrection(''); setDevice('unknown'); setError('');
+  }, [release, updateCorrection]);
   const quickExit = () => { clear(); window.location.replace('/'); };
   const ensureActive = useCallback(() => {
     if (!inactivityGuard.current || Date.now() >= inactivityGuard.current.getExpiresAt()) { clear(); return false; }
@@ -71,11 +78,11 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
       controllers.current = {}; selections.current = {}; corrections.current = {};
       setPhotoObservation(null); setPhotoEpoch(value => value + 1);
       setSlots({}); setEvidence({ fields: [], comparison: 'inconclusive', limitations: [] });
-      setPrepared(false); setEditing(null); setInspectedField(null); setCorrection(''); setDevice('unknown'); setError('');
+      setPrepared(false); setEditing(null); setInspectedField(null); updateCorrection(''); setDevice('unknown'); setError('');
     };
     window.addEventListener('pagehide', onHide);
     return () => { window.removeEventListener('pagehide', onHide); roles.forEach(role => { controllers.current[role]?.abort(); const slot = selections.current[role]; if (slot) URL.revokeObjectURL(slot.previewUrl); }); };
-  }, []);
+  }, [updateCorrection]);
   useEffect(() => {
     const update = () => setNow(new Date().toISOString());
     const timer = window.setTimeout(update, Math.min(60_000, getOfficialRouteFreshnessDelayMs(prepared ? 'national-services-directory' : 'national-record-lookup', now) ?? 60_000));
@@ -94,7 +101,7 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
       if (next.fields.some(field => field.id === id)) next = correctDocumentField(next, id, value);
     }
     setEvidence(next);
-    setPrepared(false); setEditing(null); setInspectedField(null); setCorrection(''); setError('');
+    setPrepared(false); setEditing(null); setInspectedField(null); updateCorrection(''); setError('');
   };
   const remove = (role: Role) => { heading.current?.focus({ preventScroll: true }); release(role); publish(); };
   const select = async (event: ChangeEvent<HTMLInputElement>, role: Role) => {
@@ -136,10 +143,45 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
   };
   const applyCorrection = () => {
     if (!editing) return;
-    try { setEvidence(correctDocumentField(evidence, editing, correction)); corrections.current[editing] = correction; setEditing(null); setCorrection(''); setPrepared(false); setError(''); }
+    try { setEvidence(correctDocumentField(evidence, editing, correction)); corrections.current[editing] = correction; setEditing(null); updateCorrection(''); setPrepared(false); setError(''); }
     catch { setError(t(language, 'Use the value shown in the source. The format could not be read.', 'स्रोत में दिखा मान उपयोग करें। प्रारूप पढ़ा नहीं जा सका।')); }
   };
   const vehicleRegistration = evidence.fields.find(field => field.role === 'vehicle-record' && field.key === 'registration');
+  const coachContext = useMemo<CoachContext>(() => ({
+    stage: prepared ? 'prepared' : hasRead && !busy ? 'check' : 'read',
+    busy, hasNotice: Boolean(slots.notice?.reading), hasVehicleRecord: Boolean(slots['vehicle-record']?.reading),
+    hasPhoto: Boolean(photoObservation), comparison: evidence.comparison,
+    fields: evidence.fields.flatMap(({ id, key, role }) => role === 'notice' || role === 'vehicle-record' ? [{ id, key, role }] : []),
+    activeFieldId: editing, hasError: Boolean(error || roles.some(role => slots[role]?.error)),
+  }), [prepared, hasRead, busy, slots, photoObservation, evidence, editing, error]);
+  // Metadata only: source IDs invalidate old turns without putting document text in the coach.
+  const coachRevision = JSON.stringify({ context: coachContext, draftVersion });
+  const coachAction = (action: CoachAction) => {
+    if (!ensureActive() || busy) return null;
+    const nextContext: CoachContext = { ...coachContext, stage: hasRead ? 'check' : 'read' };
+    const expectedRevision = () => JSON.stringify({ context: nextContext, draftVersion });
+    const reveal = (selector: string) => requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(selector);
+      if (!target) return;
+      if (target instanceof HTMLDetailsElement) target.open = true;
+      target.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+      target.dataset.coachHighlight = 'true';
+      window.setTimeout(() => { delete target.dataset.coachHighlight; }, 2500);
+    });
+    if (action.type === 'review-documents') { setPrepared(false); heading.current?.focus({ preventScroll: true }); return expectedRevision(); }
+    if (action.type === 'show-upload') { setPrepared(false); reveal(`[data-document-upload="${action.role}"]`); return expectedRevision(); }
+    if (action.type === 'show-photo') { setPrepared(false); reveal('[data-evidence-photo]'); return expectedRevision(); }
+    if (action.type === 'show-sources') { setPrepared(false); reveal('[data-document-sources]'); return expectedRevision(); }
+    if (action.type === 'edit-field' || action.type === 'suggest-correction') {
+      const field = evidence.fields.find(candidate => candidate.id === action.fieldId);
+      if (!field || (action.type === 'suggest-correction' && editing !== field.id)) return null;
+      setPrepared(false); setEditing(field.id); setInspectedField(field.id); setError('');
+      updateCorrection(action.type === 'suggest-correction' ? action.value : field.value);
+      reveal('[data-document-correction]');
+      return JSON.stringify({ context: { ...nextContext, activeFieldId: field.id, hasError: roles.some(role => Boolean(slots[role]?.error)) }, draftVersion: draftVersion + 1 });
+    }
+    return null;
+  };
   const photoReference = vehicleRegistration ? { value: vehicleRegistration.value, sourceId: vehicleRegistration.sourceId, page: vehicleRegistration.page, fingerprint: vehicleRegistration.sourceFingerprint } : null;
   const note = [buildDocumentEvidenceNote(evidence, language), photoObservation ? buildPhotoObservationNote(photoObservation, language) : ''].filter(Boolean).join('\n\n');
   const download = () => {
@@ -168,7 +210,7 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
       {!prepared && <>
         <section className={styles.intake} aria-label={t(language, 'Your documents', 'आपके दस्तावेज़')}>
           <div className={styles.panelHeading}><h2>{t(language, 'Your documents', 'आपके दस्तावेज़')}</h2><span>{t(language, 'PDF or image · up to 12 MiB each', 'PDF या तस्वीर · हर फ़ाइल 12 MiB तक')}</span></div>
-          {roles.map(role => <div className={styles.fileRow} key={role}>
+          {roles.map(role => <div className={styles.fileRow} key={role} data-document-upload={role}>
             <span className={`${styles.fileIcon} ${role === 'notice' ? styles.teal : styles.amber}`}><FileText size={23} aria-hidden="true" /></span>
             <div className={styles.fileCopy}><strong>{role === 'notice' ? t(language, 'Challan copy', 'चालान की कॉपी') : t(language, 'Vehicle record', 'वाहन रिकॉर्ड')}</strong><small>{role === 'notice' ? t(language, 'PDF, screenshot or photograph', 'PDF, स्क्रीनशॉट या तस्वीर') : t(language, 'Optional · RC to compare registration', 'वैकल्पिक · पंजीकरण मिलाने के लिए RC')}</small></div>
             <input ref={node => { inputs.current[role] = node; }} data-document-role={role} disabled={!clientReady || (busy && !slots[role]?.busy)} type="file" accept="application/pdf,image/png,image/jpeg,image/webp" aria-label={role === 'notice' ? t(language, 'Choose challan', 'चालान चुनें') : t(language, 'Choose vehicle record', 'वाहन रिकॉर्ड चुनें')} className={styles.fileInput} tabIndex={-1} onChange={event => { void select(event, role); }} />
@@ -190,12 +232,12 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
         </div>
         {evidence.fields.length > 0 && <div className={styles.fields}>{evidence.fields.map(field => <div className={styles.field} key={field.id}>
           <div className={styles.fieldValue}><span className={styles.fieldLabel}>{fieldLabel(field.key, language)}</span><strong>{field.value}</strong><button type="button" className={styles.sourceLink} aria-label={`${t(language, 'Show source reading', 'स्रोत में पढ़ा विवरण देखें')}: ${fieldLabel(field.key, language)} ${field.role}`} aria-expanded={inspectedField === field.id} aria-controls={`document-field-source-${field.id}`} onClick={() => setInspectedField(inspectedField === field.id ? null : field.id)}><Link2 size={15} aria-hidden="true" />{field.role === 'notice' ? t(language, 'Challan', 'चालान') : t(language, 'Vehicle record', 'वाहन रिकॉर्ड')} · {t(language, 'page', 'पृष्ठ')} {field.page}</button><small>{field.method === 'pdf-text' ? t(language, 'PDF text', 'PDF पाठ') : field.method === 'citizen-correction' ? t(language, 'Your correction', 'आपका सुधार') : t(language, 'On-device OCR', 'डिवाइस OCR')}{field.confidence === 'needs-review' ? <span className={styles.reviewFlag}>{t(language, ' · check this reading', ' · इसे जाँचें')}</span> : ''}</small></div>
-          <button type="button" className={styles.textButton} aria-label={`${t(language, 'Correct', 'सुधारें')}: ${fieldLabel(field.key, language)} ${field.role}`} onClick={() => { setEditing(field.id); setCorrection(field.value); setPrepared(false); }}>{t(language, 'Correct', 'सुधारें')}</button>
+          <button type="button" className={styles.textButton} aria-label={`${t(language, 'Correct', 'सुधारें')}: ${fieldLabel(field.key, language)} ${field.role}`} onClick={() => { setEditing(field.id); updateCorrection(field.value); setPrepared(false); }}>{t(language, 'Correct', 'सुधारें')}</button>
           <div id={`document-field-source-${field.id}`} hidden={inspectedField !== field.id} className={styles.sourceExcerpt}><span className={styles.eyebrow}>{field.method === 'citizen-correction' ? t(language, 'Your source-based correction', 'स्रोत के अनुसार आपका सुधार') : t(language, 'Reading from this source', 'इस स्रोत से पढ़ा विवरण')}</span><blockquote>{field.excerpt}</blockquote><p>{t(language, 'Compare with the original in “See the source documents” below.', 'नीचे “स्रोत दस्तावेज़ देखें” में मूल से मिलाएँ।')}</p></div>
-          {editing === field.id && <div className={styles.correction}><label htmlFor="document-correction">{t(language, 'Value shown in this source', 'इस स्रोत में दिखा मान')}</label><input id="document-correction" value={correction} maxLength={120} autoComplete="off" spellCheck={false} onChange={event => setCorrection(event.target.value)} /><button type="button" className={styles.secondary} onClick={applyCorrection}>{t(language, 'Save correction', 'सुधार सहेजें')}</button><button type="button" className={styles.textButton} onClick={() => { setEditing(null); setCorrection(''); setError(''); }}>{t(language, 'Cancel', 'रद्द करें')}</button></div>}
+          {editing === field.id && <div className={styles.correction} data-document-correction><label htmlFor="document-correction">{t(language, 'Value shown in this source', 'इस स्रोत में दिखा मान')}</label><input id="document-correction" value={correction} maxLength={120} autoComplete="off" spellCheck={false} onChange={event => updateCorrection(event.target.value)} /><button type="button" className={styles.secondary} onClick={applyCorrection}>{t(language, 'Save correction', 'सुधार सहेजें')}</button><button type="button" className={styles.textButton} onClick={() => { setEditing(null); updateCorrection(''); setError(''); }}>{t(language, 'Cancel', 'रद्द करें')}</button></div>}
         </div>)}</div>}
         {evidence.limitations.length > 0 && <p className={styles.attention}>{t(language, 'Part of this evidence needs checking. Only readable, unambiguous fields are compared. Open the source below or use manual review for the rest.', 'इस साक्ष्य के कुछ हिस्से जाँचने हैं। केवल स्पष्ट, पढ़ने योग्य जानकारी की तुलना हुई। नीचे स्रोत देखें या बाकी के लिए मैन्युअल समीक्षा करें।')}</p>}
-        <details className={styles.sources}><summary>{t(language, 'See the source documents', 'स्रोत दस्तावेज़ देखें')}</summary>{roles.map(role => slots[role]?.reading && <div key={role}><h3>{role === 'notice' ? t(language, 'Challan source', 'चालान स्रोत') : t(language, 'Vehicle-record source', 'वाहन रिकॉर्ड स्रोत')}</h3>{slots[role]!.pdf ? <p><a href={slots[role]!.previewUrl} target="_blank" rel="noopener noreferrer">{t(language, 'Open PDF on this device', 'इसी डिवाइस पर PDF खोलें')}</a><small>{t(language, 'Close that separate tab yourself after checking.', 'जाँच के बाद अलग टैब स्वयं बंद करें।')}</small></p> :   <img src={slots[role]!.previewUrl} alt={role === 'notice' ? t(language, 'Selected challan source', 'चुना चालान स्रोत') : t(language, 'Selected vehicle record source', 'चुना वाहन रिकॉर्ड स्रोत')} />}</div>)}</details>
+        <details className={styles.sources} data-document-sources><summary>{t(language, 'See the source documents', 'स्रोत दस्तावेज़ देखें')}</summary>{roles.map(role => slots[role]?.reading && <div key={role}><h3>{role === 'notice' ? t(language, 'Challan source', 'चालान स्रोत') : t(language, 'Vehicle-record source', 'वाहन रिकॉर्ड स्रोत')}</h3>{slots[role]!.pdf ? <p><a href={slots[role]!.previewUrl} target="_blank" rel="noopener noreferrer">{t(language, 'Open PDF on this device', 'इसी डिवाइस पर PDF खोलें')}</a><small>{t(language, 'Close that separate tab yourself after checking.', 'जाँच के बाद अलग टैब स्वयं बंद करें।')}</small></p> :   <img src={slots[role]!.previewUrl} alt={role === 'notice' ? t(language, 'Selected challan source', 'चुना चालान स्रोत') : t(language, 'Selected vehicle record source', 'चुना वाहन रिकॉर्ड स्रोत')} />}</div>)}</details>
         {evidence.fields.length > 0 && <div className={styles.confirmation}><p className={styles.confirmHelp}>{t(language, 'Confirm these are the right records, you have permission to use them, and you checked the readings.', 'पुष्टि करें कि ये सही रिकॉर्ड हैं, आपको इन्हें उपयोग करने की अनुमति है और आपने विवरण जाँचे हैं।')}</p><button type="button" className={styles.primary} disabled={editing !== null} onClick={() => { heading.current?.focus({ preventScroll: true }); setPrepared(true); }}>{t(language, 'I checked these readings — prepare my note', 'मैंने विवरण जाँचे — मेरा नोट तैयार करें')}<ChevronRight size={19} aria-hidden="true" /></button></div>}
       </section>}
       <div hidden={prepared}><EvidencePhotoWorkspace key={photoEpoch} language={language} reference={photoReference} onChange={observation => { setPhotoObservation(observation); setPrepared(false); }} /></div>
@@ -232,6 +274,7 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
         </ul>}
       </aside>
       </div>
+      <VoiceCoach context={coachContext} revision={coachRevision} pageLanguage={language} onAction={coachAction} />
     </main>
   </PublicBetaShell>;
 }
