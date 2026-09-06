@@ -67,5 +67,14 @@ Owner: root. Files: `components/public-beta/VoiceCoach.tsx`, module CSS, documen
 - Independent review found and resolved acknowledgement cancellation and stale spoken-draft overwrite; both have regression tests.
 - Actual Chromium local recognition correctly transcribed a synthetic English clip. Cold setup took 80.455 seconds; the first decode took 1.512 seconds. These are one desktop sample, not general latency or multilingual accuracy claims.
 - Local English/Hindi/Telugu speech output produced real PCM and played through Web Audio. Native-speaker pronunciation, low-end mobile recognition and acoustic echo interruption remain unmeasured.
-- All 74 browser scenarios passed: 68 existing scenarios plus six voice scenarios; voice tests use full Chromium because the separate headless shell lacks audio capture. The local preview runs on port 4177. Changes are uncommitted on codex/screen-aware-voice-coach; no deployment performed.
+- All 74 browser scenarios passed: 68 existing scenarios plus six voice scenarios; voice tests use full Chromium because the separate headless shell lacks audio capture. At this checkpoint the preview ran on port 4177, changes were uncommitted and no deployment had been performed. See the subsequent production record below for current release status.
 - Vite development static assets bypass production response headers; Cloudflare static-worker CSP is verified with actual Miniflare asset responses.
+
+## Production release — 2026-09-06
+
+- Movable/resizable companion, keyboard controls, minimize/restore and reset implemented and included in source commit `3d90739`.
+- Full validation: 1,168 unit tests, 78 local browser scenarios, TypeScript, ESLint, production build and Wrangler dry run passed.
+- Deployed to https://challansakshi.sh1rs.com/review with Cloudflare version `d6006d5f-97ad-4c3c-824c-82119c6866ac`; independently confirmed at 100% traffic.
+- All 10 focused production browser scenarios passed; desktop and 375px Telugu screenshots inspected.
+- Actual public worker correctly transcribed the synthetic English phrase. Fresh model setup took 87.254 seconds and decode took 1.533 seconds; broader multilingual accuracy and conversational latency remain unmeasured.
+- Detailed evidence and boundaries: [voice validation and release record](../../voice-coach-validation.md).
