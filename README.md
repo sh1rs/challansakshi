@@ -11,7 +11,7 @@ ChallanSakshi is an independent, evidence-first citizen project built around one
 - `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures;
 - `/demo/test-lab` — a ten-case synthetic evidence laboratory that recomputes every result from editable record and observation fields.
 
-The 6 September local expansion adds `/mobility`, optional `/account` and `/helper`, and the fictional `/demo/assistance-lab`. Continuation adds document dates, linked life-event plans, reviewed form copying and conflict recovery. The latest pass connects a returning-user agenda, acknowledgement text review, richer appointment preparation and a session-clear control. See [the 7 September release record](docs/2026-09-07-mobility-live-release.md) for current deployment status. See [the next-actions implementation checkpoint](docs/2026-09-06-mobility-next-actions-status.md), [the continuity report](docs/2026-09-06-mobility-continuity-status.md) and [the earlier expansion report](docs/2026-09-06-autonomous-build-status.md) for their distinct verification boundaries.
+The 7 September public deployment adds `/mobility`, optional `/account` and `/helper`, and the fictional `/demo/assistance-lab`. It includes document dates, linked life-event plans, reviewed form copying, conflict recovery, a returning-user agenda, acknowledgement text review, appointment preparation and a session-clear control. Guest preparation is available; account and cloud-provider features remain unconfigured. See [the 7 September release record](docs/2026-09-07-mobility-live-release.md) for the deployed revision and verification. See [the next-actions implementation checkpoint](docs/2026-09-06-mobility-next-actions-status.md), [the continuity report](docs/2026-09-06-mobility-continuity-status.md) and [the earlier expansion report](docs/2026-09-06-autonomous-build-status.md) for their distinct historical verification boundaries.
 
 Synthetic state remains sealed inside the demo routes. The flagship walkthrough carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. The Test Lab proves that the comparison engine is not a blue-scooter/white-motorcycle script: ten different vectors and citizen edits pass through the same normalization, comparison, confirmation, and routing functions.
 
@@ -55,7 +55,7 @@ The official e-Challan and Virtual Courts services already support status, payme
 
 These local tools need no new citizen-data backend. The optional mobility account and adviser implementations below are unconfigured. DigiLocker, live official form adapters and aggregate camera-quality reporting remain separate follow-on work.
 
-## Connected mobility preparation · 6 September 2026 local build
+## Connected mobility preparation · deployed 7 September 2026
 
 `/mobility` connects reviewed document facts and reply notes to editable preparation cases, a local timeline, reusable profile details, service plans, citizen-entered source observations and visit packs. Local case/profile storage is explicitly chosen and unencrypted. Records expire 90 days after the last save and are removed during a subsequent read or action; dormant browser storage has no background deletion service. Original documents are excluded. The older `/dashboard` remains a separate minimal checklist.
 

@@ -4,10 +4,14 @@ The user explicitly requested committing, shipping and deploying the complete cu
 
 ## Release status
 
-Release preparation is in progress. Commit, remote revision, deployed version and public verification will be recorded here only after each is confirmed.
+The complete guest implementation and the acknowledgement layout correction are deployed to the public website. Final English/Hindi mobility and PDF checks passed. Image OCR has an unresolved intermittent reading failure described below. This record accompanies the final source and documentation push to GitHub main.
 
 - Target: `https://challansakshi.sh1rs.com`, existing Cloudflare Worker `challansakshi`.
 - Remote: `https://github.com/sh1rs/challansakshi.git`, default branch `main`.
+- Initial release commit: `b983cc68f1c4ce0e402c5d8103927cd2f32007d4` (`feat: ship guest mobility cases and continuity toolkit`), independently confirmed on remote `main`.
+- Initial deployed version: `41413fcd-023d-4ace-b0ed-fcf40a6a596c`, independently confirmed at 100% traffic. Deployment created `2026-09-06T21:03:31.209Z` (7 September, 02:33 IST).
+- Corrected source commit: `f723ff2bfcbd308e7879d4a32c8b66a2f29d3510` (`fix: keep acknowledgement radio labels readable`).
+- Current deployed version: `2200a974-7447-4573-874d-968980c068ec`, independently confirmed at 100% traffic. Deployment created `2026-09-06T21:32:23.051Z` (7 September, 03:02 IST).
 - Starting implementation branch: `codex/screen-aware-voice-coach`, HEAD `6bdeb88`.
 - Remote `main` was an ancestor of the current branch after fetching; no remote work needs overwriting.
 - Verified preceding production version: `d6006d5f-97ad-4c3c-824c-82119c6866ac`, serving 100% traffic. Retain this as the rollback target.
@@ -42,7 +46,13 @@ Predeployment verification completed:
 - The existing account-copy browser scenario passed with the new English/Hindi neutral label assertions for mixed confirmed/unchecked facts.
 - Authored-source and staged whitespace checks passed.
 
-The last privacy-link class was added near the end of the complete browser run; its final rendered state was verified separately as described above. The production dry run passed with `CODEX-DEPLOY OK (mode: --dry-run)` and restored the local configuration. Its Worker upload was 2,507.74 KiB / 663.48 KiB gzip, with only the documented environment bindings. Live deployment checks are still pending. Previous local implementation results are retained separately in the [next-actions checkpoint](./2026-09-06-mobility-next-actions-status.md).
+The last privacy-link class was added near the end of the complete browser run; its final rendered state was verified separately as described above. The production dry run passed with `CODEX-DEPLOY OK (mode: --dry-run)` and restored the local configuration. Its Worker upload was 2,507.74 KiB / 663.48 KiB gzip, with only the documented environment bindings. The real deployment completed with `CODEX-DEPLOY OK (mode: real)`. Public account status returned HTTP 200, `configured: false`, `authenticated: false` and `Cache-Control: no-store`. Previous local implementation results are retained separately in the [next-actions checkpoint](./2026-09-06-mobility-next-actions-status.md).
+
+The initial Hindi 320px public flow completed acknowledgement review, local case saving, agenda updates, session clearing/reload and Safety-to-Privacy navigation without JavaScript errors or network writes. Public visual inspection caught acknowledgement radios inheriting the workspace's full-width text-input rule (722px on desktop). The correction excludes radios from text-input styling and sizes them with the other selection controls. The two focused browser regressions passed, measuring desktop and English/Hindi 320px radio width, remaining label space, font size and text bounds; TypeScript and focused ESLint also passed. Live radios now measure 19px wide, with readable labels. The final public run passed in English desktop (1365×1000) and Hindi mobile (320×740, dark mode): home discovery, saved fictional case, appointment pack, acknowledgement review/apply/save, agenda, session clear/reload, return home, Safety and Privacy. Account/helper/demo availability checks passed. Twenty-five screenshots were captured, with zero page/console errors, failed requests, bad responses, external requests, network writes or horizontal overflow. There were no sampled contrast flags; this was not a complete accessibility audit.
+
+An independent public PDF check passed: two fictional in-memory PDFs produced independently sourced registrations, a visible mismatch and a reviewed neutral note retaining each source's page and PDF-text lineage. The omitted owner field stayed omitted. All 29 requests were same-origin GETs; no documents, fixture identifiers or filenames were sent, and local/session/IndexedDB storage remained empty. There were no page/console errors or 390px overflow. Notice extraction took 1,357ms; both PDFs and review took 1,892ms.
+
+The first complete public reader check failed to complete image reading; the interface displayed its generic fallback message. A subsequent isolated OCR diagnostic using the same fictional image passed in 18,963ms: core loading, language loading, initialization and recognition all resolved, with no worker rejection or page errors. Both language files had valid gzip bytes. Two vendor parameter warnings did not prevent recognition. This does not identify the first failure's cause; no reader code was changed based on that uncertain result. A second run of the original complete check also failed: its OCR core asset request had no completed response before the reading wait expired. The cause remains unresolved. Image OCR is available and demonstrated a successful run, but it is not verified consistently reliable in this release. The existing clearer-file/manual-review fallback remains available; PDF text extraction passed independently. No further speculative reader changes were made during deployment.
 
 ## Evidence and rollback
 
