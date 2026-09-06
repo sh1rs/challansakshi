@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createCase } from '../../lib/mobility/cases';
 
 const KEY = 'challansakshi-mobility-cases-v1';
@@ -35,6 +35,37 @@ async function reviewReference(page: Page) {
 }
 async function readStore(page: Page) { return page.evaluate(KEY => JSON.parse(localStorage.getItem(KEY)!), KEY); }
 async function showTimeline(page: Page) { const summary = page.locator('summary').filter({ hasText: /^Case timeline \(/ }); if (!(await summary.evaluate(element => (element.parentElement as HTMLDetailsElement).open))) await summary.click(); }
+async function expectCompactRadioLabels(radios: Locator) {
+  const layouts = await radios.evaluateAll(elements => elements.map(element => {
+    const radio = element as HTMLInputElement, label = radio.labels?.[0];
+    const control = radio.getBoundingClientRect(), bounds = label?.getBoundingClientRect();
+    const textRects: DOMRect[] = [];
+    if (label) {
+      const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        const range = document.createRange(); range.selectNodeContents(node);
+        textRects.push(...range.getClientRects());
+      }
+    }
+    return {
+      name: label?.textContent?.trim() ?? '', width: control.width, height: control.height,
+      textSpace: (bounds?.width ?? 0) - control.width,
+      fontSize: label ? parseFloat(getComputedStyle(label).fontSize) : 0,
+      textFits: Boolean(bounds && textRects.length && textRects.every(rect => rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1)),
+    };
+  }));
+  expect(layouts.length).toBeGreaterThan(1);
+  for (const layout of layouts) {
+    expect(layout.name).not.toBe('');
+    expect(layout.width, `${layout.name}: radio width`).toBeGreaterThan(0);
+    expect(layout.width, `${layout.name}: radio width`).toBeLessThanOrEqual(44);
+    expect(layout.height, `${layout.name}: radio height`).toBeGreaterThan(0);
+    expect(layout.textSpace, `${layout.name}: room for the label`).toBeGreaterThanOrEqual(80);
+    expect(layout.fontSize, `${layout.name}: readable label font`).toBeGreaterThanOrEqual(14);
+    expect(layout.textFits, `${layout.name}: label text stays within its bounds`).toBe(true);
+  }
+}
 
 test('adds exactly the reviewed note/reference as an unsaved citizen report without raw text, network or storage writes', async ({ page }, testInfo) => {
   const posts: string[] = []; page.on('request', request => { if (request.method() !== 'GET') posts.push(request.url()); });
@@ -42,6 +73,12 @@ test('adds exactly the reviewed note/reference as an unsaved citizen report with
   await expect(page.getByRole('textbox', { name: TEXT, exact: true })).toHaveCount(0);
   await page.getByRole('checkbox', { name: CONSENT, exact: true }).check();
   await open(page); const root = panel(page);
+  await expectCompactRadioLabels(root.getByRole('radio'));
+  await root.getByRole('group', { name: 'Reference', exact: true }).screenshot({ path: testInfo.outputPath('acknowledgement-radios-desktop.png') });
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expectCompactRadioLabels(root.getByRole('radio'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await root.getByRole('group', { name: 'Reference', exact: true }).screenshot({ path: testInfo.outputPath('acknowledgement-radios-english-320.png') });
   await expect(root.getByRole('combobox', { name: 'Progress I want to report', exact: true })).toHaveValue('');
   for (const radio of await root.getByRole('radio', { name: /^Use reading/ }).all()) await expect(radio).not.toBeChecked();
   await root.getByRole('radio', { name: 'Use reading 1: ACK-2026-12', exact: true }).check();
@@ -184,6 +221,8 @@ test('Hindi exact review is keyboard accessible and readable at 320px', async ({
   const summary = page.getByText('पावती के पाठ की समीक्षा करें', { exact: true }); await summary.focus(); await page.keyboard.press('Enter');
   await page.getByRole('textbox', { name: 'पावती से मेरे द्वारा कॉपी किया पाठ', exact: true }).fill('तारीख: 6 सितंबर 2026\nराशि: ₹500\nनिस्तारित');
   await page.getByRole('textbox', { name: 'मैंने इसे कहाँ से कॉपी किया', exact: true }).fill('मेरे द्वारा खोली रसीद');
+  await expectCompactRadioLabels(page.getByRole('radio'));
+  await page.getByRole('group', { name: 'पाठ में दी तारीख', exact: true }).screenshot({ path: testInfo.outputPath('acknowledgement-radios-hindi-320.png') });
   await page.getByRole('radio', { name: 'यह मान लें 1: 2026-09-06', exact: true }).check();
   await page.getByRole('combobox', { name: 'मैं जिस प्रगति की सूचना देना चाहता/चाहती हूँ', exact: true }).selectOption('needs-attention');
   await page.getByRole('button', { name: 'इस अपडेट की समीक्षा करें', exact: true }).click();

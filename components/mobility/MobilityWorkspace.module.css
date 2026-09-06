@@ -12,9 +12,9 @@
 .main .primary { background: var(--navy); color: var(--on-navy); border-color: var(--navy); }
 .main .danger { color: var(--danger); }
 .main label { display: grid; gap: 7px; color: var(--ink); font-size: 14px; font-weight: 650; min-width: 0; }
-.main :is(input:not([type=checkbox]), textarea, select) { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; min-height: 46px; padding: 11px 12px; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--font-body); }
+.main :is(input:not([type=checkbox]):not([type=radio]), textarea, select) { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; min-height: 46px; padding: 11px 12px; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--font-body); }
 .main textarea { resize: vertical; }
-.main input[type=checkbox] { width: 19px; height: 19px; accent-color: var(--accent-text); flex-shrink: 0; margin: 2px 0; }
+.main :is(input[type=checkbox], input[type=radio]) { width: 19px; height: 19px; accent-color: var(--accent-text); flex-shrink: 0; margin: 2px 0; }
 .main .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.55; font-weight: 500; }
 .main small { color: var(--muted); line-height: 1.5; font-size: 13px; }
 .hero { display: flex; justify-content: space-between; gap: 28px; align-items: flex-start; margin-bottom: 28px; }
