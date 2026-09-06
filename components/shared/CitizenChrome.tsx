@@ -6,6 +6,7 @@ import { Menu } from 'lucide-react';
 import type { Language } from '../../lib/domain';
 import styles from './CitizenChrome.module.css';
 import { useClientReady } from './useClientReady';
+import { readLanguagePreference, saveLanguagePreference } from '../../lib/language-preference';
 
 function t(language: Language, en: string, hi: string) { return language === 'hi' ? hi : en; }
 const themeListeners = new Set<() => void>();
@@ -29,7 +30,14 @@ export function CitizenHeader({ language, setLanguage, service = 'ChallanSakshi'
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = 'citizen-navigation-menu';
   const darkTheme = useSyncExternalStore(subscribeToTheme, readDarkTheme, readServerDarkTheme);
+  useEffect(() => {
+    const saved = readLanguagePreference();
+    if (saved && !englishOnly) setLanguage(saved);
+    // Read once when a page mounts; a later user choice is written below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const chooseLanguage = (next: Language) => {
+    saveLanguagePreference(next);
     setLanguage(next);
     setMenuOpen(false);
     triggerRef.current?.focus({ preventScroll: true });
@@ -49,10 +57,10 @@ export function CitizenHeader({ language, setLanguage, service = 'ChallanSakshi'
       <nav className={styles.desktopNav} aria-label={t(language, 'Product navigation', 'उत्पाद नेविगेशन')}><a data-required-action href="/review">{t(language, 'Challan review', 'चालान समीक्षा')}</a><a data-required-action href="/fastag">{t(language, 'FASTag check', 'FASTag जाँच')}</a><a data-required-action href="/safety">{t(language, 'Safety & privacy', 'सुरक्षा और गोपनीयता')}</a></nav>
       <a data-required-action data-demo-entry className={styles.demoLink} href="/demo">{t(language, 'Demo', 'डेमो')}</a>
       {quickExit ? <span className={styles.quickExit} data-quick-exit>{quickExit}</span> : null}
-      {!englishOnly ? <select data-required-action className={styles.languageSelector} aria-label="Display language" value={language} disabled={!clientReady} onChange={(event) => { setLanguage(event.target.value === 'hi' ? 'hi' : 'en'); setMenuOpen(false); }}><option value="en">EN</option><option value="hi">हिं</option></select> : null}
+      {!englishOnly ? <select data-required-action className={styles.languageSelector} aria-label="Display language" value={language} disabled={!clientReady} onChange={(event) => { chooseLanguage(event.target.value === 'hi' ? 'hi' : 'en'); }}><option value="en">EN</option><option value="hi">हिं</option></select> : null}
       <button data-required-action ref={triggerRef} type="button" className={styles.menuTrigger} disabled={!clientReady} aria-expanded={menuOpen} aria-controls={menuId} onClick={() => setMenuOpen((open) => !open)}><Menu aria-hidden="true" size={26} strokeWidth={1.8} /><span className={styles.visuallyHidden}>{t(language, 'Menu', 'मेन्यू')}</span></button>
       <div className={styles.menuPanel} id={menuId} hidden={!menuOpen}>
-        <nav aria-label={t(language, 'Menu navigation', 'मेन्यू नेविगेशन')}><a data-required-action href="/">{t(language, 'Home', 'होम')}</a><a data-required-action href="/review">{t(language, 'Challan review', 'चालान समीक्षा')}</a><a data-required-action href="/fastag">{t(language, 'FASTag check', 'FASTag जाँच')}</a><a data-required-action href="/dashboard">{t(language, 'My checklist', 'मेरी सूची')}</a><a data-required-action href="/message-check">{t(language, 'Check a message', 'संदेश जाँचें')}</a><a data-required-action href="/reply-review">{t(language, 'Review a reply', 'उत्तर जाँचें')}</a><a data-required-action href="/sources">{t(language, 'Official sources', 'आधिकारिक स्रोत')}</a><a data-required-action href="/safety">{t(language, 'Safety & privacy', 'सुरक्षा और गोपनीयता')}</a></nav>
+        <nav aria-label={t(language, 'Menu navigation', 'मेन्यू नेविगेशन')}><a data-required-action href="/">{t(language, 'Home', 'होम')}</a><a data-required-action href="/review">{t(language, 'Challan review', 'चालान समीक्षा')}</a><a data-required-action href="/fastag">{t(language, 'FASTag check', 'FASTag जाँच')}</a><a data-required-action href="/mobility">{t(language, 'My mobility', 'मेरी मोबिलिटी')}</a><a data-required-action href="/dashboard">{t(language, 'My checklist', 'मेरी सूची')}</a><a data-required-action href="/message-check">{t(language, 'Check a message', 'संदेश जाँचें')}</a><a data-required-action href="/reply-review">{t(language, 'Review a reply', 'उत्तर जाँचें')}</a><a data-required-action href="/sources">{t(language, 'Official sources', 'आधिकारिक स्रोत')}</a><a data-required-action href="/safety">{t(language, 'Safety & privacy', 'सुरक्षा और गोपनीयता')}</a></nav>
         {utilities ? <div className={styles.utilities}>{utilities}</div> : null}
         <CitizenHeaderButton type="button" aria-pressed={darkTheme} onClick={() => applyThemeChoice(darkTheme ? 'light' : 'dark')}>{t(language, darkTheme ? 'Light mode' : 'Dark mode', darkTheme ? 'लाइट मोड' : 'डार्क मोड')}</CitizenHeaderButton>
         {englishOnly ? <p className={styles.englishAvailability}>{boundary === 'demo' ? 'This demo is currently available in English' : 'FASTag check is currently available in English'}</p> : <div className={styles.languages} role="group" aria-label={t(language, 'Language', 'भाषा')}><button data-required-action type="button" aria-pressed={language === 'en'} onClick={() => chooseLanguage('en')}>EN</button><button data-required-action type="button" aria-pressed={language === 'hi'} onClick={() => chooseLanguage('hi')}>हिं</button></div>}
@@ -62,6 +70,7 @@ export function CitizenHeader({ language, setLanguage, service = 'ChallanSakshi'
       <a href="/demo">{t(language, 'Challan walkthrough', 'चालान वॉकथ्रू')}</a>
       <a href="/demo/test-lab#case-suite">{t(language, '10-case Test Lab', '10-केस टेस्ट लैब')}</a>
       <a href="/demo/fastag">{t(language, 'FASTag cases', 'FASTag केस')}</a>
+      <a href="/demo/assistance-lab">{t(language, 'Assistance lab', 'सहायता अभ्यास')}</a>
     </nav>}
   </div>;
 }

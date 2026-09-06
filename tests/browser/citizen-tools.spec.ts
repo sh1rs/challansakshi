@@ -67,5 +67,5 @@ test('reply review links exact source text, gates a real download and invalidate
   await expect(page.locator('[data-reply-note]')).toHaveCount(0);
   await expect(page.locator('#reply-status-1')).toHaveValue('unreviewed');
   expect(requests.some(request => /PRIVATE_REPLY_MARKER|photo%20was|\bPOST\b/.test(request))).toBe(false);
-  expect(await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ local: [], session: [] });
+  expect(await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ local: ['challansakshi-language-v1'], session: [] });
 });

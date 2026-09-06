@@ -11,7 +11,7 @@ export type DocumentReading = { sourceId: string; role: DocumentRole; pages: Doc
 export type DocumentField = {
   id: string;
   sourceId: string;
-  /** Memory-only source identity, retained through correction to prevent self-comparison. */
+  /** Source identity retained through correction. It leaves review memory only in an explicitly saved case. */
   sourceFingerprint?: string;
   role: DocumentRole;
   page: number;

@@ -1,0 +1,31 @@
+.panel { margin-top: 18px; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.panel > summary { display: list-item; min-height: 48px; padding: 14px 0; font-size: 14px; font-weight: 700; line-height: 1.6; cursor: pointer; }
+.panel summary svg { vertical-align: middle; margin-right: 7px; }
+.body { display: grid; gap: 14px; min-width: 0; padding: 4px 0 16px; }
+.body p { margin: 0; font-size: 14px; line-height: 1.7; }
+.body button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 10px 13px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card); font: 650 14px/1.5 var(--font-body); cursor: pointer; }
+.body button svg { flex: 0 0 auto; }
+.body button.primary { color: var(--on-navy); background: var(--navy); border-color: var(--navy); }
+.body button:disabled { cursor: default; opacity: .55; }
+.body .small, .body small { font-size: 12px; line-height: 1.65; color: var(--muted); }
+.options { display: grid; gap: 9px; padding: 12px; min-width: 0; border: 1px solid var(--line); border-radius: 9px; margin: 0; }
+.options legend { font-size: 14px; font-weight: 700; padding: 0 5px; }
+.body label.choice, .body label.approval { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 6px 0; font-size: 14px; line-height: 1.65; cursor: pointer; }
+.choice input, .approval input { flex: 0 0 auto; }
+.choice > span { display: grid; gap: 3px; min-width: 0; }
+.value { white-space: pre-wrap; font-weight: 400; }
+.body .draftLabel { display: grid; gap: 8px; }
+.body textarea { box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card); font: 400 15px/1.65 var(--font-body); resize: vertical; }
+.body textarea[readonly] { background: var(--paper); }
+.preview { display: grid; gap: 14px; min-width: 0; padding: 14px; border: 1px solid var(--teal-border); border-radius: 10px; background: var(--teal-soft); }
+.preview h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.6; }
+.preview h3 svg { vertical-align: middle; margin-right: 7px; }
+.reviewField { display: grid; gap: 7px; min-width: 0; padding-bottom: 14px; border-bottom: 1px solid var(--teal-border); }
+.reviewField label { font-size: 14px; font-weight: 650; line-height: 1.6; }
+.exact { min-width: 0; }
+.exact summary { min-height: 44px; font-size: 13px; font-weight: 600; line-height: 1.65; cursor: pointer; }
+.notice, .warning { padding: 12px; border-radius: 8px; }
+.notice { background: var(--teal-soft); border: 1px solid var(--teal-border); }
+.warning { background: var(--amber-soft); border: 1px solid var(--amber-border); color: var(--amber-text); }
+.panel :is(button, input, textarea, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 400px) { .options, .preview { padding: 10px; } .body button { width: 100%; } }

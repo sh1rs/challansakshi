@@ -14,6 +14,8 @@ import PrivateNotePrintButton from '../shared/PrivateNotePrintButton';
 import styles from './CitizenDocumentReview.module.css';
 import VoiceCoach from './VoiceCoach';
 import type { CoachAction, CoachContext } from '../../lib/voice-coach';
+import DocumentCasePanel from '../mobility/DocumentCasePanel';
+import { readJurisdictionHint } from '../../lib/mobility/document-bridge';
 
 type Language = 'en' | 'hi';
 type Role = 'notice' | 'vehicle-record';
@@ -184,6 +186,7 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
   };
   const photoReference = vehicleRegistration ? { value: vehicleRegistration.value, sourceId: vehicleRegistration.sourceId, page: vehicleRegistration.page, fingerprint: vehicleRegistration.sourceFingerprint } : null;
   const note = [buildDocumentEvidenceNote(evidence, language), photoObservation ? buildPhotoObservationNote(photoObservation, language) : ''].filter(Boolean).join('\n\n');
+  const jurisdictionHint = readJurisdictionHint(roles.flatMap(role => slots[role]?.reading ? [slots[role]!.reading!] : []));
   const download = () => {
     if (!prepared || device !== 'private' || busy || editing || !ensureActive()) return;
     const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }));
@@ -248,6 +251,7 @@ export default function CitizenDocumentReview({ initialNowIso = new Date().toISO
         {device === 'private' && <><button data-document-download type="button" className={styles.primary} onClick={download}><Download size={19} aria-hidden="true" />{t(language, 'Save review note', 'समीक्षा नोट सहेजें')}</button><PrivateNotePrintButton note={note} language={language} privateDevice={prepared && device === 'private' && !busy && !editing} onAuthorize={ensureActive} className={styles.secondary} /><small>{t(language, 'Your browser offers printing and, where available, Save as PDF. Copies contain these extracted identifiers. Quick exit cannot delete downloaded or printed copies.', 'ब्राउज़र में प्रिंट और उपलब्ध होने पर PDF सहेजने के विकल्प मिलते हैं। प्रतियों में ये पहचाने गए नंबर होंगे। तुरंत बाहर निकलने से डाउनलोड या प्रिंट की गई कॉपी नहीं मिटती।')}</small></>}
         {device === 'shared' && <p>{t(language, 'Read the note here. Saving is off on shared devices; use Exit when finished.', 'नोट यहीं पढ़ें। साझा डिवाइस पर सहेजना बंद है; काम पूरा होने पर बाहर निकलें।')}</p>}</div>
         <div className={styles.alternatives}><a href="/dashboard">{t(language, 'Keep a follow-up date in my checklist', 'मेरी सूची में फॉलो-अप तारीख रखें')}<ChevronRight size={17} aria-hidden="true" /></a><a href="/reply-review">{t(language, 'Have an authority reply? Review its response', 'प्राधिकरण का उत्तर है? उसकी समीक्षा करें')}<ChevronRight size={17} aria-hidden="true" /></a></div>
+        <DocumentCasePanel key={JSON.stringify(evidence.fields)} evidence={evidence} jurisdictionHint={jurisdictionHint} language={language} device={device} ensureActive={ensureActive} />
         <button type="button" className={styles.secondary} onClick={() => { heading.current?.focus({ preventScroll: true }); setPrepared(false); }}>{t(language, 'Review documents', 'दस्तावेज़ जाँचें')}</button>
       </section>}
       <div className={styles.alternatives}>

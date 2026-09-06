@@ -45,18 +45,20 @@
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 1050px) {
   .desktopNav { display: none; }
-  .brand { margin-right: auto; }
+  .brand { margin-right: auto; min-width: 0; }
 }
 @media (max-width: 700px) {
   .header { width: calc(100% - 24px); height: 64px; gap: 8px; }
   .brand { margin-right: auto; }
   .brand strong { font-size: 20px; }
+  .brandName { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .brand strong { line-height: 1.15; }
   .brandIcon { display: none; }
   .header[data-has-quick-exit='true'] .brandIcon { display: block; }
   .header[data-has-quick-exit='true'] .brandName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .header[data-has-quick-exit='true'] .brand { min-width: 48px; gap: 0; }
   .demoLink { padding-inline: 6px; }
-  .demoNav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 8px; }
+  .demoNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 8px; }
   .demoNav a { min-width: 0; min-height: 52px; justify-content: center; padding-inline: 3px; font-size: 14px; line-height: 1.35; text-align: center; text-wrap: balance; }
   .brand small { display: none; }
   .desktopNav { display: none; }

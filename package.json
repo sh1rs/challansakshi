@@ -11,6 +11,7 @@
     "build:all": "vinext build && node extension/scripts/build.mjs production-disabled",
     "deploy:cloudflare": "vinext build && wrangler deploy --config dist/server/wrangler.json",
     "start": "vinext start",
+    "preview:cloudflare": "wrangler dev --config dist/server/wrangler.json --local --ip 127.0.0.1 --local-upstream 127.0.0.1 --port 4180 --inspector-port 9240",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

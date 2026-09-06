@@ -5,6 +5,7 @@ import { buildReplyFollowUp, linkReplyPassage, type ReplyPassage, type ReplyPoin
 import { PublicBetaShell, publicBetaStyles as styles } from './PublicBetaShell';
 import { useClientReady } from '../shared/useClientReady';
 import PrivateNotePrintButton from '../shared/PrivateNotePrintButton';
+import ReplyCasePanel from '../mobility/ReplyCasePanel';
 import { useUtilityPrivacy } from './ReplyReviewPrivacy';
 import local from './MessageSafetyCheck.module.css';
 
@@ -106,6 +107,7 @@ export default function ReplyReview() {
                 <PrivateNotePrintButton note={note} language={language} privateDevice={privateDevice} onAuthorize={ensureActive} className={styles.buttonSecondary} />
                 {privateDevice && <p className={styles.fieldHint}>{t('Your browser opens printing options; choose Save as PDF if available. Printed and saved copies remain after this page is cleared.', 'ब्राउज़र में प्रिंट विकल्प खुलेंगे; उपलब्ध हो तो PDF के रूप में सहेजें चुनें। प्रिंट और सहेजी प्रतियाँ पेज साफ़ होने के बाद भी रहती हैं।')}</p>}
               </fieldset>
+              <ReplyCasePanel note={note} language={language} privateDevice={privateDevice} ensureActive={ensureActive} />
               <p className={styles.fieldHint}>{t('Review and edit the downloaded text before using it through your existing official case channel. Check any deadline on the original notice. Nothing has been sent.', 'डाउनलोड का उपयोग अपने मौजूदा आधिकारिक केस चैनल पर करने से पहले जाँचें और संपादित करें। समय-सीमा मूल नोटिस पर देखें। कुछ भेजा नहीं गया है।')}</p>
             </section>}
           </div>

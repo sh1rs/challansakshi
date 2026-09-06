@@ -1,0 +1,14 @@
+.panel { margin-top: 1rem; color: var(--ink); }
+.panel summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 650; }
+.panel p, .panel small { line-height: 1.6; }
+.panel small { display: block; overflow-wrap: anywhere; }
+.changes { display: grid; gap: .9rem; margin-block: 1rem; }
+.change { border: 1px solid var(--border, #aab5c3); border-radius: .75rem; padding: .9rem; min-width: 0; }
+.change h4 { margin: 0 0 .7rem; overflow-wrap: anywhere; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.pair > div { min-width: 0; }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.panel .change label { display: flex; align-items: center; gap: .65rem; min-height: 44px; margin-top: .6rem; cursor: pointer; }
+.change input { width: 18px; height: 18px; flex-shrink: 0; }
+.panel button { min-height: 44px; padding: .65rem .9rem; white-space: normal; }
+@media (max-width: 520px) { .pair { grid-template-columns: minmax(0, 1fr); } }

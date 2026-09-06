@@ -1,0 +1,32 @@
+.panel { margin-top: 18px; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.panel > summary { display: list-item; min-height: 48px; padding: 14px 0; font-size: 14px; font-weight: 700; line-height: 1.6; cursor: pointer; }
+.panel summary svg { vertical-align: middle; margin-right: 7px; }
+.body { display: grid; gap: 14px; min-width: 0; padding: 4px 0 16px; }
+.body p { margin: 0; font-size: 14px; line-height: 1.7; }
+.body label { display: grid; gap: 7px; min-width: 0; font-size: 14px; line-height: 1.65; }
+.body button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 10px 13px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card); font: 650 14px/1.5 var(--font-body); cursor: pointer; }
+.body button.primary { color: var(--on-navy); background: var(--navy); border-color: var(--navy); }
+.body button:disabled { cursor: default; opacity: .55; }
+.body .small, .body small { font-size: 12px; line-height: 1.65; color: var(--muted); }
+.body :is(input:not([type=radio]):not([type=checkbox]), textarea, select) { box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card); font: 400 15px/1.65 var(--font-body); }
+.body textarea { resize: vertical; }
+.body textarea[readonly] { background: var(--paper); }
+.group { display: grid; gap: 12px; padding: 12px; min-width: 0; border: 1px solid var(--line); border-radius: 9px; margin: 0; }
+.group legend { font-size: 14px; font-weight: 700; padding: 0 5px; }
+.body label.choice { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 6px 0; font-size: 14px; line-height: 1.65; cursor: pointer; }
+.choice input { flex: 0 0 auto; }
+.value { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reading { display: grid; gap: 7px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.context { min-width: 0; }
+.context summary { min-height: 44px; font-size: 13px; font-weight: 600; line-height: 1.65; cursor: pointer; }
+.context pre { margin: 7px 0; padding: 10px; border-radius: 7px; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 13px/1.7 var(--font-body); background: var(--paper); }
+.context mark { background: var(--amber-soft); color: var(--ink); }
+.contextText { max-height: 360px; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.contextText:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.preview { display: grid; gap: 14px; min-width: 0; padding: 14px; border: 1px solid var(--teal-border); border-radius: 10px; background: var(--teal-soft); }
+.preview h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.6; }
+.notice, .warning { padding: 12px; border-radius: 8px; }
+.notice { background: var(--teal-soft); border: 1px solid var(--teal-border); }
+.warning { background: var(--amber-soft); border: 1px solid var(--amber-border); color: var(--amber-text); }
+.panel :is(button, input, textarea, select, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 400px) { .group, .preview { padding: 10px; } .body button { width: 100%; } }

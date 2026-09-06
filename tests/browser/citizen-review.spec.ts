@@ -67,9 +67,10 @@ test.describe('informative home and product chrome', () => {
       await page.goto('/');
       await chooseLanguage(page, language);
       const mainLinks = page.locator('main a');
-      await expect(mainLinks).toHaveCount(7);
+      await expect(mainLinks).toHaveCount(8);
       expect(await mainLinks.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual([
         '/review',
+        '/mobility',
         '/manual/challan',
         '/message-check',
         '/fastag',

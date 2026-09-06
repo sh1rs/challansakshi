@@ -52,7 +52,7 @@ describe('citizen chrome contracts', () => {
     const host = mountHeader({ boundary: 'demo' });
     const demoNav = host.querySelector('nav[aria-label="Demo cases"]');
     expect(demoNav).not.toBeNull();
-    expect([...demoNav!.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/demo', '/demo/test-lab#case-suite', '/demo/fastag']);
+    expect([...demoNav!.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/demo', '/demo/test-lab#case-suite', '/demo/fastag', '/demo/assistance-lab']);
     expect(demoNav!.querySelector('a[href="/demo/test-lab#case-suite"]')?.textContent).toBe('10-case Test Lab');
     const real = mountHeader();
     expect(real.querySelector('nav[aria-label="Demo cases"]')).toBeNull();
@@ -84,7 +84,7 @@ describe('citizen chrome contracts', () => {
     expect(trigger?.getAttribute('aria-expanded')).toBe('true');
     const menu = host.querySelector<HTMLElement>('#citizen-navigation-menu');
     expect(menu?.hidden).toBe(false);
-    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/dashboard', '/message-check', '/reply-review', '/sources', '/safety']);
+    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/mobility', '/dashboard', '/message-check', '/reply-review', '/sources', '/safety']);
     expect(menu?.querySelector('[role="group"][aria-label="Language"]')).not.toBeNull();
     expect(menu?.textContent).toContain('Dark mode');
     act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

@@ -40,6 +40,41 @@ function expectBilingualPair(english: string, hindi: string) {
 }
 
 describe('public privacy and safety pages', () => {
+  it('makes the privacy notice discoverable from the shared safety destination', () => {
+    const html = renderToStaticMarkup(createElement(SafetyPage));
+    expect(html).toMatch(/<a href="\/privacy" class="[^"]+">Privacy notice<\/a>/);
+    expect(html).toContain('how to clear saved data');
+    expectBilingualPair('Privacy notice', 'गोपनीयता सूचना');
+  });
+
+  it('discloses independent organiser and linked-plan storage, retention and deletion', () => {
+    const html = renderToStaticMarkup(createElement(PrivacyPage));
+    expect(html).toContain('document type, optional document and vehicle labels, expiry date, source label');
+    expect(html).toContain('Linked plans save the plan type, selected case links, dates and revision');
+    expect(html).toContain('stay unencrypted in this browser and are not synced to an account');
+    expect(html).toContain('Reminders expire 90 days after their last explicit save; plans expire 90 days after a changed plan is saved');
+    expect(html).toContain('Reading them does not extend retention');
+    expect(html).toContain('Clear all mobility data on this device');
+    expect(html).toContain('Deleting a plan or reminder keeps its cases');
+    expect(html).toContain('Clearing browser records cannot remove those copies');
+    const translated = bilingualCalls.find(pair => pair.en.startsWith('The document expiry organiser saves'));
+    expect(translated?.hi).toContain('बिना एन्क्रिप्शन');
+    expect(translated?.hi).toContain('90 दिन');
+  });
+
+  it('distinguishes clearing working session state from deleting saved data or signing out', () => {
+    const html = renderToStaticMarkup(createElement(PrivacyPage));
+    expect(html).toContain('Clear this session removes working forms, unsaved edits and reviews');
+    expect(html).toContain('leaves saved device data, other tabs, account sign-in, downloads and clipboard copies in place');
+    expect(html).toContain('non-personal marker in this tab’s session storage');
+    expect(html).toContain('until you choose Start a new session');
+    expect(html).toContain('If the marker cannot be stored');
+    expect(html).toContain('Use the separate deletion controls to remove saved records');
+    const translated = bilingualCalls.find(pair => pair.en.startsWith('Clear this session removes'));
+    expect(translated?.hi).toContain('उसमें केस विवरण नहीं होते');
+    expect(translated?.hi).toContain('अलग मिटाने के नियंत्रण');
+  });
+
   it('explains the deliberate local-file boundary without claiming government authentication', () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
 
@@ -333,8 +368,8 @@ describe('public privacy and safety pages', () => {
 
   it('keeps complete Hindi counterparts for the critical privacy and safety boundaries', () => {
     expectBilingualPair(
-      'Document-first review extracts PDF text or runs English/Hindi OCR locally after you choose a file. The reader downloads code and language files from this site; document bytes and extracted fields are not uploaded. Up to three pages are read, and unclear or incomplete readings remain limited. OCR caches for selected content are disabled.',
-      'फ़ाइल चुनने पर दस्तावेज़ समीक्षा PDF पाठ निकालती है या अंग्रेज़ी/हिंदी OCR स्थानीय रूप से चलाती है। रीडर इस साइट से कोड और भाषा फ़ाइलें डाउनलोड करता है; दस्तावेज़ बाइट्स और निकाली जानकारी अपलोड नहीं होती। अधिकतम तीन पृष्ठ पढ़े जाते हैं; अस्पष्ट या अधूरी जानकारी सीमित रहती है। चुनी सामग्री का OCR कैश बंद है।',
+      'Document-first review extracts PDF text or runs English/Hindi OCR locally after you choose a file. The reader downloads code and language files from this site; document bytes and extracted fields are not uploaded by the reader. Up to three pages are read, and unclear or incomplete readings remain limited. OCR caches for selected content are disabled.',
+      'फ़ाइल चुनने पर दस्तावेज़ समीक्षा PDF पाठ निकालती है या अंग्रेज़ी/हिंदी OCR स्थानीय रूप से चलाती है। रीडर इस साइट से कोड और भाषा फ़ाइलें डाउनलोड करता है; रीडर दस्तावेज़ बाइट्स और निकाली जानकारी अपलोड नहीं करता। अधिकतम तीन पृष्ठ पढ़े जाते हैं; अस्पष्ट या अधूरी जानकारी सीमित रहती है। चुनी सामग्री का OCR कैश बंद है।',
     );
     expectBilingualPair(
       'Cloud vision is not enabled on this deployment: no server-side AI key or production usage controls are configured. If enabled in a future release, it will require an explicit choice identifying the selected files and provider before anything is sent. Cloud providers may retain data under their policies; a no-storage API setting is not a zero-retention guarantee.',

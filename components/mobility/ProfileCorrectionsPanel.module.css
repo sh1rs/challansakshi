@@ -1,0 +1,31 @@
+.root { min-width: 0; margin-top: 18px; color: var(--ink); }
+.root * { box-sizing: border-box; }
+.root .trigger { width: 100%; text-align: left; }
+.panel { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); overflow-wrap: anywhere; }
+.panel h3 { margin: 0 0 8px; font: 700 18px/1.4 var(--font-heading); }
+.panel p { font-size: 14px; line-height: 1.6; }
+.panel button { max-width: 100%; white-space: normal; }
+.hint { font-size: 13px !important; color: var(--muted); }
+.counts { font-weight: 650; padding-top: 12px; border-top: 1px solid var(--line); }
+.draft { margin-top: 16px; padding: 14px 0; border-top: 1px solid var(--line); min-width: 0; }
+.root .selection { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-weight: 500; line-height: 1.5; }
+.selection input { flex-shrink: 0; width: 19px; height: 19px; margin: 2px 0; accent-color: var(--accent-text); }
+.draft > small { display: block; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.changes { margin: 12px 0; }
+.changes > div { margin: 0 0 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.changes dt { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.changes dd { margin: 0; padding: 5px 0; }
+.changes dd > span { color: var(--muted); font-size: 12px; font-weight: 650; }
+.changes dd p { margin: 3px 0 !important; white-space: pre-wrap; color: var(--ink); }
+.apply { margin: 16px 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.root .primary { background: var(--navy); border-color: var(--navy); color: var(--on-navy); width: 100%; }
+.error, .warning, .success { padding: 12px; border-radius: 8px; }
+.error, .warning { background: var(--amber-soft); color: var(--amber-text) !important; border: 1px solid var(--amber-border); }
+.success { background: var(--teal-soft); color: var(--accent-text) !important; border: 1px solid var(--teal-border); }
+.exclusions { border-top: 1px solid var(--line); padding-top: 8px; }
+.exclusions summary { min-height: 44px; padding: 12px 0; font-size: 14px; font-weight: 650; cursor: pointer; }
+.exclusions ul { padding-left: 18px; margin: 0; }
+.exclusions li { padding: 8px 0; font-size: 13px; }
+.exclusions li p { margin: 4px 0 8px; font-size: 13px; }
+.root :is(button, input, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 400px) { .panel { padding: 12px; } .changes > div { padding: 10px; } }

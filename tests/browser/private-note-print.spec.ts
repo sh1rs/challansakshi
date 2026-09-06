@@ -53,7 +53,7 @@ test('private reply printing isolates the exact note in EN/HI without exposing t
   await page.locator('#reply-body').fill('Changed reply');
   await expect(page.locator('[data-private-note-print-root]')).toHaveCount(0);
   expect(requests.some(request => /PRIVATE_|evil\.example|\bPOST\b/.test(request))).toBe(false);
-  expect(await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ local: [], session: [] });
+  expect(await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ local: ['challansakshi-language-v1'], session: [] });
 });
 
 test('document print action preserves source lineage, blocks shared mode and discards its copy before reviewing again', async ({ page, context }) => {

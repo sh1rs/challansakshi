@@ -18,6 +18,7 @@
     "NEXT_PUBLIC_SITE_URL": "https://challansakshi.sh1rs.com",
     "ANALYSIS_ENABLED": "false",
     "SYNTHETIC_UPLOADS_ENABLED": "false",
+    "MOBILITY_AI_ENABLED": "false",
     "OPENAI_MODEL": "gpt-5.4-mini"
   }
 }

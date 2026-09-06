@@ -155,7 +155,7 @@ export default function CitizenHome({ initialLanguage = 'en' }: { initialLanguag
         <p className={styles.supporting}>{text.supporting}</p>
         <div className={styles.startReview}>
           <a className={styles.primaryAction} href="/review"><FileSearch size={20} aria-hidden="true" /><span>{text.review}</span><ArrowRight size={20} aria-hidden="true" /></a>
-          <p>{text.reviewHint}</p>
+          <p>{text.reviewHint}</p><a href="/mobility">{language === 'hi' ? 'मेरे मामले और दूसरे मोबिलिटी काम' : 'My cases and other mobility tasks'}<ArrowRight size={18} aria-hidden="true" /></a>
         </div>
         <p className={styles.reassurance}><ShieldCheck size={18} aria-hidden="true" /><span>{text.reassurance}</span></p>
         <div className={styles.capabilityList}>

@@ -21,7 +21,7 @@ describe('informative citizen home', () => {
     const main = html.match(/<main\b[\s\S]*?<\/main>/)?.[0] ?? '';
     const links = linksFrom(main);
     expect(links.map(({ href }) => href).sort()).toEqual([
-      '/dashboard', '/fastag', '/manual/challan', '/message-check', '/reply-review', '/review', '/sources',
+      '/dashboard', '/fastag', '/manual/challan', '/message-check', '/mobility', '/reply-review', '/review', '/sources',
     ]);
     expect(links.find(({ href }) => href === '/review')?.name).toBe('Review my challan');
     expect(main.match(/<h1\b/g)).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('informative citizen home', () => {
     const html = renderToStaticMarkup(createElement(CitizenHome, { initialLanguage: 'hi' }));
     const main = html.match(/<main\b[\s\S]*?<\/main>/)?.[0] ?? '';
     expect(main).toContain('lang="hi"');
-    expect(linksFrom(main).map(({ href }) => href).sort()).toEqual(['/dashboard', '/fastag', '/manual/challan', '/message-check', '/reply-review', '/review', '/sources']);
+    expect(linksFrom(main).map(({ href }) => href).sort()).toEqual(['/dashboard', '/fastag', '/manual/challan', '/message-check', '/mobility', '/reply-review', '/review', '/sources']);
     expect(linksFrom(main).find(({ href }) => href === '/review')?.name).toBe('मेरे चालान की समीक्षा करें');
   });
 });

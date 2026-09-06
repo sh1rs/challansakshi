@@ -79,13 +79,20 @@ describe('real-mode privacy isolation', () => {
   it('contains no network-send, persistence, analyze, raw paste, or unsafe HTML surface', () => {
     for (const { path, source } of publicModeFiles) {
       expect(source, path).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket\s*\(|EventSource\s*\(/);
-      if (path !== 'components/public-beta/MobilityDashboard.tsx') expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
+      if (!['components/public-beta/MobilityDashboard.tsx', 'lib/language-preference.ts', 'lib/mobility/store.ts'].includes(path)) expect(source, path).not.toMatch(/localStorage\.|sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
       else expect(source, path).not.toMatch(/sessionStorage\.|document\.cookie|indexedDB|caches\.|serviceWorker/);
       expect(source, path).not.toMatch(/dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
       expect(source, path).not.toMatch(/contenteditable|contentEditable/);
       const textareas = source.match(/<textarea\b/g) ?? [];
-      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2, 'components/public-beta/VoiceCoach.tsx': 1 } as Record<string, number>)[path] ?? 0;
+      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2, 'components/public-beta/VoiceCoach.tsx': 1, 'components/mobility/DocumentCasePanel.tsx': 1, 'components/mobility/ReplyCasePanel.tsx': 1 } as Record<string, number>)[path] ?? 0;
       expect(textareas, path).toHaveLength(count);
+      if (path === 'components/mobility/ReplyCasePanel.tsx') {
+        const metadataPreview = source.match(/<textarea\b[^>]*>/g) ?? [];
+        expect(metadataPreview).toHaveLength(1);
+        expect(metadataPreview[0]).toMatch(/\breadOnly\b/);
+        expect(metadataPreview[0]).not.toMatch(/\bonChange\s*=|\bname\s*=/);
+        expect(metadataPreview[0]).toContain('JSON.stringify(preview, null, 2)');
+      }
     }
   });
 
