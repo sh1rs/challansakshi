@@ -29,7 +29,9 @@ Search Console verification needs the owner's Google property access or verifica
 
 Search engines decide the displayed title, snippet, favicon, sitelinks and indexing schedule. Text descriptions, structured data and sitemap submission improve discoverability but cannot guarantee indexing, ranking, a knowledge panel, rich results or an AI overview. The machine-readable summary is supplementary and does not grant a crawler access to private data.
 
-On 13 September 2026, a web search for the exact brand and site returned the homepage, safety/privacy pages, FASTag and older demo/query URLs. The cached content described an earlier release. This establishes existing web-search discovery in that check, not Google-specific ranking or a refreshed snippet. Updated descriptions, canonical URLs and demo `noindex` directives take effect in results only after the relevant engine recrawls them. Search Console opened signed out in the available browser, so no sitemap submission or indexing request was made.
+On 13 September 2026, an initial web search for the exact brand and site returned the homepage, safety/privacy pages, FASTag and older demo/query URLs with cached content from an earlier release. Later that day, after the owner signed into Google, Search Console verified the URL-prefix property `https://challansakshi.sh1rs.com/` using the public HTML verification tag in `app/layout.tsx`. Keep that tag in place to retain ownership verification.
+
+Google accepted `/sitemap.xml` and reported **Success**, with **11 discovered pages** and a 13 September last-read date. URL Inspection confirmed the homepage was already indexed. Fresh indexing requests for both the homepage and `/about` passed Google's live indexability check and were accepted into the priority crawl queue. The newly published `/about` page was not yet indexed at inspection time; request acceptance is not completed indexing. See [the identity release record](./2026-09-13-identity-release.md) for the final evidence. Crawl requests and discovered-page counts do not guarantee refreshed snippets, rankings or AI overviews.
 
 ## Official guidance checked 13 September 2026
 

@@ -2,6 +2,8 @@
 
 Released 13 September 2026 at https://challansakshi.sh1rs.com.
 
+The later [Road & Record identity release](./2026-09-13-identity-release.md) supersedes the deployed artifact below and records the final logo, discovery, mobile and hosted-check follow-up. This document preserves the original launch evidence.
+
 This record identifies the public artifact and the evidence checked around it. It does not turn an independent civic project into a government service, legal adviser, bank or official filing channel.
 
 ## Deployed artifact

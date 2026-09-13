@@ -2,6 +2,8 @@
 
 ChallanSakshi is a free, independent civic project by **Shourya Banda · sh1rs**. Its public home is https://challansakshi.sh1rs.com. The September 2026 public release keeps guest use available and requires no new paid provider. Documents are processed in the browser. Saving device cases is optional; exported files and clipboard copies remain under the citizen's control.
 
+The latest published artifact and verification evidence are in the [Road & Record identity release](./2026-09-13-identity-release.md). The editable symbol, font license and asset regeneration instructions are in [brand-identity.md](./brand-identity.md).
+
 ## What needs no account setup
 
 Document and manual challan review, FASTag preparation, message warnings, reply review, source information, the device checklist, mobility preparation, visit packs, personal calendar exports, and encrypted manual case transfer work without Google sign-in. The app never files, pays, handles an official OTP/CAPTCHA, or verifies a government outcome. Practice tools remain clearly separated under `/demo`.
