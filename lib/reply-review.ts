@@ -11,6 +11,19 @@ export function linkReplyPassage(reply: string, start: number, end: number): Rep
   return text.trim() ? { start, end, text } : null;
 }
 
+/** Exact source offsets only. Repeated wording must be chosen by the citizen. */
+export function findReplyPassages(reply: string, text: string): { passages: ReplyPassage[]; tooMany: boolean } {
+  const passages: ReplyPassage[] = [];
+  if (!text.trim() || text.length > reply.length) return { passages, tooMany: false };
+  let start = reply.indexOf(text);
+  while (start !== -1) {
+    if (passages.length === 20) return { passages: [], tooMany: true };
+    passages.push({ start, end: start + text.length, text });
+    start = reply.indexOf(text, start + 1);
+  }
+  return { passages, tooMany: false };
+}
+
 /** Citizen-authored classifications only; there is no keyword-based adjudication. */
 export function buildReplyFollowUp({ reply, sourceLabel, points }: ReplyReviewInput, language: Language): string | null {
   if (!reply.trim() || reply.length > 12000 || sourceLabel.length > 160 || points.length < 1 || points.length > 5) return null;

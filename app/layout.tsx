@@ -1,25 +1,23 @@
 import type { Metadata } from 'next';
 import { buildThemeBootScript } from '../lib/theme-preference';
+import { publicPageMetadata, serializeStructuredData, SITE_URL, siteStructuredData } from '../lib/site-seo';
 import './globals.css';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: 'ChallanSakshi — Understand your challan safely',
-  description: 'A citizen-first guide to understand an e-Challan, compare the records and evidence you can see, and continue through the correct official service.',
-  openGraph: {
-    type: 'website',
-    title: 'ChallanSakshi — Understand your challan safely',
-    description: 'An independent citizen tool for reviewing the official record and evidence you choose to inspect before using an official service.',
-    images: [{ url: '/og.png', width: 1200, height: 675, alt: 'ChallanSakshi citizen record and evidence guidance.' }],
+  ...publicPageMetadata('/'),
+  metadataBase: new URL(SITE_URL),
+  applicationName: 'ChallanSakshi',
+  category: 'civic technology',
+  referrer: 'no-referrer',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+      { url: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'ChallanSakshi — Understand your challan safely',
-    description: 'Review the record and evidence you can see before you use the appropriate official service.',
-    images: ['/og.png'],
-  },
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -27,6 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: buildThemeBootScript() }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(siteStructuredData) }} />
         {children}
       </body>
     </html>

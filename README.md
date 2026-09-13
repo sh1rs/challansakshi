@@ -2,28 +2,37 @@
 
 **Evidence before action.**
 
-ChallanSakshi is an independent, evidence-first citizen project built around one discipline: **inspect the official record, separate observation from conclusion, refuse unsupported claims, and hand the citizen a conservative next-step checklist.** The flagship synthetic journey asks whether a challan’s own evidence, timestamp, vehicle-relationship record, and case state agree. The public routes keep the real citizen tools separate from that synthetic walkthrough:
+**A free civic tool for clearer next steps on India’s roads.** Built by **Shourya Banda · [sh1rs](https://sh1rs.com)**.
 
-- `/` — the clean citizen homepage and bounded goal chooser;
-- `/review` — document-first e-Challan reading in tab memory: local PDF text/OCR, labelled fields, notice-versus-independent-vehicle-record registration comparison, corrections, and a neutral review note;
-- `/manual/challan` — the two-phase adaptive **Check → Resolve** fallback, including its separately gated deeper preparation and official handoff;
-- `/fastag` — TollSakshi, a structured FASTag transaction reconciler with a Transaction-to-Journey Map and TP1–TP14 Toll Evidence Passport;
-- `/demo` — the isolated, fully synthetic hackathon walkthrough and its fictional fixtures;
-- `/demo/test-lab` — a ten-case synthetic evidence laboratory that recomputes every result from editable record and observation fields.
+[Open ChallanSakshi](https://challansakshi.sh1rs.com) · [About and contact](https://challansakshi.sh1rs.com/about) · [Maintenance handoff](docs/PUBLIC-MAINTENANCE.md)
 
-The 7 September public deployment adds `/mobility`, optional `/account` and `/helper`, and the fictional `/demo/assistance-lab`. It includes document dates, linked life-event plans, reviewed form copying, conflict recovery, a returning-user agenda, acknowledgement text review, appointment preparation and a session-clear control. Guest preparation is available; account and cloud-provider features remain unconfigured. See [the 7 September release record](docs/2026-09-07-mobility-live-release.md) for the deployed revision and verification. See [the next-actions implementation checkpoint](docs/2026-09-06-mobility-next-actions-status.md), [the continuity report](docs/2026-09-06-mobility-continuity-status.md) and [the earlier expansion report](docs/2026-09-06-autonomous-build-status.md) for their distinct historical verification boundaries.
+Understand an e-Challan, compare your own records, check a suspicious message, prepare a FASTag query, or organise a mobility case. Start without signing up. The document reader runs in your browser; you review extracted facts before using them. ChallanSakshi is independent of government authorities, police, courts, banks and FASTag issuers. You choose and complete every official action yourself.
+
+- `/review` — local PDF/image reading, source-linked fields, independent-record comparison, corrections and a neutral review note;
+- `/manual/challan` — a guided review when you cannot use a document;
+- `/fastag` — transaction comparison and preparation for the appropriate support route;
+- `/message-check` — on-device message warning checks with inert links;
+- `/reply-review` — link exact reply passages to the points you raised and prepare a reviewed follow-up;
+- `/mobility` — optional device cases, visit packs, acknowledgement review, personal reminders and encrypted manual transfer;
+- `/dashboard` — a minimal private-device checklist;
+- `/sources`, `/privacy`, `/safety`, `/about` — transparent sources, limits, data controls and project information;
+- `/demo` and `/demo/test-lab` — clearly separate fictional practice tools.
+
+The September 13 public release adds a redesigned homepage, creator/contact information, search and sharing metadata, crawl and language-model summaries, improved phone reply review, error recovery, dependency patches and consistent Worker security protections. Optional Google/D1 accounts and hosted AI remain disabled by the maintainer’s choice. See the [public maintenance guide](docs/PUBLIC-MAINTENANCE.md), the [security record](qa/security-release-2026-09-13/README.md) and the [previous mobility release](docs/2026-09-07-mobility-live-release.md) for their separate evidence and setup boundaries.
 
 Synthetic state remains sealed inside the demo routes. The flagship walkthrough carries one frozen Local Evidence Passport from source review to contest pack, fictional response, Order-to-Evidence Review, and neutral clarification note. The Test Lab proves that the comparison engine is not a blue-scooter/white-motorcycle script: ten different vectors and citizen edits pass through the same normalization, comparison, confirmation, and routing functions.
 
-> Independent prototype, deployed at [challansakshi.sh1rs.com](https://challansakshi.sh1rs.com). Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate with government services, give legal advice, or guarantee an outcome. `/review` reads selected documents on this device and does not upload them to a server or AI provider. Opening a selected PDF creates a separate browser-local tab that the citizen must close. Real-document cloud analysis is not available in this build.
+> Independent civic tool, available at [challansakshi.sh1rs.com](https://challansakshi.sh1rs.com). Not affiliated with MoRTH, Parivahan, traffic police, courts, NPCI, banks, or toll operators. It does not file, pay, authenticate with government services, give legal advice, or guarantee an outcome. `/review` reads selected documents on this device and does not upload them to a server or AI provider. Opening a selected PDF creates a separate browser-local tab that the citizen must close. Real-document cloud analysis is not available in this build.
 
 ## Release posture
 
-**Code status:** public source publication authorized; the web prototype is deployed at [challansakshi.sh1rs.com](https://challansakshi.sh1rs.com). The repository contains functioning citizen tools and synthetic demonstrations, but deployment is not evidence of government integration or completion of the operational controls below. A real public announcement remains blocked until the non-code controls below are supplied and independently verified.
+**Current scope:** a free guest self-service tool. The maintenance guide names the creator, product-feedback contact, release procedure, rollback checks, storage limits and remaining external validation. No government integration or independently audited privacy, legal, accessibility or voice-quality claim is made. Search engines decide when to index and how to display the public pages.
 
-At minimum, release requires a named operator, privacy/grievance owner, and low-data security and official-link correction channel; published implementation-matched Privacy Policy and Terms; a CERT-In contact and incident runbook; verified India log-retention and clock controls; a vendor and data-flow inventory; external privacy, security, legal, dependency, and supply-chain review; an official-route re-verification cadence; and live monitoring, rollback, correction, and incident ownership. Deployment also requires explicit authorization, correct Cloudflare account and domain verification, and a fresh full gate. The optional extension has additional Store, policy, lawful adapter-verification, portal-authorisation, packaging, publisher-access, staged-rollout, and takedown prerequisites.
+The earlier hackathon release checklist below is retained as a planning reference for any future account-backed or assisted official-service rollout. It is not evidence that those reviews were performed, nor an assertion that every item applies identically to this browser-local guest tool.
 
-Do not describe this repository or product as a launched beta, generally available, secure, DPDP-compliant, or government-authorised service. The retained [official route reverification report](docs/superpowers/verification/official-route-reverification-2026-09-03.md) is a dated non-submitting route-and-purpose smoke check; it does not satisfy those operational gates.
+That broader rollout checklist includes a named operator, privacy/grievance owner, and low-data security and official-link correction channel; published implementation-matched Privacy Policy and Terms; a CERT-In contact and incident runbook; verified India log-retention and clock controls; a vendor and data-flow inventory; external privacy, security, legal, dependency, and supply-chain review; an official-route re-verification cadence; and live monitoring, rollback, correction, and incident ownership. Deployment also requires explicit authorization, correct Cloudflare account and domain verification, and a fresh full gate. The optional extension has additional Store, policy, lawful adapter-verification, portal-authorisation, packaging, publisher-access, staged-rollout, and takedown prerequisites.
+
+For that broader account-backed or assisted rollout, do not claim launch readiness, general availability, security or DPDP compliance, or government authorisation until its additional gates are complete. The retained [official route reverification report](docs/superpowers/verification/official-route-reverification-2026-09-03.md) is a dated non-submitting route-and-purpose smoke check; it does not satisfy those operational gates.
 
 ## The exact citizen problem
 
@@ -340,7 +349,7 @@ For another common host, install dependencies, configure the optional environmen
 
 ## Known limitations
 
-- The real-mode tools remain a non-public prototype, not a government-ready production service. No secure incident/feedback inbox or external privacy/legal review has been completed; the UI says so rather than hiding the gap.
+- The guest tools are a free public civic service maintained by Shourya Banda (sh1rs). The About page provides a best-effort contact for non-personal feedback; do not send identity documents or case evidence through that contact. Independent privacy, legal, and accessibility reviews have not been completed, and ChallanSakshi does not claim government authority or a support response time.
 - The real review tools do not authenticate an original document, upload its bytes, or submit it to an official service. Separately reviewed facts and notes can be saved as a local mobility case; optional account storage remains unconfigured. `/review` extracts labelled text locally and may misread it; unsupported layouts, blurry text and partial documents require correction or manual fallback. Its neutral note is not the manual flow’s form-compatible grievance pack. `/manual/challan` continues to rely on citizen-confirmed structured answers.
 - TollSakshi does not access a bank or NETC system, raise a chargeback, prove fraud/cloning, promise a refund, or treat a current tag status as historical event-time status.
 - The October 2025 NETC evidence circular is source-labelled; a newer 2026 duplicate-validation circular appears in the current index, so the product deliberately avoids asserting a definitive duplicate time threshold.

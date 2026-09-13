@@ -21,9 +21,9 @@ const situationIcons = [CircleHelp, CarFront, ReceiptText, MessageSquareWarning,
 
 const copy = {
   en: {
-    eyebrow: 'Clarity before your next step',
+    eyebrow: 'Free civic help. Built for everyone.',
     heading: 'What happened with your challan?',
-    supporting: 'Verify the record, understand the notice, check the evidence, and prepare for the right official next step.',
+    supporting: 'A confusing notice should not leave you stuck. Understand your e-Challan, compare your records, and prepare your next step with confidence.',
     capabilities: [
       {
         title: 'Verify',
@@ -81,9 +81,9 @@ const copy = {
     fastagAction: 'Check a FASTag transaction',
   },
   hi: {
-    eyebrow: 'अगले कदम से पहले स्पष्टता',
+    eyebrow: 'निःशुल्क नागरिक सहायता। सभी के लिए।',
     heading: 'आपके चालान के साथ क्या हुआ?',
-    supporting: 'रिकॉर्ड सत्यापित करें, नोटिस समझें, सबूत जाँचें और सही आधिकारिक अगले कदम की तैयारी करें।',
+    supporting: 'उलझन भरे नोटिस पर अटकें नहीं। अपना ई-चालान समझें, रिकॉर्ड की तुलना करें और अगले कदम की तैयारी करें।',
     capabilities: [
       {
         title: 'सत्यापित करें',
@@ -150,15 +150,19 @@ export default function CitizenHome({ initialLanguage = 'en' }: { initialLanguag
     <CitizenHeader language={language} setLanguage={setLanguage} />
     <main className={styles.main} lang={language}>
       <section className={styles.hero} aria-labelledby="citizen-home-heading">
+        <div className={styles.heroIntro}>
         <p className={styles.eyebrow}>{text.eyebrow}</p>
         <h1 id="citizen-home-heading">{text.heading}</h1>
         <p className={styles.supporting}>{text.supporting}</p>
         <div className={styles.startReview}>
           <a className={styles.primaryAction} href="/review"><FileSearch size={20} aria-hidden="true" /><span>{text.review}</span><ArrowRight size={20} aria-hidden="true" /></a>
-          <p>{text.reviewHint}</p><a href="/mobility">{language === 'hi' ? 'मेरे मामले और दूसरे मोबिलिटी काम' : 'My cases and other mobility tasks'}<ArrowRight size={18} aria-hidden="true" /></a>
+          <p>{text.reviewHint}</p><a className={styles.secondaryAction} href="/mobility">{language === 'hi' ? 'मेरे मामले और दूसरे मोबिलिटी काम' : 'My cases and other mobility tasks'}<ArrowRight size={18} aria-hidden="true" /></a>
         </div>
         <p className={styles.reassurance}><ShieldCheck size={18} aria-hidden="true" /><span>{text.reassurance}</span></p>
+        <div className={styles.heroNote}><span aria-hidden="true" className={styles.noteMark}>↳</span><span>{language === 'hi' ? 'आपकी जानकारी। आपका निर्णय। हर कदम पर आपका नियंत्रण।' : 'Your information. Your decision. You stay in control.'}</span></div>
+        </div>
         <div className={styles.capabilityList}>
+          <div className={styles.capabilityHeading}><span>{language === 'hi' ? 'यहाँ से आगे बढ़ें' : 'A little clarity goes a long way'}</span><span aria-hidden="true">01 — 04</span></div>
           {capabilities.map(({ id, Icon }, index) => {
             const capability = text.capabilities[index];
             return <details className={styles.capability} data-home-capability={id} key={id}>

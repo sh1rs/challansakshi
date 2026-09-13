@@ -1,13 +1,14 @@
-import type { Metadata } from 'next';
+import { createPageMetadata } from '../../../../lib/site-seo';
 import OperatorAnalysisLab from '../../../../components/test-lab/OperatorAnalysisLab';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Controlled Synthetic Extraction — ChallanSakshi',
-  description: 'Feature-flagged evaluation of ChallanSakshi’s three-source observation extraction contract.',
-  robots: { index: false, follow: false },
-};
+export const metadata = createPageMetadata('/demo/test-lab/operator', {
+  title: 'Controlled synthetic extraction — ChallanSakshi',
+  description: 'Controlled synthetic extraction evaluation. Disabled in public production.',
+  index: false,
+  follow: false,
+});
 
 export default function OperatorAnalysisPage() {
   const enabled = process.env.ANALYSIS_ENABLED === 'true'

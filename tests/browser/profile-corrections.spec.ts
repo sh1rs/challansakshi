@@ -62,7 +62,7 @@ test('applies a reviewed batch, preserves history and unsaved editor work, and r
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', event => { if (event.type() === 'error') errors.push(event.text()); });
   await page.goto('/mobility#case=correction-first');
-  await expect(page).toHaveTitle(/mobility cases.*ChallanSakshi/i);
+  await expect(page).toHaveTitle(/mobility case.*ChallanSakshi/i);
   const editor = page.getByRole('region', { name: 'Renew my licence', exact: true });
   const note = editor.getByRole('textbox', { name: 'Your editable request / preparation note', exact: true });
   await expect(note).toHaveValue(SAVED_NOTE);

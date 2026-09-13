@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inspectNotice } from '../lib/notice-safety';
-import { buildReplyFollowUp, linkReplyPassage, type ReplyPoint } from '../lib/reply-review';
+import { buildReplyFollowUp, findReplyPassages, linkReplyPassage, type ReplyPoint } from '../lib/reply-review';
 
 describe('pasted message checks', () => {
   it.each([
@@ -39,6 +39,17 @@ describe('citizen authority reply mapping', () => {
     expect(linkReplyPassage(reply, 5, 5)).toBeNull();
     expect(linkReplyPassage(reply, -1, 29)).toBeNull();
     expect(linkReplyPassage(reply, 0, 999)).toBeNull();
+  });
+  it('finds pasted words without changing spaces, punctuation or source offsets', () => {
+    expect(findReplyPassages(reply, 'Please supply a clearer receipt.')).toEqual({ passages: [{ start: 30, end: 62, text: 'Please supply a clearer receipt.' }], tooMany: false });
+    expect(findReplyPassages(reply, 'please supply a clearer receipt.').passages).toEqual([]);
+    expect(findReplyPassages(reply, 'Please  supply a clearer receipt.').passages).toEqual([]);
+    expect(findReplyPassages(reply, '  ').passages).toEqual([]);
+  });
+  it('requires a source-position choice for duplicate words and bounds repeated matches', () => {
+    expect(findReplyPassages('Yes. No. Yes.', 'Yes.')).toEqual({ passages: [{ start: 0, end: 4, text: 'Yes.' }, { start: 9, end: 13, text: 'Yes.' }], tooMany: false });
+    expect(findReplyPassages('हाँ। हाँ।', 'हाँ।').passages.map(passage => passage.start)).toEqual([0, 5]);
+    expect(findReplyPassages('word '.repeat(21), 'word')).toEqual({ passages: [], tooMany: true });
   });
   it('requires citizen review of every point and source evidence for addressed points', () => {
     expect(buildReplyFollowUp({ reply, points: [{ ...answered, status: 'unreviewed' }], sourceLabel: '' }, 'en')).toBeNull();

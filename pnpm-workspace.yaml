@@ -1,7 +1,17 @@
 allowBuilds:
   esbuild: true
   sharp: true
+  # The OCR package only uses postinstall for its optional donation notice.
+  tesseract.js: false
   unrs-resolver: true
   workerd: true
 minimumReleaseAgeExclude:
   - lucide-react@1.41.0
+overrides:
+  # Security patches for pinned build-tool dependencies; keep major API families.
+  'postcss@<8.5.23': 8.5.23
+  'sharp@<0.35.4': 0.35.4
+  'undici@>=7.0.0 <7.29.0': 7.29.0
+  'ws@>=8.0.0 <8.21.0': 8.21.0
+  'js-yaml@>=4.0.0 <4.3.2': 4.3.2
+  'esbuild@>=0.27.3 <0.28.1': 0.28.1

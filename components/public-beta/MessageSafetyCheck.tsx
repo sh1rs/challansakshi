@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Language } from '../../lib/domain';
 import { inspectNotice, type NoticePreflightResult, type NoticeSignal } from '../../lib/notice-safety';
 import { OFFICIAL_FALLBACK_ROUTE } from '../../lib/official-destinations';
@@ -29,8 +29,15 @@ export default function MessageSafetyCheck() {
   const [language, setLanguage] = useState<Language>('en');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<NoticePreflightResult | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+  const resultRef = useRef<HTMLHeadingElement>(null);
   const clear = useCallback(() => { setMessage(''); setResult(null); }, []);
   useUtilityPrivacy(clear);
+  useEffect(() => {
+    if (!result || !resultRef.current) return;
+    resultRef.current.focus({ preventScroll: true });
+    resultRef.current.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+  }, [result]);
   const t = (en: string, hi: string) => language === 'hi' ? hi : en;
   const exit = () => { clear(); window.location.replace('/'); };
   return <PublicBetaShell language={language} setLanguage={setLanguage} service="Message check" serviceHindi="संदेश जाँच" onQuickExit={exit}>
@@ -44,11 +51,11 @@ export default function MessageSafetyCheck() {
         <section className={styles.panel} aria-label={t('Message to check', 'जाँचने वाला संदेश')}>
           <div className={local.field}>
             <label htmlFor="message-body">{t('Paste the SMS or message', 'SMS या संदेश पेस्ट करें')}</label>
-            <textarea id="message-body" rows={7} maxLength={6000} autoComplete="off" spellCheck={false} value={message} onChange={event => { setMessage(event.target.value); setResult(null); }} aria-describedby="message-privacy" />
+            <textarea ref={messageRef} id="message-body" rows={7} maxLength={6000} autoComplete="off" spellCheck={false} value={message} placeholder={t('Paste the message here. Do not include an OTP, password or full payment details.', 'संदेश यहाँ पेस्ट करें। OTP, पासवर्ड या पूरा भुगतान विवरण शामिल न करें।')} onChange={event => { setMessage(event.target.value); setResult(null); }} aria-describedby="message-privacy" />
             <p id="message-privacy" className={local.hint}>{t('Remove personal details you do not need checked. No upload, account or saved history.', 'अनावश्यक निजी विवरण हटा दें। कोई अपलोड, खाता या सहेजा इतिहास नहीं।')} {message.length}/6000</p>
           </div>
           <div className={styles.actions}>
-            <button type="button" className={styles.buttonSecondary} onClick={clear}>{t('Clear message', 'संदेश साफ़ करें')}</button>
+            <button type="button" className={styles.buttonSecondary} onClick={() => { clear(); messageRef.current?.focus(); }}>{t('Clear message', 'संदेश साफ़ करें')}</button>
             <button type="button" className={styles.button} disabled={!message.trim()} onClick={() => setResult(inspectNotice(message))}>{t('Check message', 'संदेश जाँचें')}</button>
           </div>
         </section>
@@ -56,7 +63,7 @@ export default function MessageSafetyCheck() {
           {result && <section data-message-result className={`${styles.panel} ${local.results}`} aria-labelledby="message-result-title">
             <div className={styles.resultHero} data-tone={result.risk === 'pause-and-verify' ? 'stop' : 'warn'}>
               <span className={styles.resultIcon} aria-hidden="true">!</span><div>
-                <h2 id="message-result-title">{result.risk === 'pause-and-verify' ? t('Pause and verify', 'रुकें और जाँचें') : result.risk === 'caution' ? t('Verify through an official route', 'आधिकारिक रास्ते से जाँचें') : t('No obvious indicator in this text', 'इस पाठ में स्पष्ट संकेत नहीं मिला')}</h2>
+                <h2 ref={resultRef} id="message-result-title" tabIndex={-1}>{result.risk === 'pause-and-verify' ? t('Pause and verify', 'रुकें और जाँचें') : result.risk === 'caution' ? t('Verify through an official route', 'आधिकारिक रास्ते से जाँचें') : t('No obvious indicator in this text', 'इस पाठ में स्पष्ट संकेत नहीं मिला')}</h2>
                 <p>{t('This is a limited text check. It cannot confirm a genuine sender, a safe link or a real challan. A message can include an official link and still be misleading.', 'यह सीमित पाठ जाँच है। यह असली भेजने वाले, सुरक्षित लिंक या वास्तविक चालान की पुष्टि नहीं कर सकती। आधिकारिक लिंक वाला संदेश भी भ्रामक हो सकता है।')}</p>
               </div>
             </div>

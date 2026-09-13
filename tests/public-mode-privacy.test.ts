@@ -84,8 +84,17 @@ describe('real-mode privacy isolation', () => {
       expect(source, path).not.toMatch(/dangerouslySetInnerHTML|\/api\/analyze|navigator\.sendBeacon/);
       expect(source, path).not.toMatch(/contenteditable|contentEditable/);
       const textareas = source.match(/<textarea\b/g) ?? [];
-      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 2, 'components/public-beta/VoiceCoach.tsx': 1, 'components/mobility/DocumentCasePanel.tsx': 1, 'components/mobility/ReplyCasePanel.tsx': 1 } as Record<string, number>)[path] ?? 0;
+      const count = ({ 'components/public-beta/OfficialHandoffPanel.tsx': 1, 'components/public-beta/MessageSafetyCheck.tsx': 1, 'components/public-beta/ReplyReview.tsx': 3, 'components/public-beta/VoiceCoach.tsx': 1, 'components/mobility/DocumentCasePanel.tsx': 1, 'components/mobility/ReplyCasePanel.tsx': 1 } as Record<string, number>)[path] ?? 0;
       expect(textareas, path).toHaveLength(count);
+      if (path === 'components/public-beta/ReplyReview.tsx') {
+        const replyFields = source.match(/<textarea\b[^>]*>/g) ?? [];
+        for (const field of replyFields) {
+          expect(field).toMatch(/\bmaxLength=\{(?:500|12000)\}/);
+          expect(field).toContain('autoComplete="off"');
+          expect(field).not.toMatch(/\bname\s*=/);
+        }
+        expect(source).toContain('setPassageDrafts({})');
+      }
       if (path === 'components/mobility/ReplyCasePanel.tsx') {
         const metadataPreview = source.match(/<textarea\b[^>]*>/g) ?? [];
         expect(metadataPreview).toHaveLength(1);

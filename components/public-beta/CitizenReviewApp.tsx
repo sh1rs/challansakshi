@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { CitizenGoal } from '../../lib/citizen-home';
 import { useClientReady } from '../shared/useClientReady';
@@ -355,6 +355,7 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
   const headingRef = useRef<HTMLHeadingElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const [minimumContentHeight, setMinimumContentHeight] = useState<number>();
+  const preservedScrollYRef = useRef<number | null>(null);
   const questionFocusRef = useRef<CitizenReviewDecisionQuestionId | null>(null);
   const previousStep = useRef(step);
   const signatureRef = useRef('');
@@ -646,11 +647,23 @@ export default function CitizenReviewApp({ readRenderNowMs = Date.now, initialGo
   const preserveViewportHeight = () => {
     const main = mainRef.current;
     if (!main) return;
+    preservedScrollYRef.current = window.scrollY;
     // A shorter result must not clamp the browser's current scroll position.
     // Reserve only the height needed for this viewport, not the whole old form.
     const surroundingHeight = document.documentElement.scrollHeight - main.getBoundingClientRect().height;
     setMinimumContentHeight(Math.max(0, Math.ceil(window.scrollY + window.innerHeight - surroundingHeight)));
   };
+
+  useLayoutEffect(() => {
+    const scrollY = preservedScrollYRef.current;
+    if (scrollY === null) return;
+    preservedScrollYRef.current = null;
+    if (/\bjsdom\b/i.test(window.navigator.userAgent)) {
+      (document.scrollingElement ?? document.documentElement).scrollTop = scrollY;
+      return;
+    }
+    window.scrollTo({ top: scrollY, left: window.scrollX, behavior: 'instant' });
+  }, [step, minimumContentHeight]);
 
   const editAnswers = () => {
     preserveViewportHeight();

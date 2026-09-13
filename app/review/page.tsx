@@ -1,13 +1,10 @@
-import type { Metadata } from 'next';
+import { publicPageMetadata } from '../../lib/site-seo';
 import CitizenReviewApp from '../../components/public-beta/CitizenReviewApp';
 import CitizenDocumentReview from '../../components/public-beta/CitizenDocumentReview';
 import { parseCitizenGoalValue } from '../../lib/citizen-home';
 import { getCitizenReviewServerNowIso } from '../../lib/citizen-review-server-clock';
 
-export const metadata: Metadata = {
-  title: 'Document-first e-Challan Review — ChallanSakshi',
-  description: 'Read your challan on this device, compare source-linked details, correct uncertain readings and prepare your next step.',
-};
+export const metadata = publicPageMetadata('/review');
 
 type ReviewPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

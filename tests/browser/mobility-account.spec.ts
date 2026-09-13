@@ -118,7 +118,7 @@ test('real PDF review carries confirmed facts and edited wording into a saved ca
 
 test('unconfigured account page keeps device cases available and does not show a fake sign-in', async ({ page }) => {
   await page.goto('/account');
-  await expect(page.getByText('Account saving is not available yet.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Cloud accounts are not enabled for this public release.', { exact: false })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Continue with Google', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Go to my mobility cases', exact: true })).toHaveAttribute('href', '/mobility');
 });

@@ -1,5 +1,5 @@
-import type { Metadata } from 'next';
+import { publicPageMetadata } from '../../lib/site-seo';
 import { PrivacyPage } from '../../components/public-beta/PublicInfoPage';
 
-export const metadata: Metadata = { title: 'Privacy & Data Controls — ChallanSakshi', description: 'How local record preview, tab-memory answers, infrastructure request metadata, device copies, and clear controls work.' };
+export const metadata = publicPageMetadata('/privacy');
 export default function Page() { return <PrivacyPage />; }

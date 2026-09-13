@@ -57,13 +57,14 @@ describe('citizen chrome contracts', () => {
     const real = mountHeader();
     expect(real.querySelector('nav[aria-label="Demo cases"]')).toBeNull();
   });
-  it('uses one boundary paragraph followed by one Safety & privacy link', () => {
+  it('keeps one clear boundary with safety, contact and creator links', () => {
     const html = renderToStaticMarkup(createElement(CitizenFooter, { language: 'en' }));
     const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/g)];
     const links = [...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
     expect(paragraphs).toHaveLength(1);
     expect(paragraphs[0][1].replace(/<[^>]+>/g, '')).toBe('Independent—not a government service. Documents are read on this device. Nothing is filed, paid or submitted for you. No legal advice or guaranteed outcome.');
-    expect(links.map((match) => [match[1], match[2]])).toEqual([['/safety', 'Safety &amp; privacy']]);
+    expect(links.map((match) => match[1])).toEqual(['/safety', '/about', 'https://sh1rs.com']);
+    expect(html).toContain('Shourya Banda');
   });
 
   it('renders a faithful standalone Hindi boundary', () => {
@@ -84,7 +85,7 @@ describe('citizen chrome contracts', () => {
     expect(trigger?.getAttribute('aria-expanded')).toBe('true');
     const menu = host.querySelector<HTMLElement>('#citizen-navigation-menu');
     expect(menu?.hidden).toBe(false);
-    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/mobility', '/dashboard', '/message-check', '/reply-review', '/sources', '/safety']);
+    expect([...menu!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/', '/review', '/fastag', '/mobility', '/dashboard', '/message-check', '/reply-review', '/sources', '/safety', '/about']);
     expect(menu?.querySelector('[role="group"][aria-label="Language"]')).not.toBeNull();
     expect(menu?.textContent).toContain('Dark mode');
     act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

@@ -1,0 +1,32 @@
+.page { width: min(940px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 64px; color: var(--pb-ink); }
+.back { display: inline-flex; align-items: center; min-height: 44px; color: var(--pb-teal-dark); text-decoration: none; font-size: 13px; font-weight: 700; }
+.hero { padding: 24px 0 36px; max-width: 800px; }
+.hero h1 { margin: 0 0 24px; font-family: var(--font-heading); font-size: clamp(34px, 5vw, 54px); line-height: 1.09; letter-spacing: -.045em; text-wrap: balance; }
+.hero > p { max-width: 730px; margin: 0 0 14px; color: var(--pb-muted); font-size: 17px; line-height: 1.7; }
+.values { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 26px; color: var(--pb-teal-dark); font-size: 13px; font-weight: 750; }
+.section { margin-top: 24px; }
+.section h2, .creator h2 { margin: 0 0 20px; font-family: var(--font-heading); font-size: clamp(23px, 3vw, 29px); letter-spacing: -.025em; }
+.tools { border-top: 1px solid var(--pb-line); }
+.tool { display: flex; align-items: center; gap: 20px; padding: 22px 0; border-bottom: 1px solid var(--pb-line); color: inherit; text-decoration: none; }
+.tool > svg:first-child { flex-shrink: 0; color: var(--pb-teal-dark); }
+.tool > svg:last-child { margin-left: auto; flex-shrink: 0; color: var(--pb-muted); }
+.tool h3 { margin: 0 0 5px; font-size: 17px; font-weight: 700; }
+.tool p, .note, .creator p { margin: 0; color: var(--pb-muted); font-size: 14px; line-height: 1.7; }
+.tool:hover h3, .related a:hover, .back:hover { text-decoration: underline; text-underline-offset: 4px; }
+.note { padding: 20px 0; }
+.note a, .related a { color: var(--pb-teal-dark); font-weight: 700; text-underline-offset: 3px; }
+.questions { border-top: 1px solid var(--pb-line); }
+.questions details { border-bottom: 1px solid var(--pb-line); }
+.questions summary { padding: 21px 0; cursor: pointer; font-weight: 700; font-size: 16px; line-height: 1.6; }
+.questions details p { color: var(--pb-muted); margin: 0 0 23px; max-width: 800px; font-size: 15px; line-height: 1.75; }
+.creator { display: grid; grid-template-columns: 1.5fr 1fr; gap: 36px; margin: 50px 0 28px; padding: 30px; background: var(--pb-card); border: 1px solid var(--pb-line); border-radius: 18px; }
+.creator .signature { margin-bottom: 12px; color: var(--pb-ink); font-size: 26px; font-weight: 850; letter-spacing: -.06em; }
+.signature span { color: var(--pb-teal-dark); }
+.creator h2 { margin-bottom: 12px; font-size: 23px; }
+.contact { align-self: center; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.contact a { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; color: var(--pb-teal-dark); font-size: 15px; font-weight: 750; text-underline-offset: 4px; }
+.contact p { font-size: 12px; }
+.related { display: flex; gap: 12px 24px; flex-wrap: wrap; }
+.related a { display: inline-flex; min-height: 44px; align-items: center; font-size: 13px; }
+.page a:focus-visible, .questions summary:focus-visible { outline: 3px solid var(--pb-teal-dark); outline-offset: 5px; border-radius: 3px; }
+@media (max-width: 600px) { .page { width: calc(100% - 32px); padding-top: 20px; } .hero { padding-top: 18px; } .hero > p { font-size: 16px; } .values { gap: 10px 16px; } .tool { gap: 14px; } .tool h3 { font-size: 16px; } .tool p { font-size: 13px; } .creator { grid-template-columns: 1fr; padding: 22px; gap: 24px; } .questions summary { font-size: 15px; } }

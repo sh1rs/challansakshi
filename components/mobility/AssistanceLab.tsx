@@ -127,6 +127,8 @@ export default function AssistanceLab() {
   function clearAndExit() {
     if (timerRef.current) clearTimeout(timerRef.current);
     try { sessionStorage.removeItem(CHECKPOINT_KEY); } catch { /* Navigation still exits the practice page. */ }
+    // A full document navigation releases the practice session and its pending in-memory state.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign('/demo');
   }
   const step = session.stage === 'review' ? 0 : session.stage === 'private' ? 1 : ['approval', 'approved'].includes(session.stage) ? 2 : 3;

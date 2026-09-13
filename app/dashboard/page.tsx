@@ -1,4 +1,8 @@
-import type { Metadata } from 'next';
+import { createPageMetadata } from '../../lib/site-seo';
 import MobilityDashboard from '../../components/public-beta/MobilityDashboard';
-export const metadata: Metadata = { title: 'Your mobility checklist — ChallanSakshi', description: 'An optional private-device checklist for challan, FASTag and document follow-ups. No account required.' };
+export const metadata = createPageMetadata('/dashboard', {
+  title: 'Your mobility checklist — ChallanSakshi',
+  description: 'Your optional private-device checklist for challan, FASTag and document follow-ups.',
+  index: false,
+});
 export default function DashboardPage() { return <MobilityDashboard />; }

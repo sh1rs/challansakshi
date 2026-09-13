@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
 const base = process.env.DOCUMENT_RELEASE_BASE ?? 'http://127.0.0.1:3000';
-if (!['http://127.0.0.1:3000', 'https://challansakshi.sh1rs.com'].includes(base)) throw new Error('Use the local preview or the approved production origin.');
+if (!['http://127.0.0.1:3000', 'http://127.0.0.1:4177', 'http://127.0.0.1:4180', 'https://challansakshi.sh1rs.com'].includes(base)) throw new Error('Use the local preview or the approved production origin.');
 
 function fixturePdf(lines) {
   const stream = `BT /F1 18 Tf 45 740 Td ${lines.map((line, index) => `${index ? '0 -32 Td ' : ''}(${line.replace(/[()\\]/g, '\\$&')}) Tj`).join('\n')} ET`;

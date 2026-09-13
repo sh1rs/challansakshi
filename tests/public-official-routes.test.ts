@@ -42,6 +42,6 @@ describe('public route transparency', () => {
     expect(current).not.toContain('href="https://echallan.parivahan.gov.in/gsticket"');
     const expired = renderToStaticMarkup(createElement(OfficialSourcesPage, { evaluatedAt: '2026-10-03T00:00:00Z' }));
     expect(expired).toContain('Needs recheck');
-    expect(expired).not.toContain('href="https://');
+    expect(expired.match(/<main\b[\s\S]*?<\/main>/)?.[0]).not.toContain('href="https://');
   });
 });

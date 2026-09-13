@@ -1,9 +1,10 @@
-import type { Metadata } from 'next';
+import { createPageMetadata } from '../../../lib/site-seo';
 import AssistanceLab from '../../../components/mobility/AssistanceLab';
 
-export const metadata: Metadata = {
+export const metadata = createPageMetadata('/demo/assistance-lab', {
   title: 'Synthetic assistance lab — ChallanSakshi',
-  description: 'Practise citizen-controlled approval, private input isolation and receipt recovery in a local synthetic portal. No real payment or government action.',
-};
+  description: 'Practise a fictional citizen-controlled portal journey. No real payment or government action.',
+  index: false,
+});
 
 export default function AssistanceLabPage() { return <AssistanceLab />; }

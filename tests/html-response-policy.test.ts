@@ -76,16 +76,21 @@ describe('HTML response policy at the Worker boundary', () => {
     expect(response.body).toBeNull();
   });
 
-  it.each(['application/json', 'text/x-component', 'application/pdf', 'text/html-extra', null])('leaves non-HTML responses unchanged: %s', async contentType => {
+  it.each(['application/json', 'text/x-component', 'application/pdf', 'text/html-extra', null])('leaves non-HTML bodies and cache directives unchanged: %s', async contentType => {
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     if (contentType) headers.set('Content-Type', contentType);
     const upstream = new Response(null, { headers });
-    expect(await throughWorker(upstream)).toBe(upstream);
+    const response = await throughWorker(upstream);
+    expect(response.body).toBe(upstream.body);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it.each(['/api', '/api/analyze?fixture=true'])('leaves API responses unchanged even when an error uses HTML: %s', async path => {
+  it.each(['/api', '/api/analyze?fixture=true'])('preserves API bodies without adding HTML transformation directives: %s', async path => {
     const upstream = new Response('<main>Unavailable</main>', { status: 503, headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
-    expect(await throughWorker(upstream, path)).toBe(upstream);
+    const response = await throughWorker(upstream, path);
+    expect(response.body).toBe(upstream.body);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.status).toBe(503);
   });
 
   it('preserves the production HTTPS redirect', async () => {

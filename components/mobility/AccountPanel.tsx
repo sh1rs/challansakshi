@@ -114,8 +114,10 @@ export default function AccountPanel({ language }: { language: 'en' | 'hi' }) {
   };
   return <section className={styles.panel} aria-labelledby="account-heading">
     <h1 id="account-heading">{t('Your account', 'आपका खाता')}</h1>
-    <p>{t('Keep using the tools as a guest. An account lets you choose which saved cases to carry to another device.', 'अतिथि के रूप में उपकरण उपयोग करते रहें। खाते से आप चुने हुए मामले दूसरे डिवाइस पर ले जा सकते हैं।')}</p>
-    {status && !status.configured && <p>{t('Account saving is not available yet. You can save and reopen cases on this device today.', 'खाते में सहेजना अभी उपलब्ध नहीं है। आज इस डिवाइस पर मामले सहेज और फिर खोल सकते हैं।')}</p>}
+    <p>{t('All public tools work without signing in. Save a case on your private device when you want to return to it.', 'सभी सार्वजनिक उपकरण बिना साइन इन किए काम करते हैं। दोबारा लौटना हो तो अपने निजी डिवाइस पर केस सहेजें।')}</p>
+    {status === null && notice !== 'unavailable' && <p role="status">{t('Checking optional account availability…', 'वैकल्पिक खाते की उपलब्धता जाँच रहे हैं…')}</p>}
+    {status && !status.configured && <p role="status">{t('Cloud accounts are not enabled for this public release. Your saved cases work on this device. To move a case, open it in My mobility cases and review a portable backup before downloading it.', 'इस सार्वजनिक संस्करण में क्लाउड खाते चालू नहीं हैं। आपके सहेजे केस इस डिवाइस पर काम करते हैं। केस दूसरे डिवाइस पर ले जाने के लिए मेरे मोबिलिटी केस में खोलें और पोर्टेबल बैकअप डाउनलोड करने से पहले उसकी समीक्षा करें।')}</p>}
+    {status?.configured && <p>{t('An optional account lets you choose which saved cases to carry to another device. Nothing is uploaded until you review and approve it.', 'वैकल्पिक खाते से चुने हुए सहेजे केस दूसरे डिवाइस पर ले जा सकते हैं। समीक्षा और अनुमति से पहले कुछ अपलोड नहीं होता।')}</p>}
     {status?.configured && !status.authenticated && <a className={styles.action} href="/api/account/login">{t('Continue with Google', 'Google से आगे बढ़ें')}</a>}
     {status?.authenticated && <>
       <p>{t('Signed in as', 'इस नाम से साइन इन')}: {status.user?.name || status.user?.email}</p>

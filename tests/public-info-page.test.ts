@@ -124,18 +124,20 @@ describe('public privacy and safety pages', () => {
     expect(readmeSource).toContain('app/demo/page.tsx\n  └─ components/ChallanSakshiApp.tsx');
   });
 
-  it('distinguishes the deployed prototype from verified operational readiness', () => {
+  it('names the public maintainer while retaining honest operating limits', () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
 
-    expect(html).toContain('this release is a publicly reachable prototype');
-    expect(publicInfoSource).toContain('संचालन की वे शर्तें अभी सत्यापित नहीं हैं।');
+    expect(html).toContain('built and maintained by Shourya Banda (sh1rs)');
+    expect(html).toContain('best-effort maintenance');
+    expect(html).toContain('Independent privacy, legal and full accessibility reviews have not been completed');
+    expect(publicInfoSource).toContain('जवाब के समय या मामले के नतीजे की गारंटी नहीं है।');
     expect(html).not.toMatch(/early access|public beta/i);
     expect(publicInfoSource).not.toMatch(/early access|अर्ली एक्सेस|public beta/i);
   });
 
   it('documents the complete installation-free handoff without blurring real and synthetic authority', () => {
-    expect(readmeSource).toContain('**Code status:** public source publication authorized;');
-    expect(readmeSource).toContain('deployment is not evidence of government integration');
+    expect(readmeSource).toContain('**Current scope:** a free guest self-service tool.');
+    expect(readmeSource).toContain('No government integration or independently audited privacy, legal, accessibility or voice-quality claim is made.');
     expect(readmeSource).toContain('The complete installation-free path is the in-tab field pack plus the normal official-service anchor.');
     expect(readmeSource).toContain('The field pack is a user-reviewed factual preparation aid, not an official form, filing, legal conclusion, or proof of submission.');
     expect(readmeSource).toContain('single controlled description textarea');
@@ -154,8 +156,8 @@ describe('public privacy and safety pages', () => {
     expect(readmeSource).toContain('No public installation or preparation action is exposed');
   });
 
-  it('states the blocked public-release prerequisites without making a launch claim', () => {
-    expect(readmeSource).toContain('A real public announcement remains blocked');
+  it('separates the public guest scope from unperformed broader rollout prerequisites', () => {
+    expect(readmeSource).toContain('It is not evidence that those reviews were performed');
     expect(readmeSource).toContain('named operator, privacy/grievance owner, and low-data security and official-link correction channel');
     expect(readmeSource).toContain('external privacy, security, legal, dependency, and supply-chain review');
     expect(readmeSource).toContain('official-route re-verification cadence');

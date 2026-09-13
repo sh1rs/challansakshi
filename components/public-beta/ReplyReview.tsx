@@ -1,7 +1,7 @@
 'use client';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Language } from '../../lib/domain';
-import { buildReplyFollowUp, linkReplyPassage, type ReplyPassage, type ReplyPoint, type ReplyStatus } from '../../lib/reply-review';
+import { buildReplyFollowUp, findReplyPassages, linkReplyPassage, type ReplyPassage, type ReplyPoint, type ReplyStatus } from '../../lib/reply-review';
 import { PublicBetaShell, publicBetaStyles as styles } from './PublicBetaShell';
 import { useClientReady } from '../shared/useClientReady';
 import PrivateNotePrintButton from '../shared/PrivateNotePrintButton';
@@ -19,15 +19,22 @@ export default function ReplyReview() {
   const [selection, setSelection] = useState<ReplyPassage | null>(null);
   const [prepared, setPrepared] = useState(false);
   const [privateDevice, setPrivateDevice] = useState(false);
+  const [passageDrafts, setPassageDrafts] = useState<Record<string, { text: string; start: string }>>({});
   const replyRef = useRef<HTMLTextAreaElement>(null);
+  const noteRef = useRef<HTMLHeadingElement>(null);
   const nextId = useRef(2);
-  const clear = useCallback(() => { setReply(''); setSourceLabel(''); setPoints([firstPoint()]); setSelection(null); setPrepared(false); setPrivateDevice(false); nextId.current = 2; }, []);
+  const clear = useCallback(() => { setReply(''); setSourceLabel(''); setPoints([firstPoint()]); setSelection(null); setPrepared(false); setPrivateDevice(false); setPassageDrafts({}); nextId.current = 2; }, []);
   const ensureActive = useUtilityPrivacy(clear);
   const t = (en: string, hi: string) => language === 'hi' ? hi : en;
   const note = buildReplyFollowUp({ reply, sourceLabel, points }, language);
+  useEffect(() => {
+    if (!prepared || !noteRef.current) return;
+    noteRef.current.focus({ preventScroll: true });
+    noteRef.current.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+  }, [prepared]);
   const updatePoint = (id: string, changes: Partial<ReplyPoint>) => { setPrepared(false); setPoints(current => current.map(point => point.id === id ? { ...point, ...changes } : point)); };
   const changeReply = (value: string) => {
-    setReply(value); setSelection(null); setPrepared(false);
+    setReply(value); setSelection(null); setPrepared(false); setPassageDrafts({});
     setPoints(current => current.map(point => ({ ...point, status: 'unreviewed', passage: undefined })));
   };
   const captureSelection = () => { const field = replyRef.current; if (field) setSelection(linkReplyPassage(reply, field.selectionStart, field.selectionEnd)); };
@@ -57,7 +64,7 @@ export default function ReplyReview() {
               <div className={local.field}>
                 <label htmlFor="reply-body">{t('Paste the reply text', 'उत्तर का पाठ पेस्ट करें')}</label>
                 <textarea ref={replyRef} id="reply-body" rows={8} maxLength={12000} autoComplete="off" spellCheck={false} value={reply} onChange={event => changeReply(event.target.value)} onSelect={captureSelection} onKeyUp={captureSelection} onMouseUp={captureSelection} aria-describedby="reply-select-help" />
-                <p id="reply-select-help" className={local.hint}>{t('To link evidence, select the relevant words here, then use “Link selected passage” under a point. Keyboard: hold Shift and use the arrow keys. You can return here for another selection.', 'साक्ष्य जोड़ने के लिए यहाँ संबंधित शब्द चुनें, फिर बिंदु के नीचे “चुना अंश जोड़ें” दबाएँ। कीबोर्ड: Shift दबाकर ऐरो कुंजियाँ उपयोग करें। दूसरे अंश के लिए यहाँ लौटें।')}</p>
+                <p id="reply-select-help" className={local.hint}>{t('Select the relevant words here, then use “Link selected passage” under a point. On a phone, you can also paste an exact passage under each point. Keyboard: hold Shift and use the arrow keys.', 'यहाँ संबंधित शब्द चुनें, फिर बिंदु के नीचे “चुना अंश जोड़ें” दबाएँ। फ़ोन पर हर बिंदु के नीचे सटीक अंश पेस्ट भी कर सकते हैं। कीबोर्ड: Shift दबाकर ऐरो कुंजियाँ उपयोग करें।')}</p>
                 <p className={local.hint}>{reply.length}/12000</p>
               </div>
             </div>
@@ -66,13 +73,31 @@ export default function ReplyReview() {
             <h2 id="reply-points-title" className={styles.decisionHeading}>{t('2. Review up to five points', '2. अधिकतम पाँच बिंदु जाँचें')}</h2>
             <p className={styles.stepIntro}>{t('Use the questions or issues you actually raised. “Not found” means only that you did not find an answer in the supplied text; it does not prove a failure by the authority.', 'वही प्रश्न या मुद्दे लिखें जो आपने उठाए थे। “नहीं मिला” का अर्थ केवल इतना है कि दिए पाठ में आपको उत्तर नहीं मिला; यह प्राधिकरण की गलती का प्रमाण नहीं है।')}</p>
             <div className={local.stack}>
-              {points.map((point, index) => <fieldset key={point.id} className={local.point}>
+              {points.map((point, index) => {
+                const draft = passageDrafts[point.id] ?? { text: '', start: '' };
+                const matches = findReplyPassages(reply, draft.text);
+                const chosen = matches.passages.length === 1 ? matches.passages[0] : matches.passages.find(passage => String(passage.start) === draft.start);
+                return <fieldset key={point.id} className={local.point}>
                 <legend>{t(`Point ${index + 1}`, `बिंदु ${index + 1}`)}</legend>
                 <div className={local.field}>
                   <label htmlFor={`reply-point-${point.id}`}>{t('What did you raise?', 'आपने क्या मुद्दा उठाया?')}</label>
                   <textarea id={`reply-point-${point.id}`} rows={2} maxLength={500} autoComplete="off" value={point.question} onChange={event => updatePoint(point.id, { question: event.target.value, status: 'unreviewed', passage: undefined })} />
                 </div>
                 <button type="button" className={styles.buttonSecondary} disabled={!selection || !point.question.trim()} onClick={() => { if (selection && reply.slice(selection.start, selection.end) === selection.text) updatePoint(point.id, { passage: selection, status: 'unreviewed' }); }}>{t(`Link selected passage to point ${index + 1}`, `चुना अंश बिंदु ${index + 1} से जोड़ें`)}</button>
+                <details className={local.passageAlternative}>
+                  <summary>{t('Or paste an exact passage', 'या सटीक अंश पेस्ट करें')}</summary>
+                  <div className={local.field}>
+                    <label htmlFor={`reply-passage-${point.id}`}>{t('Exact words from the reply', 'उत्तर के सटीक शब्द')}</label>
+                    <textarea id={`reply-passage-${point.id}`} rows={3} maxLength={12000} autoComplete="off" spellCheck={false} value={draft.text} disabled={!reply.trim()} aria-describedby={`reply-passage-help-${point.id}`} onChange={event => setPassageDrafts(current => ({ ...current, [point.id]: { text: event.target.value, start: '' } }))} />
+                    <p id={`reply-passage-help-${point.id}`} className={local.hint}>{t('Copy a sentence from the reply above. Wording, punctuation and spaces must match. Nothing is inferred or paraphrased.', 'ऊपर के उत्तर से वाक्य कॉपी करें। शब्द, विराम चिह्न और खाली स्थान समान होने चाहिए। कुछ अनुमानित या दोबारा लिखा नहीं जाता।')}</p>
+                    {!reply.trim() && <p className={local.hint}>{t('Add the reply text first.', 'पहले उत्तर का पाठ जोड़ें।')}</p>}
+                    {draft.text.trim() && <div role="status" className={local.hint}>
+                      {matches.tooMany ? t('These words repeat often. Include more of the sentence to identify the passage.', 'ये शब्द कई बार आए हैं। अंश पहचानने के लिए वाक्य के और शब्द जोड़ें।') : !matches.passages.length ? t('No exact match. Copy the words directly from the reply above.', 'सटीक मेल नहीं मिला। ऊपर के उत्तर से सीधे शब्द कॉपी करें।') : matches.passages.length === 1 ? t('Exact passage found in your reply.', 'आपके उत्तर में सटीक अंश मिला।') : t('This wording appears more than once. Choose the source position you mean.', 'ये शब्द एक से अधिक बार आए हैं। सही स्रोत स्थान चुनें।')}
+                    </div>}
+                    {matches.passages.length > 1 && <><label htmlFor={`reply-passage-position-${point.id}`}>{t('Which occurrence?', 'कौन सा स्थान?')}</label><select id={`reply-passage-position-${point.id}`} value={draft.start} onChange={event => setPassageDrafts(current => ({ ...current, [point.id]: { ...draft, start: event.target.value } }))}><option value="">{t('Choose a position in the reply', 'उत्तर में स्थान चुनें')}</option>{matches.passages.map(passage => <option key={passage.start} value={String(passage.start)}>{t(`Characters ${passage.start + 1}–${passage.end}`, `अक्षर ${passage.start + 1}–${passage.end}`)} · {reply.slice(Math.max(0, passage.start - 24), Math.min(reply.length, passage.end + 24))}</option>)}</select></>}
+                    <button type="button" className={styles.buttonSecondary} disabled={!chosen || !point.question.trim()} onClick={event => { if (chosen && reply.slice(chosen.start, chosen.end) === chosen.text) { updatePoint(point.id, { passage: chosen, status: 'unreviewed' }); setPassageDrafts(current => ({ ...current, [point.id]: { text: '', start: '' } })); event.currentTarget.closest('details')?.removeAttribute('open'); document.getElementById(`reply-status-${point.id}`)?.focus(); } }}>{t(`Link pasted passage to point ${index + 1}`, `पेस्ट किया अंश बिंदु ${index + 1} से जोड़ें`)}</button>
+                  </div>
+                </details>
                 {point.passage && <div><blockquote className={local.quote}>{point.passage.text}</blockquote><p className={local.hint}>{t(`Reply text, characters ${point.passage.start + 1}–${point.passage.end}`, `उत्तर पाठ, अक्षर ${point.passage.start + 1}–${point.passage.end}`)}</p><button className={styles.buttonQuiet} type="button" onClick={() => updatePoint(point.id, { passage: undefined, status: 'unreviewed' })}>{t('Remove linked passage', 'जुड़ा अंश हटाएँ')}</button></div>}
                 <div className={local.field}>
                   <label htmlFor={`reply-status-${point.id}`}>{t('My reading of this point', 'इस बिंदु पर मेरी समीक्षा')}</label>
@@ -84,7 +109,7 @@ export default function ReplyReview() {
                   </select>
                 </div>
                 {points.length > 1 && <button type="button" className={styles.buttonQuiet} onClick={() => { setPrepared(false); setPoints(current => current.filter(item => item.id !== point.id)); }}>{t(`Remove point ${index + 1}`, `बिंदु ${index + 1} हटाएँ`)}</button>}
-              </fieldset>)}
+              </fieldset>; })}
             </div>
             <div className={styles.actions}>
               {points.length < 5 && <button type="button" className={styles.buttonSecondary} onClick={() => { setPrepared(false); setPoints(current => [...current, { id: String(nextId.current++), question: '', status: 'unreviewed' }]); }}>{t('Add another point', 'एक और बिंदु जोड़ें')}</button>}
@@ -94,7 +119,7 @@ export default function ReplyReview() {
           </section>
           <div aria-live="polite">
             {prepared && note && <section className={styles.panel} aria-labelledby="reply-note-title">
-              <h2 id="reply-note-title" className={styles.decisionHeading}>{t('3. Check your follow-up note', '3. अपना अगला नोट जाँचें')}</h2>
+              <h2 ref={noteRef} id="reply-note-title" tabIndex={-1} className={styles.decisionHeading}>{t('3. Check your follow-up note', '3. अपना अगला नोट जाँचें')}</h2>
               <pre className={local.note} data-reply-note>{note}</pre>
               <fieldset className={local.device}>
                 <legend>{t('Before saving a copy', 'प्रति सहेजने से पहले')}</legend>

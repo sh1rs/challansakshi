@@ -12,6 +12,7 @@ test('message checker keeps pasted links inert, clears results on edits, and fit
   await page.locator('#message-body').fill('PRIVATE_SMS_MARKER Install https://evil.example/RTO.apk and send your OTP immediately.');
   await page.getByRole('button', { name: 'Check message', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Pause and verify', exact: true })).toBeVisible();
+  await expect(page.locator('#message-result-title')).toBeFocused();
   await expect(page.locator('a[href*="evil.example"]')).toHaveCount(0);
   await noOverflow(page);
   await page.getByLabel('Display language').selectOption('hi');
@@ -25,6 +26,7 @@ test('message checker keeps pasted links inert, clears results on edits, and fit
   await expect(page.locator('[data-message-result]')).toHaveCount(0);
   await page.getByRole('button', { name: 'संदेश साफ़ करें', exact: true }).click();
   await expect(page.locator('#message-body')).toHaveValue('');
+  await expect(page.locator('#message-body')).toBeFocused();
   expect(requests.some(request => /PRIVATE_SMS_MARKER|evil\.example|\bPOST\b/.test(request))).toBe(false);
 });
 
@@ -46,6 +48,7 @@ test('reply review links exact source text, gates a real download and invalidate
   await page.locator('#reply-point-2').fill('Please clarify the receipt date.');
   await page.locator('#reply-status-2').selectOption('not-found');
   await page.getByRole('button', { name: 'Prepare my follow-up note', exact: true }).click();
+  await expect(page.locator('#reply-note-title')).toBeFocused();
   await expect(page.locator('[data-reply-note]')).toContainText('characters 1–22');
   await expect(page.locator('[data-reply-note]')).toContainText('I did not find a response in the supplied text');
   await expect(page.locator('[data-reply-download]')).toHaveCount(0);
@@ -68,4 +71,41 @@ test('reply review links exact source text, gates a real download and invalidate
   await expect(page.locator('#reply-status-1')).toHaveValue('unreviewed');
   expect(requests.some(request => /PRIVATE_REPLY_MARKER|photo%20was|\bPOST\b/.test(request))).toBe(false);
   expect(await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }))).toEqual({ local: ['challansakshi-language-v1'], session: [] });
+});
+
+test('reply passages can be pasted on a phone without guessing duplicate source positions', async ({ page, context }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const writes: string[] = [];
+  const errors: string[] = [];
+  context.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/reply-review');
+  await page.locator('#reply-body').fill('The photo was checked. The receipt is missing. The photo was checked.');
+  await page.locator('#reply-point-1').fill('Was my photo checked?');
+  await page.getByText('Or paste an exact passage', { exact: true }).click();
+  await page.getByLabel('Exact words from the reply', { exact: true }).fill('The photo was checked!');
+  await expect(page.getByText('No exact match. Copy the words directly from the reply above.', { exact: true })).toBeVisible();
+  const link = page.getByRole('button', { name: 'Link pasted passage to point 1', exact: true });
+  await expect(link).toBeDisabled();
+  await page.getByLabel('Exact words from the reply', { exact: true }).fill('The photo was checked.');
+  await expect(link).toBeDisabled();
+  await page.getByLabel('Which occurrence?', { exact: true }).selectOption('47');
+  await link.click();
+  await expect(page.locator('#reply-status-1')).toBeFocused();
+  await expect(page.locator('blockquote')).toHaveText('The photo was checked.');
+  await expect(page.getByText('Reply text, characters 48–69', { exact: true })).toBeVisible();
+  await page.locator('#reply-status-1').selectOption('addressed');
+  await page.getByRole('button', { name: 'Prepare my follow-up note', exact: true }).click();
+  await expect(page.locator('#reply-note-title')).toBeFocused();
+  await expect(page.locator('[data-reply-note]')).toContainText('characters 48–69');
+  await noOverflow(page);
+  await page.screenshot({ path: '/tmp/challansakshi-reply-paste-phone.png', fullPage: false });
+  await page.getByText('Or paste an exact passage', { exact: true }).click();
+  await page.getByLabel('Exact words from the reply', { exact: true }).fill('PRIVATE_CLEAR_MARKER');
+  await page.getByRole('button', { name: 'Clear all text', exact: true }).click();
+  await expect(page.getByLabel('Exact words from the reply', { exact: true })).toHaveValue('');
+  await expect(page.locator('blockquote')).toHaveCount(0);
+  await expect(page.locator('[data-reply-note]')).toHaveCount(0);
+  expect(writes).toEqual([]);
+  expect(errors).toEqual([]);
 });
