@@ -68,7 +68,7 @@
 .toolIcon { display: inline-flex; color: var(--pb-teal-dark); margin-bottom: 22px; }
 .toolAside h2 { margin: 0 0 15px; font: 650 27px/1.2 var(--font-heading); letter-spacing: -.03em; }
 .toolAside > p:not(.sectionLabel) { color: var(--pb-muted); font-size: 14px; line-height: 1.75; }
-.primaryAction { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; margin-top: 23px; padding: 13px 16px; border-radius: 9px; background: var(--pb-teal); color: white; font-size: 13px; line-height: 1.55; font-weight: 750; text-decoration: none; }
+.primaryAction { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; margin-top: 23px; padding: 13px 16px; border-radius: 9px; background: var(--teal-dark); color: white; font-size: 13px; line-height: 1.55; font-weight: 750; text-decoration: none; }
 .primaryAction:hover { background: var(--pb-navy); }
 .primaryAction svg { flex-shrink: 0; }
 .toolAside > p.toolBoundary { margin: 15px 0 0; font-size: 11px; line-height: 1.8; }

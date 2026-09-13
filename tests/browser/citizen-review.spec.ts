@@ -67,7 +67,7 @@ test.describe('informative home and product chrome', () => {
       await page.goto('/');
       await chooseLanguage(page, language);
       const mainLinks = page.locator('main a');
-      await expect(mainLinks).toHaveCount(8);
+      await expect(mainLinks).toHaveCount(13);
       expect(await mainLinks.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual([
         '/review',
         '/mobility',
@@ -77,6 +77,11 @@ test.describe('informative home and product chrome', () => {
         '/reply-review',
         '/dashboard',
         '/sources',
+        '/guides/wrong-e-challan',
+        '/guides/fastag-wrong-deduction',
+        '/guides/fake-challan-message',
+        '/guides',
+        '/about',
       ]);
       const box = await mainLinks.first().boundingBox();
       expect(box && box.y >= 0 && box.y + box.height <= 812).toBeTruthy();

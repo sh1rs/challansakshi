@@ -38,6 +38,8 @@ On 13 September 2026, an initial web search for the exact brand and site returne
 
 Google accepted `/sitemap.xml` and reported **Success**, with **11 discovered pages** and a 13 September last-read date. URL Inspection confirmed the homepage was already indexed. Fresh indexing requests for both the homepage and `/about` passed Google's live indexability check and were accepted into the priority crawl queue. The newly published `/about` page was not yet indexed at inspection time; request acceptance is not completed indexing. See [the identity release record](./2026-09-13-identity-release.md) for the final evidence. Crawl requests and discovered-page counts do not guarantee refreshed snippets, rankings or AI overviews.
 
+Later on 13 September, the [civic guides SEO release](./2026-09-13-seo-release.md) expanded the sitemap to **15 pages**. Google accepted the changed sitemap and reported **Success / 15 discovered pages**. A live Google test confirmed the new guides hub can be indexed and detected a valid breadcrumb item; its individual indexing request was accepted after one temporary submission error. Manual actions and Security issues both reported **No issues detected**. Aggregate reports were still processing.
+
 ## Official guidance checked 13 September 2026
 
 - [Google developer SEO guide](https://developers.google.com/search/docs/fundamentals/get-started-developers): descriptive page metadata, crawlable links, sitemap discovery and explicit noindex controls.
