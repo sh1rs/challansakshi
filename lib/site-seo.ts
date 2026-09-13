@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 /** Public discovery always points to the live origin, including preview builds. */
 export const SITE_URL = 'https://challansakshi.sh1rs.com';
 export const SITE_NAME = 'ChallanSakshi';
+export const SITE_ALTERNATE_NAMES = ['ChallanSakshi by sh1rs', 'challansakshi.sh1rs.com'];
+export const SITE_LOGO_URL = `${SITE_URL}/brand/logo-square.png`;
 export const SITE_DESCRIPTION = 'Free, independent help with e-Challans and FASTag issues in India. Review your records, prepare a clear request and find the right official service.';
 
 export const publicPages = {
@@ -68,7 +70,7 @@ export const siteStructuredData = {
       '@id': `${SITE_URL}/#website`,
       url: `${SITE_URL}/`,
       name: SITE_NAME,
-      alternateName: 'Challan Sakshi',
+      alternateName: SITE_ALTERNATE_NAMES,
       description: SITE_DESCRIPTION,
       inLanguage: ['en', 'hi'],
       publisher: { '@id': `${SITE_URL}/#project` },
@@ -77,8 +79,17 @@ export const siteStructuredData = {
       '@type': 'Organization',
       '@id': `${SITE_URL}/#project`,
       name: SITE_NAME,
+      alternateName: SITE_ALTERNATE_NAMES,
       url: `${SITE_URL}/`,
-      logo: `${SITE_URL}/icons/icon-512.png`,
+      logo: {
+        '@type': 'ImageObject',
+        '@id': `${SITE_URL}/#logo`,
+        url: SITE_LOGO_URL,
+        contentUrl: SITE_LOGO_URL,
+        width: 512,
+        height: 512,
+        caption: 'ChallanSakshi Road & Record symbol',
+      },
       description: 'An independent civic technology project offering free tools to help people in India understand mobility records and prepare their own next steps. Not affiliated with a government authority.',
       founder: { '@id': `${SITE_URL}/#creator` },
     },
@@ -96,6 +107,7 @@ export const siteStructuredData = {
       name: SITE_NAME,
       url: `${SITE_URL}/`,
       description: SITE_DESCRIPTION,
+      image: { '@id': `${SITE_URL}/#logo` },
       applicationCategory: 'UtilitiesApplication',
       operatingSystem: 'Web browser',
       browserRequirements: 'A modern web browser with JavaScript enabled',

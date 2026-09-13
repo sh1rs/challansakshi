@@ -41,6 +41,7 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /outputs/
+/output/brand-mockups/
 /work/
 
 # generated extension artifacts

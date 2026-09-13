@@ -1,0 +1,17 @@
+Manrope font provenance
+
+The Latin variable WOFF2 font is locally hosted for the ChallanSakshi brand.
+It was retrieved from official Google Fonts on 2026-09-13.
+
+Stylesheet:
+https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap
+
+Latin WOFF2 (Manrope v20; normal; variable weight 400–800):
+https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggexSvfedN4.woff2
+
+Local file: manrope-latin.woff2
+Size: 24576 bytes
+SHA-256: e310b55a7fd9677f5e3555e6c6c4d064fa1f1d24393f0ddbe217cea12a8c432f
+
+License: OFL-Manrope.txt in this directory.
+Manrope.ttf is retained as the source font for deterministic brand artwork.

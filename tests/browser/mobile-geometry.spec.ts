@@ -25,6 +25,9 @@ for (const width of [320, 375, 390]) for (const hi of [false, true]) {
     await page.setViewportSize({ width, height: width === 375 ? 812 : 844 });
     await page.goto('/manual/challan');
     await page.locator('main:not([inert])').waitFor();
+    // Exercise a wider system-font metric at the smallest English viewport,
+    // which previously wrapped the confirmation action below the fold in CI.
+    if (width === 320 && !hi) await page.addStyleTag({ content: ':root { --font-body: Verdana, sans-serif; }' });
     if (hi) {
       await page.getByRole('button', { name: 'Menu', exact: true }).click();
       await page.getByRole('button', { name: 'हिं', exact: true }).click();

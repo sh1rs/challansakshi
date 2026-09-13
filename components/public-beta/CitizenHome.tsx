@@ -23,7 +23,7 @@ const copy = {
   en: {
     eyebrow: 'Free civic help. Built for everyone.',
     heading: 'What happened with your challan?',
-    supporting: 'A confusing notice should not leave you stuck. Understand your e-Challan, compare your records, and prepare your next step with confidence.',
+    supporting: 'ChallanSakshi helps you understand your e-Challan, check a FASTag issue and prepare a clear next step. Free civic tools, with your records and decisions in your control.',
     capabilities: [
       {
         title: 'Verify',
@@ -83,7 +83,7 @@ const copy = {
   hi: {
     eyebrow: 'निःशुल्क नागरिक सहायता। सभी के लिए।',
     heading: 'आपके चालान के साथ क्या हुआ?',
-    supporting: 'उलझन भरे नोटिस पर अटकें नहीं। अपना ई-चालान समझें, रिकॉर्ड की तुलना करें और अगले कदम की तैयारी करें।',
+    supporting: 'ChallanSakshi से अपना ई-चालान समझें, FASTag की समस्या जाँचें और अगले कदम की तैयारी करें। मुफ़्त नागरिक उपकरण, जिनमें रिकॉर्ड और निर्णय आपके नियंत्रण में हैं।',
     capabilities: [
       {
         title: 'सत्यापित करें',

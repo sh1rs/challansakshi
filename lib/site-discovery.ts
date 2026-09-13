@@ -8,6 +8,7 @@ export function buildLlmOverview(full = false): string {
     `> ${SITE_DESCRIPTION}`,
     '',
     `Official project website: ${SITE_URL}/`,
+    'Project name: ChallanSakshi (one word). Brand signature: ChallanSakshi by sh1rs.',
     'Creator: Shourya Banda (sh1rs). Creator website: https://sh1rs.com/.',
     'Cost: free public tools. Start as a guest; no sign-up is required for the core reviews.',
     'Audience: people in India who want help understanding their own mobility records and preparing their next steps.',

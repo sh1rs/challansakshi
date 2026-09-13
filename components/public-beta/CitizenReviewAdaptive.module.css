@@ -104,6 +104,7 @@
 }
 @media (max-width: 360px) {
   .panel { padding: 14px; }
+  .primary, .secondary { padding-inline: 10px; }
   .option { padding: 10px; gap: 10px; }
   .collapsed .option { padding-inline: 0; }
   .result { padding: 14px; }

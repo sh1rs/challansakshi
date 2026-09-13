@@ -91,6 +91,9 @@ test.describe('informative home and product chrome', () => {
     test(`header and footer satisfy mobile geometry at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto('/');
+      // Linux and user-selected system fonts can be wider than the macOS
+      // default. Keep the compact footer usable under that real variation.
+      if (width === 320) await page.addStyleTag({ content: ':root { --font-body: Verdana, sans-serif; }' });
       const header = page.locator('[data-mobile-header]');
       const footer = page.locator('footer');
       expect((await header.boundingBox())?.height).toBeLessThanOrEqual(72);
@@ -224,6 +227,9 @@ test.describe('review entry and short resolution paths', () => {
   test('editing a result preserves scroll position and invalidates the resolved phase', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await mismatchResult(page);
+    // Reach the control before measuring the application's transition;
+    // Playwright may scroll to it when a system font makes the result taller.
+    await page.getByRole('button', { name: labels.en.edit, exact: true }).scrollIntoViewIfNeeded();
     const before = await page.evaluate(() => scrollY);
     await page.getByRole('button', { name: labels.en.edit, exact: true }).click();
     await expect(page.locator('main')).toHaveAttribute('data-review-phase', 'check');

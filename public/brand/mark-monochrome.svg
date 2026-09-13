@@ -1,11 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><title>ChallanSakshi — Road and Record</title><rect width="64" height="64" rx="13" fill="#F7F4EB"/><defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>ChallanSakshi — Road and Record</title>
+  <defs>
     <clipPath id="ticket">
       <path d="M14 4h36a10 10 0 0 1 10 10v5c-5.33 2.67-5.33 10.33 0 13v18a10 10 0 0 1-10 10h-2a6 6 0 0 0-12 0h-8a6 6 0 0 0-12 0h-2A10 10 0 0 1 4 50V32c5.33-2.67 5.33-10.33 0-13v-5A10 10 0 0 1 14 4Z"/>
     </clipPath>
   </defs>
   <g clip-path="url(#ticket)">
-    <path fill="#087A74" d="M4 4h56v56H4z"/>
+    <path fill="#173741" d="M4 4h56v56H4z"/>
     <path fill="#F7F4EB" d="M26.2 13h11.6a2 2 0 0 1 1.9 1.36L57 56H7l17.3-41.64A2 2 0 0 1 26.2 13Z"/>
     <path fill="#173741" d="M28 13h8l16 47H12z"/>
     <path fill="#F7F4EB" d="M30.8 23h2.4a.8.8 0 0 1 .8.76l.4 8.4a.8.8 0 0 1-.8.84h-3.2a.8.8 0 0 1-.8-.84l.4-8.4a.8.8 0 0 1 .8-.76Zm-.6 16h3.6a.8.8 0 0 1 .8.76l.6 11.4a.8.8 0 0 1-.8.84h-4.8a.8.8 0 0 1-.8-.84l.6-11.4a.8.8 0 0 1 .8-.76Z"/>
-  </g></svg>
+  </g>
+</svg>
