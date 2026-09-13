@@ -4,7 +4,7 @@
 
 **A free civic tool for clearer next steps on India’s roads.** Built by **Shourya Banda · [sh1rs](https://sh1rs.com)**.
 
-[Open ChallanSakshi](https://challansakshi.sh1rs.com) · [About and contact](https://challansakshi.sh1rs.com/about) · [Maintenance handoff](docs/PUBLIC-MAINTENANCE.md)
+[Open ChallanSakshi](https://challansakshi.sh1rs.com) · [About and contact](https://challansakshi.sh1rs.com/about) · [Public release record](docs/2026-09-13-public-release.md) · [Maintenance handoff](docs/PUBLIC-MAINTENANCE.md)
 
 Understand an e-Challan, compare your own records, check a suspicious message, prepare a FASTag query, or organise a mobility case. Start without signing up. The document reader runs in your browser; you review extracted facts before using them. ChallanSakshi is independent of government authorities, police, courts, banks and FASTag issuers. You choose and complete every official action yourself.
 
@@ -75,7 +75,7 @@ These local tools need no new citizen-data backend. The optional mobility accoun
 - **Return to the next step:** a compact agenda combines entered appointments, personal checks, case attention and document dates. It shows why an item appears and checks the latest saved source before opening it.
 - **Prepare and return from a visit:** an appointment can produce a selected packing list, an exact reviewed text pack and a minimal personal calendar. Pasted acknowledgement text offers labelled readings for review; the citizen chooses progress and saves the resulting report separately.
 - **Clear the working session:** a manual control closes forms and pending reviews, cancels queued writes and keeps this tab on a neutral screen after reload. Saved device records remain available after explicitly starting a new session.
-- **Optional account and helper:** the existing Worker has Google OAuth and D1 account storage, with explicit transfers and a narrowly scoped trusted-helper invitation. The helper can suggest wording for one selected case snapshot; the owner reviews every application. Neither a real database nor Google credentials are configured.
+- **Optional account and helper:** the codebase includes Google OAuth and D1-backed account storage, with explicit transfers and a narrowly scoped trusted-helper invitation. The helper can suggest wording for one selected case snapshot; the owner reviews every application. The public Worker has no D1 binding or Google credentials, so these routes accurately remain unavailable.
 - **Optional AI second opinion:** a bounded writer and critic path is implemented behind both a disabled flag and absent Workers AI binding. Selected-data preview, per-request consent, atomic request limits and stale-case rejection apply. Current provider tests are fixtures; live model quality remains unmeasured.
 - **Assisted-task prototype:** `/demo/assistance-lab` exercises private practice input, exact action approval, interruption, ambiguous outcomes and synthetic acknowledgement checks. It has no real remote browser or official portal adapter.
 
