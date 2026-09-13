@@ -81,6 +81,16 @@
 .situation > summary:hover { color: var(--accent-text); }
 .situation > p { margin: 0; padding: 0 28px 18px 37px; color: var(--muted); font-size: 16px; line-height: 1.6; }
 .otherChecks { display: grid; align-content: start; gap: 16px; }
+.guides { margin-top: 40px; padding: 30px; border: 1px solid var(--teal-border); border-radius: 16px; background: var(--teal-soft); }
+.guideLinks { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.guideLinks a { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--accent-text); font-weight: 700; font-size: 17px; line-height: 1.5; text-decoration: none; }
+.guideLinks a > svg { flex-shrink: 0; margin-top: 3px; }
+.guideLinks a:hover { border-color: var(--teal); }
+.guideHub, .projectOverview > a { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; margin-top: 14px; color: var(--accent-text); font-weight: 700; text-underline-offset: 4px; }
+.projectOverview { max-width: 800px; margin: 40px 0 8px; }
+.projectOverview h2 { margin: 0; font: 700 27px/1.2 var(--font-heading); letter-spacing: -.02em; }
+.projectOverview p { color: var(--muted); line-height: 1.75; font-size: 16px; margin: 16px 0 0; }
+@media (max-width: 800px) { .guides { padding: 24px 20px; } .guideLinks { grid-template-columns: 1fr; gap: 10px; } .guideLinks a { padding: 17px; } }
 .followUp { margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--line); }
 .followUpLinks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 .followUpLinks a { display: flex; gap: 12px; align-items: center; min-height: 108px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--accent-text); text-decoration: none; box-shadow: 0 4px 16px var(--shadow); }

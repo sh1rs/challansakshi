@@ -10,6 +10,10 @@ export const SITE_DESCRIPTION = 'Free, independent help with e-Challans and FAST
 export const publicPages = {
   '/': { title: 'ChallanSakshi — Free e-Challan & FASTag help', description: SITE_DESCRIPTION },
   '/about': { title: 'About ChallanSakshi — Free civic help for India', description: 'What ChallanSakshi does, how to use it, and how your information is handled. A free independent civic project for e-Challan and FASTag preparation.' },
+  '/guides': { title: 'e-Challan & FASTag guides — ChallanSakshi', description: 'Practical guides to a wrong e-Challan, an unexpected FASTag deduction and a suspicious challan message. Check your records and prepare the next step with official sources.' },
+  '/guides/wrong-e-challan': { title: 'Wrong e-Challan? What to check and prepare — ChallanSakshi', description: 'Check the vehicle number, photograph and details of an e-Challan you do not recognise. Keep the evidence and prepare a clear query for the issuing authority.' },
+  '/guides/fastag-wrong-deduction': { title: 'Wrong FASTag deduction? Check these records — ChallanSakshi', description: 'Compare a FASTag debit with your journey, statement and any later adjustment. Gather the details your issuing bank needs to investigate a transaction query.' },
+  '/guides/fake-challan-message': { title: 'Fake challan SMS? How to check safely — ChallanSakshi', description: 'Received a suspicious challan message or payment link? Check the record independently, recognise warning signs and preserve useful details without opening the message link.' },
   '/review': { title: 'Review your e-Challan — ChallanSakshi', description: 'Read your challan PDF or photo on your device, check uncertain details, compare vehicle records and prepare a request you can review before using an official service.' },
   '/manual/challan': { title: 'Review a challan without a file — ChallanSakshi', description: 'Work through an e-Challan with guided questions. Compare the details you can see and prepare a clear next step without uploading a document.' },
   '/fastag': { title: 'Check a FASTag debit — TollSakshi by ChallanSakshi', description: 'Compare a FASTag debit with your vehicle, time, toll plaza and credit adjustments. Prepare the facts for a query through the appropriate official service.' },
@@ -92,6 +96,7 @@ export const siteStructuredData = {
       },
       description: 'An independent civic technology project offering free tools to help people in India understand mobility records and prepare their own next steps. Not affiliated with a government authority.',
       founder: { '@id': `${SITE_URL}/#creator` },
+      sameAs: ['https://github.com/sh1rs/challansakshi'],
     },
     {
       '@type': 'Person',

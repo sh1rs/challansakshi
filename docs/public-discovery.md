@@ -6,6 +6,9 @@ The public origin is `https://challansakshi.sh1rs.com`. Canonicals intentionally
 
 - Public tools and information pages have individual titles, descriptions and absolute canonicals. `/toll` identifies `/fastag` as its canonical version.
 - `/about` is a rendered English/Hindi project overview with common questions, creator credit and the explicitly approved product feedback contact.
+- `/guides` introduces three English/Hindi guides for a wrong e-Challan, a questioned FASTag deduction and a suspicious challan message. Each has a direct answer, checklist, practical steps, reviewed official references, a preparation-tool link and Article/Breadcrumb structured data. The English articles are readable in initial HTML without JavaScript. Hindi is an interface preference on the same canonical URL, not a separate indexed language route.
+- The homepage links directly to every guide and gives an explicit "What is ChallanSakshi?" definition. `/about` uses the same brand question and links to the public GitHub source; the Organization graph identifies that repository as another project presence.
+- `/mobility` renders a useful public introduction before the private case editor initializes. This is the normal first-load view for all visitors, and it includes no saved cases or private IDs. Four native tool/directory links remain usable without JavaScript.
 - The homepage supplies `WebSite`, independent project `Organization`, creator `Person` and free `WebApplication` JSON-LD. The preferred spelling is `ChallanSakshi`; `ChallanSakshi by sh1rs` and the lowercase hostname are consistent alternate names. The homepage introduction also names the project and explains its public use. There are no invented awards, reviews, case-success claims, government affiliations or search actions.
 - `/robots.txt` allows public crawling and excludes `/api/`. Account, trusted-helper, saved-checklist, unpublished-extension and synthetic-demo pages use `noindex`. They are not blocked in robots.txt, because crawlers must be able to read the noindex directive.
 - `/sitemap.xml` lists the maintained public canonical pages. It does not manufacture modification dates on each request.
@@ -17,6 +20,8 @@ The public origin is `https://challansakshi.sh1rs.com`. Canonicals intentionally
 ## Verification after a deployment
 
 Run `tests/browser/public-discovery.spec.ts` against the live origin using `CHALLANSAKSHI_BASE_URL`. The test checks initial HTML metadata, noindex boundaries, actual text/XML/manifest endpoints, brand asset types/size and a 320px English/Hindi overview interaction. Inspect the rendered page and the share image as well.
+
+Also run `tests/browser/civic-guides.spec.ts` for no-JavaScript article reading, structured data, unknown-guide 404s, persisted language preference and phone navigation. The mobility session tests cover the public no-JavaScript view and the unchanged private-session boundary. When updating a guide, preserve `publishedAt`, change `updatedAt` only after a substantive review, check the linked official references and keep the visible advice aligned with them. Do not mechanically refresh dates or copy historical fees, deadlines or bank-phone lists.
 
 ## Owner steps for Google discovery
 

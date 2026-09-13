@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const origin = 'https://challansakshi.sh1rs.com';
-const publicRoutes = ['/', '/about', '/review', '/manual/challan', '/fastag', '/message-check', '/reply-review', '/mobility', '/sources', '/privacy', '/safety'];
+const publicRoutes = ['/', '/about', '/guides', '/guides/wrong-e-challan', '/guides/fastag-wrong-deduction', '/guides/fake-challan-message', '/review', '/manual/challan', '/fastag', '/message-check', '/reply-review', '/mobility', '/sources', '/privacy', '/safety'];
 
 test('public HTML exposes distinct search and social metadata before JavaScript', async ({ request }) => {
   test.setTimeout(90_000);
@@ -67,6 +67,7 @@ test('machine-readable summaries serve real text and retain the same facts acros
   expect(summary).toContain('Shourya Banda');
   expect(summary).toContain('not a government website');
   expect(summary).toContain(`${origin}/privacy`);
+  for (const route of publicRoutes) expect(summary).toContain(`${origin}${route}`);
   expect(await full.text()).toContain('## Frequently asked questions');
 });
 
@@ -128,21 +129,21 @@ test('about content, creator credit and Hindi controls work on a small phone', a
   });
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/about');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A little clarity. A better next step.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What is ChallanSakshi?');
   await expect(page.getByRole('heading', { name: 'Built by Shourya Banda' })).toBeVisible();
   await expect(page.locator('a[href="tel:+916305640566"]')).toHaveAttribute('href', 'tel:+916305640566');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   // A rendered language change establishes client hydration before toggling native
   // details, whose open attribute can otherwise change before React takes over.
   await page.getByRole('combobox', { name: 'Display language' }).selectOption('hi');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('थोड़ी स्पष्टता। एक बेहतर अगला कदम।');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('ChallanSakshi क्या है?');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('combobox', { name: 'Display language' }).selectOption('en');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A little clarity. A better next step.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What is ChallanSakshi?');
   await page.getByText('Is ChallanSakshi a government website?', { exact: true }).click();
   await expect(page.getByText(/It is not affiliated with a government authority, police service/)).toBeVisible();
   await page.getByRole('combobox', { name: 'Display language' }).selectOption('hi');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('थोड़ी स्पष्टता। एक बेहतर अगला कदम।');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('ChallanSakshi क्या है?');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(runtimeErrors).toEqual([]);
 });

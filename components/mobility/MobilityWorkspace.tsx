@@ -89,7 +89,22 @@ export default function MobilityWorkspace({ initialCaseId, language: initialLang
   if (session === 'active') return <Workspace initialCaseId={resumed ? undefined : initialCaseId} language={language} onEndSession={endSession} />;
   return <PublicBetaShell language={language} setLanguage={setLanguage} service="Your mobility cases" serviceHindi="आपके मोबिलिटी केस">
     <main className={styles.main}>
-      {session === 'checking' ? <section className={styles.panel} aria-busy="true"><h1>{t('Your mobility workspace', 'आपकी मोबिलिटी कार्यशाला')}</h1><p role="status">{t('Opening your workspace…', 'आपकी कार्यशाला खुल रही है…')}</p></section> : <section className={`${styles.panel} ${styles.sessionEnded}`}>
+      {session === 'checking' ? <section className={`${styles.panel} ${styles.publicEntry}`} aria-labelledby="mobility-public-title">
+        <span className={styles.eyebrow}>{t('Free tools for your next mobility task', 'आपके अगले मोबिलिटी काम के लिए मुफ़्त उपकरण')}</span>
+        <h1 id="mobility-public-title">{t('Your mobility workspace', 'आपकी मोबिलिटी कार्यशाला')}</h1>
+        <p>{t('ChallanSakshi helps you organise the facts, prepare a request and keep track of your next step. No account is required. You review the records and use the relevant official service yourself.', 'ChallanSakshi से तथ्य व्यवस्थित करें, अनुरोध तैयार करें और अगला कदम याद रखें। खाते की ज़रूरत नहीं। आप रिकॉर्ड जाँचते हैं और संबंधित आधिकारिक सेवा स्वयं उपयोग करते हैं।')}</p>
+        <h2>{t('What can you prepare here?', 'यहाँ किस काम की तैयारी कर सकते हैं?')}</h2>
+        <p>{t('Plan a challan review, payment preparation or payment follow-up; a FASTag concern; driving-licence applications and renewals; vehicle ownership transfers; replacement of a lost DL or RC; or a move to another state.', 'चालान की समीक्षा, भुगतान की तैयारी या भुगतान का फ़ॉलो-अप; FASTag की समस्या; ड्राइविंग लाइसेंस का आवेदन या नवीनीकरण; वाहन स्वामित्व हस्तांतरण; खोए DL या RC की प्रतिलिपि; या दूसरे राज्य में स्थानांतरण की तैयारी करें।')}</p>
+        <p>{t('Build an evidence checklist and an editable note. Cases stay on your private device only after you choose to save them. This workspace does not submit applications, take payments or check official case status.', 'साक्ष्य की सूची और संपादन योग्य नोट बनाएँ। केस आपके निजी डिवाइस पर तभी रहते हैं जब आप उन्हें सहेजना चुनते हैं। यह कार्यशाला आवेदन जमा नहीं करती, भुगतान नहीं लेती और आधिकारिक केस स्थिति नहीं जाँचती।')}</p>
+        <nav className={styles.publicTaskLinks} aria-label={t('Focused mobility tools', 'सीधे मोबिलिटी उपकरण')}>
+          <a href="/review">{t('Review a challan document', 'चालान दस्तावेज़ की समीक्षा करें')}<ArrowRight size={18} aria-hidden="true" /></a>
+          <a href="/fastag">{t('Check a FASTag debit', 'FASTag कटौती जाँचें')}<ArrowRight size={18} aria-hidden="true" /></a>
+          <a href="/message-check">{t('Check a suspicious message', 'संदिग्ध संदेश जाँचें')}<ArrowRight size={18} aria-hidden="true" /></a>
+          <a href="/sources">{t('Find official service links', 'आधिकारिक सेवा के लिंक देखें')}<ArrowRight size={18} aria-hidden="true" /></a>
+        </nav>
+        <p className={styles.footnote} role="status">{t('The private case editor opens here when the page finishes loading.', 'पेज लोड होने पर निजी केस संपादक यहीं खुलेगा।')}</p>
+        <noscript><p className={styles.notice}>{t('Enable JavaScript to use the case editor. The public explanations and official service directory remain available through the links above.', 'केस संपादक उपयोग करने के लिए JavaScript चालू करें। ऊपर के लिंक से सार्वजनिक जानकारी और आधिकारिक सेवा निर्देशिका पढ़ सकते हैं।')}</p></noscript>
+      </section> : <section className={`${styles.panel} ${styles.sessionEnded}`}>
         <ShieldCheck size={28} aria-hidden="true" />
         <h1 ref={clearedHeading} tabIndex={-1}>{t('This session is cleared', 'यह सत्र साफ़ हो गया')}</h1>
         <p>{t('The working forms, unsaved edits and reviews in this tab have been cleared.', 'इस टैब के कार्यरत फ़ॉर्म, बिना सहेजे बदलाव और समीक्षाएँ साफ़ हो गई हैं।')}</p>

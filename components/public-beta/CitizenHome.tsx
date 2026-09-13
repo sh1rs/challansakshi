@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   ArrowRight, ArrowUpRight, CarFront, ChevronDown, CircleHelp, ClipboardCheck,
   FileSearch, FileText, Image, Landmark, MessageSquareWarning, ReceiptText,
@@ -227,6 +228,20 @@ export default function CitizenHome({ initialLanguage = 'en' }: { initialLanguag
           <a href="/dashboard"><ClipboardCheck size={22} aria-hidden="true" /><span><strong>{language === 'hi' ? 'मेरी मोबिलिटी सूची' : 'My mobility checklist'}</strong><small>{language === 'hi' ? 'अपने निजी डिवाइस पर अगले कदम रखें।' : 'Keep next steps on your private device.'}</small></span><ArrowRight size={18} aria-hidden="true" /></a>
           <a href="/sources"><Landmark size={22} aria-hidden="true" /><span><strong>{language === 'hi' ? 'आधिकारिक स्रोत देखें' : 'Explore official sources'}</strong><small>{language === 'hi' ? 'रास्ते, समीक्षा की तारीख और सीमाएँ।' : 'Routes, review dates and limitations.'}</small></span><ArrowRight size={18} aria-hidden="true" /></a>
         </div>
+      </section>
+      <section className={styles.guides} aria-labelledby="home-guides-heading">
+        <div className={styles.sectionHeading}><h2 id="home-guides-heading">{language === 'hi' ? 'पहले पढ़ें। फिर सही कदम चुनें।' : 'Read first. Take a clearer next step.'}</h2><p>{language === 'hi' ? 'आम समस्याओं के लिए छोटे मार्गदर्शक, काम की सूचियाँ और आधिकारिक स्रोत।' : 'Practical guides, useful checklists and official sources for common problems.'}</p></div>
+        <nav className={styles.guideLinks} aria-label={language === 'hi' ? 'नागरिक मार्गदर्शक' : 'Civic guides'}>
+          <Link href="/guides/wrong-e-challan"><span>{language === 'hi' ? 'गलत ई-चालान मिला है?' : 'Received a wrong e-Challan?'}</span><ArrowUpRight size={20} aria-hidden="true" /></Link>
+          <Link href="/guides/fastag-wrong-deduction"><span>{language === 'hi' ? 'FASTag से गलत कटौती हुई?' : 'An unexpected FASTag deduction?'}</span><ArrowUpRight size={20} aria-hidden="true" /></Link>
+          <Link href="/guides/fake-challan-message"><span>{language === 'hi' ? 'चालान का संदेश संदिग्ध है?' : 'Does that challan message look suspicious?'}</span><ArrowUpRight size={20} aria-hidden="true" /></Link>
+        </nav>
+        <Link className={styles.guideHub} href="/guides">{language === 'hi' ? 'सभी मार्गदर्शक देखें' : 'Browse all guides'}<ArrowRight size={18} aria-hidden="true" /></Link>
+      </section>
+      <section className={styles.projectOverview} aria-labelledby="home-about-heading">
+        <h2 id="home-about-heading">{language === 'hi' ? 'ChallanSakshi क्या है?' : 'What is ChallanSakshi?'}</h2>
+        <p>{language === 'hi' ? 'ChallanSakshi भारत में ई-चालान और FASTag समस्याएँ समझने के लिए एक मुफ़्त, स्वतंत्र नागरिक उपकरण है। Shourya Banda (sh1rs) द्वारा निर्मित, यह अपने रिकॉर्ड जाँचने, अनुरोध तैयार करने और उचित आधिकारिक सेवा ढूँढने में मदद करता है। बिना खाते के शुरू करें; आपके दस्तावेज़ आपके डिवाइस पर पढ़े जाते हैं।' : 'ChallanSakshi is a free, independent civic tool for e-Challan and FASTag issues in India. Built by Shourya Banda (sh1rs), it helps you review your records, prepare a clear request and find the right official service. Start without an account; your documents are read on your device.'}</p>
+        <a href="/about">{language === 'hi' ? 'परियोजना और इसकी सीमाएँ जानें' : 'About the project and its limits'}<ArrowRight size={18} aria-hidden="true" /></a>
       </section>
     </main>
     <CitizenFooter language={language} />

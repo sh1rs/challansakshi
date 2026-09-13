@@ -8,6 +8,8 @@
 
 Understand an e-Challan, compare your own records, check a suspicious message, prepare a FASTag query, or organise a mobility case. Start without signing up. The document reader runs in your browser; you review extracted facts before using them. ChallanSakshi is independent of government authorities, police, courts, banks and FASTag issuers. You choose and complete every official action yourself.
 
+Start with a practical guide: [Wrong e-Challan](https://challansakshi.sh1rs.com/guides/wrong-e-challan) · [Unexpected FASTag deduction](https://challansakshi.sh1rs.com/guides/fastag-wrong-deduction) · [Suspicious challan SMS](https://challansakshi.sh1rs.com/guides/fake-challan-message). Each guide includes a checklist, official references and a link into the free tool, in English and Hindi.
+
 - `/review` — local PDF/image reading, source-linked fields, independent-record comparison, corrections and a neutral review note;
 - `/manual/challan` — a guided review when you cannot use a document;
 - `/fastag` — transaction comparison and preparation for the appropriate support route;

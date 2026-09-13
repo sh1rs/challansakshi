@@ -3,6 +3,25 @@ import { expect, test } from '@playwright/test';
 const CASES = 'challansakshi-mobility-cases-v1';
 const ENDED = 'challansakshi-mobility-session-ended-v1';
 
+test.describe('public mobility first load without JavaScript', () => {
+  test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 844 } });
+  test('shows useful preparation guidance and usable directory links before opening any private workspace', async ({ page }) => {
+    await page.goto('/mobility');
+    const main = page.locator('main');
+    await expect(main.getByRole('heading', { level: 1 })).toHaveText('Your mobility workspace');
+    await expect(main).toContainText('driving-licence applications and renewals');
+    await expect(main).toContainText('only after you choose to save them');
+    await expect(main.locator('noscript p')).toBeVisible();
+    await expect(main.locator('noscript p')).toContainText('Enable JavaScript to use the case editor.');
+    await expect(main.getByRole('link')).toHaveCount(4);
+    await expect(main.locator('input, textarea, select, button')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await main.getByRole('link', { name: 'Find official service links', exact: true }).click();
+    await expect(page).toHaveURL(/\/sources$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Know where your next step leads.');
+  });
+});
+
 test('clear session removes unsaved intake and keeps a neutral screen after reload until explicit restart', async ({ page }) => {
   const writes: string[] = []; const errors: string[] = [];
   page.on('request', request => { if (!['GET', 'HEAD'].includes(request.method())) writes.push(request.url()); });
