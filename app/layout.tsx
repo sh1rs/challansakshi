@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   applicationName: 'ChallanSakshi',
   category: 'civic technology',
   referrer: 'no-referrer',
+  verification: {
+    google: 'j2Yns6jzYbsXkJvdCs9PZNp-9C2xMcHbdiVmggFvEWk',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
