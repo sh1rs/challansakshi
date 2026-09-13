@@ -27,6 +27,7 @@ it('serves review microphone permission without widening other page capabilities
     expect(headers.get('Content-Security-Policy')).toContain("connect-src 'self';");
     expect(headers.get('Content-Security-Policy')).not.toContain("'unsafe-eval'");
     expect(headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(headers.get('Referrer-Policy')).toBe('no-referrer');
   }
   for (const path of ['/', '/demo', '/review-extra', '/api/analyze']) {
     expect((await responseHeaders(path)).get('Permissions-Policy')).toContain('microphone=()');

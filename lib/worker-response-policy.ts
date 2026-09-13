@@ -8,13 +8,15 @@ export function applyWorkerResponsePolicy(request: Request, response: Response):
   const defaults: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'Referrer-Policy': 'no-referrer',
     'Cross-Origin-Resource-Policy': 'same-origin',
   };
   if (new URL(request.url).protocol === 'https:') defaults['Strict-Transport-Security'] = 'max-age=31536000';
   for (const [name, value] of Object.entries(defaults)) {
     if (!headers.has(name)) headers.set(name, value);
   }
+  // Privacy is the application boundary even when the framework supplies a
+  // more permissive browser default.
+  headers.set('Referrer-Policy', 'no-referrer');
 
   if (apiPath(request)) {
     // An API response can carry private account or case data, including on errors.

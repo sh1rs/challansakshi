@@ -41,12 +41,14 @@ describe('public Worker security and recovery boundary', () => {
     const upstream = new Response('/* public runtime */', { headers: {
       'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=604800',
       'Content-Security-Policy': "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'self'",
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
     } });
     app.fetch.mockResolvedValueOnce(upstream);
     const response = await worker.fetch(request('/voice-assets/espeak-ng-1.49.1/espeakng.worker.js'), undefined, undefined);
     expect(response.body).toBe(upstream.body);
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=604800');
     expect(response.headers.get('Content-Security-Policy')).toBe(upstream.headers.get('Content-Security-Policy'));
+    expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
     expect(response.headers.has('X-Robots-Tag')).toBe(false);
   });
 
